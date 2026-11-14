@@ -148,8 +148,13 @@ jobs:
         if: steps.moved.outputs.skip != 'true'
         run: |
           short="${{ steps.what.outputs.short }}"
+          name=$(tools/bundle-name.sh "${{ steps.what.outputs.kind }}" "$short")
           mkdir -p build/release
-          ( cd build/bundle-windows && zip -qr "../release/chimera-win-x64-$short.zip" . )
+          # one top-level folder, named like the archive, so the zip unpacks
+          # into a directory instead of the one it was unzipped in
+          cp -r build/bundle-windows "build/$name"
+          ( cd build && zip -qr "release/$name.zip" "$name" )
+          rm -rf "build/$name"
           ( cd build/bundle-linux && tar czf "../release/chimera-linux-x64-$short.tar.gz" . )
           cp build/bundle-windows/LICENSES.md build/release/LICENSES.md
           cp build/bundle-windows/BUILD.txt build/release/BUILD.txt
@@ -162,6 +167,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           short="${{ steps.what.outputs.short }}"
+          name=$(tools/bundle-name.sh "${{ steps.what.outputs.kind }}" "$short")
           # Everything that landed since the previous build of this kind, not
           # just the top commit (issue #76): the newest release tag for a
           # nightly, the dev release's commit for dev. With nothing to measure
@@ -188,7 +194,7 @@ jobs:
             fi
             echo "| what | file |"
             echo "| --- | --- |"
-            echo "| Windows x64 | \`chimera-win-x64-$short.zip\` |"
+            echo "| Windows x64 | \`$name.zip\` |"
             echo "| Linux x64 | \`chimera-linux-x64-$short.tar.gz\` |"
             echo
             echo "Both carry the frontend and its natives. They carry **no cores**, and"

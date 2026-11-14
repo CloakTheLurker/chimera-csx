@@ -1,38 +1,36 @@
 <p align="center">
-	<a href="https://github.com/ToolAssisted-run/chimera/actions/workflows/ci.yml"><img src="https://github.com/ToolAssisted-run/chimera/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-	<a href="https://github.com/ToolAssisted-run/chimera/releases"><img src="https://img.shields.io/github/downloads/ToolAssisted-run/chimera/total?label=downloads&color=8A63E8" alt="Downloads"></a>
 	<a href="https://discord.gg/VsKDT9XB6u"><img src="https://img.shields.io/discord/1537060793894314097?logo=discord&logoColor=white&label=discord&color=5865F2" alt="toolAssisted.run on Discord"></a>
 </p>
 
 <p align="center">
 	<picture>
 		<source media="(prefers-color-scheme: dark)" srcset="docs/icon-dark.svg">
-		<img src="docs/icon.svg" alt="Chimera - four pixel modules around the beast's eye" width="140" align="middle">
+		<img src="docs/icon.svg" alt="Chimera CSX - four pixel modules around the beast's eye" width="140" align="middle">
 	</picture>
 	&nbsp;&nbsp;
 	<picture>
 		<source media="(prefers-color-scheme: dark)" srcset="docs/logotype-dark.svg">
-		<img src="docs/logotype.svg" alt="CHIMERA" width="330" align="middle">
+		<img src="docs/logotype.svg" alt="CHIMERA CSX" width="330" align="middle">
 	</picture>
 </p>
 
-<p align="center">Chimera is a modular frontend for creating tool-assisted speedruns (TAS).</p>
+<p align="center">Chimera CSX is a modular frontend for creating tool-assisted speedruns (TAS), keeping the WinForms C# frontend for convenience and stability.</p>
 
 ## Goals
 
-- **Modularity.** The frontend contains no emulation core and no system-specific knowledge. Cores are external, self-contained packages (`.chimeraCore`), each maintained in its own repository under its own license, loaded explicitly like a ROM. Chimera includes none and downloads none.
+- **Stability.** This fork keeps the WinForms C# frontend that [Chimera Nightly 2026-10-27 (e9b74216)](https://github.com/ToolAssisted-run/chimera/releases/tag/nightly-2026-10-27) shipped, instead of following upstream to a Qt window. It is the interface the existing projects, movies and hotkeys were made with, it starts on Windows with only the .NET Framework and its native libraries, and its behaviour is frozen so that work recorded against it keeps opening the same way.
+
+- **Modularity.** Emulation cores are external, self-contained packages (`.chimeraCore`), each maintained in its own repository under its own license, loaded explicitly like a ROM. The frontend contains no core and no system-specific knowledge.
 
 - **Performance.** All functional machinery (the sandbox host, movies, savestates, file formats, the running machine itself) lives in `libchimera`, a native C++ engine the GUI calls into.
 
 - **Stronger reproducibility guarantees.** Every core runs inside the [miniBox](https://github.com/ToolAssisted-run/chimera-common-minibox) sandbox, so the same project and input files play the same movie on any machine.
 
-- **Stability.** This fork keeps the WinForms C# frontend that Chimera 1.0.0 shipped, instead of following upstream to a Qt window. It is the interface the existing projects, movies and hotkeys were made with, it starts on Windows with only the .NET Framework and its native libraries, and its behaviour is frozen so that work recorded against it keeps opening the same way.
-
-Chimera is not designed for casual play. For that, use the original emulators directly, or a multi-emulation frontend such as RetroArch.
+Chimera is not designed for casual play. For that, use the original emulators directly, or a multi-emulation frontend such as [RetroArch](https://github.com/libretro/RetroArch).
 
 ## Cores
 
-Chimera does not include cores and does not download them. To use a core, download its `.chimeraCore` package from the core's own project (linked below) or build it yourself, and put it in the `Cores` folder beside Chimera.
+To use a core, download its `.chimeraCore` package (hosted on [this repository](https://github.com/CloakTheLurker/chimera-csx-cores)) or build it yourself, and put it in the `Cores` folder beside Chimera.
 
 **File > Core Manager** lists the cores in that folder and lets you point Chimera at a different one ([docs/core-manager.md](docs/core-manager.md)).
 
@@ -52,7 +50,7 @@ Chimera does not include cores and does not download them. To use a core, downlo
 | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) | Dreamcast, Sega NAOMI / NAOMI 2 (arcade), Sammy Atomiswave (arcade) |
 | [Mednafen](https://github.com/ToolAssisted-run/chimera-core-mednafen) | Sega Saturn, Sega ST-V (arcade), Virtual Boy, PC-FX, Atari Lynx |
 | [FBNeo](https://github.com/ToolAssisted-run/chimera-core-fbneo) | Capcom CPS-1 / CPS-2 / CPS-3 (arcade), Neo Geo MVS (arcade), Neo Geo CD, Sega System 16 (arcade) |
-| [MAME](https://github.com/ToolAssisted-run/chimera-core-mame) | Arcade (the arcade machines of MAME) |
+| [MAME](https://github.com/ToolAssisted-run/chimera-core-mame) | Arcade machines |
 | [MAME Home Systems](https://github.com/ToolAssisted-run/chimera-core-mamehome) | Atari 7800, Intellivision, Vectrex, Odyssey 2 / Videopac, Channel F, Amstrad CPC / CPC+ / GX4000, TI-83, BBC Micro |
 | [DuckStation](https://github.com/ToolAssisted-run/chimera-core-duckstation) | PlayStation, Namco System 11 (arcade), Konami GQ (arcade) |
 | [PCSX2](https://github.com/ToolAssisted-run/chimera-core-pcsx2) | PlayStation 2 |
@@ -110,31 +108,17 @@ SRB2 is published by its author, P-AS, from their own repository.
 
 The frontend is built for Linux and Windows and published here:
 
-- [**Latest development build**](https://github.com/ToolAssisted-run/chimera/releases/tag/dev) - rebuilt on every change to `main` that passes the gates, and replaced each time. Nothing is published that did not pass them. **Not for submissions:** a dev build is replaced on every change, so it may stop being downloadable and a movie made on it can stop being replayable. Do not use one to produce a TAS for submission to toolAssisted.run - use a nightly.
-- [**Nightly builds**](https://github.com/ToolAssisted-run/chimera/releases) - dated, immutable, and kept forever. Cite one of these in a bug report or beside a movie: a run is only reproducible while the build that recorded it still exists, and this is what a TAS submitted to toolAssisted.run should be made on.
+- [**Nightly builds**](https://github.com/CloakTheLurker/chimera-csx/releases) - dated, immutable, and kept forever. A run is only reproducible while the build that recorded it still exists, and this is what a TAS submitted to toolAssisted.run should be made on.
 
-A bundle carries no cores, and Chimera never reaches the network - it downloads
-nothing, not a core and not a list of them. To set one up:
+A bundle carries no cores, and Chimera never reaches the network - it downloads nothing, not a core and not a list of them. To set one up:
 
 1. Download a build above and unpack it.
-2. Download the `.chimeraCore` package of each core you want from that core's
-   releases page (the [Cores](#cores) tables link them), or build it.
+2. Download the `.chimeraCore` package of each core you want from that core's releases page (the [Cores](#cores) tables link them), or build it.
 3. Put the packages in the `Cores` folder beside `Chimera.exe`, and start Chimera.
 
-Each core publishes a `dev` build and nightly releases the same way, and its
-nightlies are never deleted - which is what lets a movie name the exact package
-that recorded it and still be replayable years later.
+Each core publishes a nightly release the same way, and its nightlies are never deleted - which is what lets a movie name the exact package that recorded it and still be replayable years later.
 
-Every bundle carries `BUILD.txt`, naming the exact commit it was built from, and
-`LICENSES.md`, stating its terms. **Adding a core adds that core's terms**,
-and some of them (Genesis Plus GX, Opera, Snes9x) forbid commercial use, which
-binds whatever they are installed into; Chimera shows a core's licence once it
-is in the folder.
-
-Core packages published before the split are kept in the
-[`cores`](https://github.com/ToolAssisted-run/chimera/releases/tag/cores)
-release, named by SHA1. It no longer grows - each core archives its own now -
-but movies recorded then still cite packages in it.
+Every bundle carries `BUILD.txt`, naming the exact commit it was built from, and `LICENSES.md`, stating its terms. **Adding a core adds that core's terms**, and some of them (Genesis Plus GX, Opera, Snes9x) forbid commercial use, which binds whatever they are installed into; Chimera shows a core's licence once it is in the folder.
 
 ## Working with an AI agent
 
@@ -143,8 +127,7 @@ An AI agent (Claude Code, or any program that speaks MCP) can look at the projec
 ## Building
 
 The canonical build is Linux-hosted and meson-mediated, and produces the artifacts for both operating systems: the managed frontend is built once (platform-neutral IL, .NET Framework on Windows / Mono on Linux), and every native library is built twice: gcc for Linux, mingw-w64 cross for Windows. Clone with `--recursive`; the repository contains no precompiled binaries, and
-no cores - `tools/fetch-cores.sh` puts the published ones in `build/Cores` if
-you want a working set without opening the frontend.
+no cores - `tools/fetch-cores.sh` puts the published ones in `build/Cores` if you want a working set without opening the frontend.
 
 ```
 meson setup build/meson-linux   --prefix "$(pwd)/build" --libdir dll
@@ -156,8 +139,7 @@ meson compile -C build/meson-linux frontend   # the managed solution (dotnet)
 
 Linux requirements: meson, ninja, cmake, gcc, mingw-w64, and Microsoft's own .NET SDK binary (`curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 8.0`); distro-built SDKs omit the WindowsDesktop targets the net48/WinForms frontend needs.
 
-The frontend ships no cores, so get at least one before running it - either the
-published packages, or a core repository cloned wherever you like:
+The frontend ships no cores, so get at least one before running it - either the published packages, or a core repository cloned wherever you like:
 
 ```
 tools/fetch-cores.sh                                # every published core -> build/Cores
@@ -177,32 +159,16 @@ Open an issue on this repository, whichever core it concerns - one inbox,
 and the issue template asks for what a fix needs. What settles most
 reports before anybody opens a debugger:
 
-- **Help > Report an Issue** shows the link to the report form and fills in
-  its first lines for you: build, core, system, processor and memory, files
-  and changed settings.
-  It can also save the files worth attaching as one zip.
-- **The build strings.** Help > Copy Version Info puts the frontend's build
-  and the running core's version on the clipboard, in the template's words.
-  A frontend and a core from different days may not
-  understand each other's states, so before reporting a save/load problem,
-  match them.
-- **The project file.** A `.chimeraProject` is small and names every file
-  by hash, so attach it rather than describing it.
-- **The three crash files.** When Chimera or a core dies it writes a crash
-  note and a minidump, `<date> pid<N>.txt` and `.dmp`, into the `Crashes`
-  folder of the data directory (Config > Data Directory... opens it;
-  `%LOCALAPPDATA%\Chimera` by default on Windows), and the sandbox writes
-  `minibox-diag.log` next to `Chimera.exe`. Attach all three: the note
-  carries the faulting instruction and the machine's last words, and two of
-  three crashes in one recent report were fixed off those files alone.
-- **The core's log.** Tools > Export Core Log... keeps everything the core
-  says in a file you choose; it is off until asked for, and reboots the core
-  so the log starts at boot. Use it again to turn it off, and attach the file.
+- **Help > Report an Issue** shows the link to the report form and fills in its first lines for you: build, core, system, processor and memory, files and changed settings. It can also save the files worth attaching as one zip.
+- **The build strings.** Help > Copy Version Info puts the frontend's build and the running core's version on the clipboard, in the template's words. A frontend and a core from different days may not understand each other's states, so before reporting a save/load problem, match them.
+- **The project file.** A `.chimeraProject` is small and names every file by hash, so attach it rather than describing it.
+- **The three crash files.** When Chimera or a core dies it writes a crash note and a minidump, `<date> pid<N>.txt` and `.dmp`, into the `Crashes` folder of the data directory (Config > Data Directory... opens it; `%LOCALAPPDATA%\Chimera` by default on Windows), and the sandbox writes `minibox-diag.log` next to `Chimera.exe`. Attach all three: the note carries the faulting instruction and the machine's last words, and two of three crashes in one recent report were fixed off those files alone.
+- **The core's log.** Tools > Export Core Log... keeps everything the core says in a file you choose; it is off until asked for, and reboots the core so the log starts at boot. Use it again to turn it off, and attach the file.
 
 ## Contributing
 
-Pull requests are welcome, from people and from people working with AI assistants alike. A contribution is judged on its merits: it should build, pass the witness gate, and keep to the project's scope. The one firm requirement is legal cleanliness: you must have the right to submit the code under this repository's MIT license, and anything derived from other works must respect their licenses and carry the attribution they require.
+A contribution is judged on its merits: it should build, pass the witness gate, and keep to the project's scope. The one firm requirement is legal cleanliness: you must have the right to submit the code under this repository's MIT license, and anything derived from other works must respect their licenses and carry the attribution they require.
 
 ## Credits and license
 
-**Chimera is a derivative of [BizHawk](https://github.com/TASEmulators/BizHawk).** Chimera is provided under the MIT License, preserving the BizHawk team's copyright; see [LICENSE](LICENSE) for the terms and [NOTICE](NOTICE) for whose work it is and what the terms do not cover: the native libraries built from `extern/`, the vendored test suite, and why core packages carry their own licenses. The people behind Chimera itself are in [CREDITS.md](CREDITS.md).
+**Chimera CSX is a fork of [Chimera](https://github.com/ToolAssisted-run/chimera), a derivative of [BizHawk](https://github.com/TASEmulators/BizHawk).** Chimera CSX is provided under the MIT License, preserving the BizHawk team's copyright; see [LICENSE](LICENSE) for the terms and [NOTICE](NOTICE) for whose work it is and what the terms do not cover: the native libraries built from `extern/`, the vendored test suite, and why core packages carry their own licenses. The people behind Chimera CSX itself are in [CREDITS.md](CREDITS.md).

@@ -122,7 +122,7 @@ namespace Chimera.Client.Common
 				using var package = EnginePackage.Open(packagePath);
 				var json = package?.EntryText(WaterboxCoreFactory.ConfigFileName);
 				if (string.IsNullOrWhiteSpace(json)) return ([ ], new JArray());
-				var cfg = WaterboxConfig.FromJson(json!);
+				var cfg = WaterboxConfig.FromJson(json!, CoreLanguageTable.Parse(package?.EntryText(CoreLanguageTable.EnglishPath)));
 				if (cfg is null) return ([ ], new JArray());
 				JArray raw;
 				try

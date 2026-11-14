@@ -316,7 +316,7 @@ namespace Chimera.Client.Common
 					? System.IO.Path.GetFileName(full.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar))
 					: System.IO.Path.GetFileNameWithoutExtension(full);
 				return package.IsWaterbox
-					? FromWaterboxConfig(full, package.Sha1, fallbackName, package.EntryText(WaterboxCoreFactory.ConfigFileName)!)
+					? FromWaterboxConfig(full, package.Sha1, fallbackName, package.EntryText(WaterboxCoreFactory.ConfigFileName)!, CoreLanguageTable.Parse(package.EntryText(CoreLanguageTable.EnglishPath)))
 					: FromManifest(full, package.Sha1, fallbackName, package.EntryText(CorePackageManifest.FILE_NAME)!);
 			}
 			catch (Exception ex)
@@ -330,9 +330,9 @@ namespace Chimera.Client.Common
 			}
 		}
 
-		private static DiscoveredCorePackage FromWaterboxConfig(string path, string? sha1, string fallbackName, string json)
+		private static DiscoveredCorePackage FromWaterboxConfig(string path, string? sha1, string fallbackName, string json, IReadOnlyDictionary<string, string>? texts)
 		{
-			var cfg = WaterboxConfig.FromJson(json)
+			var cfg = WaterboxConfig.FromJson(json, texts)
 				?? throw new InvalidOperationException($"{WaterboxCoreFactory.ConfigFileName} is empty or invalid");
 			var systems = cfg.SystemIds;
 			if (systems.Count is 0)

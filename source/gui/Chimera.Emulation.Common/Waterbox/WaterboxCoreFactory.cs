@@ -22,7 +22,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		public WaterboxCoreFactory(string packageDir)
 		{
 			_packageDir = packageDir;
-			_cfg = WaterboxConfig.FromJson(File.ReadAllText(Path.Combine(packageDir, ConfigFileName)))
+			_cfg = WaterboxConfig.FromJson(File.ReadAllText(Path.Combine(packageDir, ConfigFileName)), CoreLanguageTable.FromDirectory(packageDir))
 				?? throw new InvalidOperationException($"{ConfigFileName} is empty or invalid");
 			// before anything else is read out of it: a package from the far side of an
 			// ABI change may declare fields this build has no idea how to interpret, so

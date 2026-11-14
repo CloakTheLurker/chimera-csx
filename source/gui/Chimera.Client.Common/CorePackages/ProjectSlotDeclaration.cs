@@ -3,6 +3,8 @@
 using System.Collections.Generic;
 using System.Linq;
 
+using Chimera.Emulation.Common.Waterbox;
+
 using Newtonsoft.Json.Linq;
 
 namespace Chimera.Client.Common
@@ -67,7 +69,7 @@ namespace Chimera.Client.Common
 		public IReadOnlyList<IReadOnlyList<string>> AtLeastOneOf { get; private init; } = [ ];
 
 		/// <returns>null when the text is not a usable declaration</returns>
-		public static ProjectSlotDeclaration? Parse(string? json)
+		public static ProjectSlotDeclaration? Parse(string? json, IReadOnlyDictionary<string, string>? texts = null)
 		{
 			if (json is not { } text || string.IsNullOrWhiteSpace(text)) return null;
 			try
@@ -82,15 +84,15 @@ namespace Chimera.Client.Common
 					parsed.Add(new Slot
 					{
 						Id = id!,
-						Title = item.Value<string>("title") ?? id!,
+						Title = CoreLanguageTable.Resolve(texts, item.Value<string>("title")) ?? id!,
 						Min = item.Value<int?>("min") ?? 0,
 						Max = item.Value<int?>("max") ?? -1,
 						Formats = item["formats"] is JArray formats
 							? formats.Values<string>().OfType<string>().ToList()
 							: [ ],
-						Help = item.Value<string>("help") ?? "",
+						Help = CoreLanguageTable.Resolve(texts, item.Value<string>("help")) ?? "",
 						NamePattern = item.Value<string>("namePattern"),
-						NameHelp = item.Value<string>("nameHelp") ?? "",
+						NameHelp = CoreLanguageTable.Resolve(texts, item.Value<string>("nameHelp")) ?? "",
 						SettingGatedOnly = item["exposedWhen"] is JToken when && ReadsOnlySettings(when),
 					});
 				}

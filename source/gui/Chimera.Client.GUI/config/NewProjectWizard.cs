@@ -1707,16 +1707,18 @@ namespace Chimera.Client.GUI
 
 
 			string? declarationJson = null;
+			IReadOnlyDictionary<string, string>? texts = null;
 			try
 			{
 				using var pkg = EnginePackage.Open(core.Path);
 				declarationJson = pkg?.EntryText("file_slots.json");
+				texts = CoreLanguageTable.Parse(pkg?.EntryText(CoreLanguageTable.EnglishPath));
 			}
 			catch (InvalidOperationException)
 			{
 				// unreadable package: the message below covers it
 			}
-			_declaration = ProjectSlotDeclaration.Parse(declarationJson);
+			_declaration = ProjectSlotDeclaration.Parse(declarationJson, texts);
 			if (_declaration is null)
 			{
 				_status.Text = $"{core.Name} declares no file form (no usable file_slots.json in the package)";

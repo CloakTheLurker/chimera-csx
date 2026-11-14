@@ -1017,11 +1017,70 @@ namespace Chimera.Emulation.Common.Waterbox
 			return result;
 		}
 
-		public static WaterboxConfig? FromJson(string json)
+		/// <summary>
+		/// Applies a core package's text table to the declarations that name a
+		/// key. A package built before the cut has no table and holds words, so
+		/// it is unchanged; a key with no entry keeps the key.
+		/// </summary>
+		public void ApplyTexts(IReadOnlyDictionary<string, string>? texts)
+		{
+			if (texts is null || texts.Count is 0) return;
+			string? T(string? text) => CoreLanguageTable.Resolve(texts, text);
+			void ResolveInput(InputConfig? input)
+			{
+				if (input is null) return;
+				input.Name = T(input.Name);
+				if (input.PlayerNames is not null)
+				{
+					foreach (var key in input.PlayerNames.Keys.ToList())
+						input.PlayerNames[key] = T(input.PlayerNames[key])!;
+				}
+			}
+			void ResolveSetting(SettingDecl decl)
+			{
+				decl.Display = T(decl.Display);
+				decl.Description = T(decl.Description);
+				if (decl.OptionLabels is not null)
+				{
+					foreach (var key in decl.OptionLabels.Keys.ToList())
+						decl.OptionLabels[key] = T(decl.OptionLabels[key])!;
+				}
+			}
+			CoreName = T(CoreName);
+			if (SystemNames is not null)
+			{
+				foreach (var id in SystemNames.Keys.ToList()) SystemNames[id] = T(SystemNames[id])!;
+			}
+			ResolveInput(Input);
+			if (Machines is not null)
+			{
+				foreach (var machine in Machines)
+				{
+					machine.Label = T(machine.Label);
+					ResolveInput(machine.Input);
+				}
+			}
+			if (Firmware is not null)
+			{
+				foreach (var decl in Firmware)
+				{
+					decl.Display = T(decl.Display);
+					decl.Description = T(decl.Description);
+					decl.Label = T(decl.Label);
+				}
+			}
+			if (Settings is not null)
+			{
+				foreach (var decl in Settings) ResolveSetting(decl);
+			}
+		}
+
+		public static WaterboxConfig? FromJson(string json, IReadOnlyDictionary<string, string>? texts = null)
 		{
 			var cfg = JsonConvert.DeserializeObject<WaterboxConfig>(json);
 			if (cfg is not null)
 			{
+				cfg.ApplyTexts(texts);
 				try
 				{
 					var root = Newtonsoft.Json.Linq.JObject.Parse(json);

@@ -11188,3 +11188,21 @@ history (it failed with the loader emptying first); the earlier check that
 a history in an older format is dropped without the list now finds the
 states held kept. The MCP agent run against the cache that broke it: every
 check passed (before: every seek back answered "interrupted").
+
+## Chimera CSX reads a core's own configuration words (2026-11-14, owner)
+
+A core built after nightly-2026-10-27 names its settings, file slots and
+firmware text by key (for example "setting.machine.display") and carries the
+words in languages/en.json inside its package. The C# window showed the keys.
+It now reads that table from the zip or the extracted folder and resolves the
+keys when the config is parsed, so the wizard, the settings window, the
+firmware survey and TAStudio see words: setting labels and descriptions,
+option labels, system and player names, firmware text, and a slot's title,
+help and name help.
+
+A package built before the cut has no table and its declarations already hold
+words, so it is unchanged. A key with no entry keeps the key, which is what an
+older frontend showed and what tells a core author the table is missing. The
+engine's own text keys (upstream 999f79dd and 7013a849) are not part of this:
+they rewrite every engine text and the Qt window, and this window has no
+keyed-text interface to show them.

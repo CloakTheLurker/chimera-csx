@@ -124,6 +124,7 @@ namespace Chimera.Client.Common
 			EmulationLuaLibrary.FrameAdvanceCallback = FrameAdvance;
 			EmulationLuaLibrary.YieldCallback = EmuYield;
 			BranchLoadEvents.Loaded += CallLoadStateEvent;
+			ScriptUserData.Set(this, CaptureUserData, RestoreUserData);
 		}
 
 		private ApiContainer _apiContainer;
@@ -260,9 +261,33 @@ namespace Chimera.Client.Common
 			}
 		}
 
+		/// <summary>The scripts' userdata, as the text a branch keeps (issue 534).</summary>
+		private string CaptureUserData()
+		{
+			var api = _apiContainer.UserData;
+			List<KeyValuePair<string, object?>> bag = new();
+			foreach (var key in api.Keys)
+			{
+				bag.Add(new(key, api.Get(key)));
+			}
+			return UserDataText.Serialize(bag);
+		}
+
+		/// <summary>A branch's bag put back, before its event.onloadstate functions run.</summary>
+		private void RestoreUserData(string text)
+		{
+			var api = _apiContainer.UserData;
+			api.Clear();
+			foreach (var pair in UserDataText.Parse(text))
+			{
+				api.Set(pair.Key, pair.Value);
+			}
+		}
+
 		public void Close()
 		{
 			BranchLoadEvents.Loaded -= CallLoadStateEvent;
+			ScriptUserData.Clear(this);
 			foreach (LuaFile file in ScriptList)
 			{
 				foreach (var closeCallback in file.Functions

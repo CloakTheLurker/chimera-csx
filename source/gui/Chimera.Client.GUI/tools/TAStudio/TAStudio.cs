@@ -1389,7 +1389,11 @@ namespace Chimera.Client.GUI
 				BranchLoadedCallback?.Invoke(branchIndex.Value);
 				if (branchIndex.Value >= 0 && branchIndex.Value < CurrentTasMovie.Branches.Count)
 				{
-					BranchLoadEvents.Raise(CurrentTasMovie.Branches[branchIndex.Value].UserText ?? "");
+					var branch = CurrentTasMovie.Branches[branchIndex.Value];
+					// issue 534: the branch's scripts' bag goes back before its
+					// event.onloadstate functions hear the branch's name
+					ScriptUserData.RestoreText(branch.UserData);
+					BranchLoadEvents.Raise(branch.UserText ?? "");
 				}
 			}
 			UpdateTools();

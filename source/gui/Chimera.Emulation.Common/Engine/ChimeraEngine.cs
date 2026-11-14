@@ -428,6 +428,12 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract void ce_project_branch_marker_add(IntPtr project, int branch, long frame, string text, int keepState);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_branch_userdata(IntPtr project, int index);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_branch_set_userdata(IntPtr project, int index, string? text);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_header_count(IntPtr project);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -2083,6 +2089,14 @@ namespace Chimera.Emulation.Common.Engine
 			=> ChimeraEngine.Instance.ce_project_branch_marker_keep_state(_project, branch, index) is not 0;
 		public void BranchMarkerAdd(int branch, long frame, string text, bool keepState = true)
 			=> ChimeraEngine.Instance.ce_project_branch_marker_add(_project, branch, frame, text, keepState ? 1 : 0);
+
+		/// <summary>The scripts' userdata a branch keeps (issue 534), or null when it keeps none.</summary>
+		public string? BranchUserdata(int index)
+			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_branch_userdata(_project, index));
+
+		/// <summary>null keeps none; "" keeps an empty bag, which is not the same.</summary>
+		public void SetBranchUserdata(int index, string? text)
+			=> ChimeraEngine.Instance.ce_project_branch_set_userdata(_project, index, text);
 
 		public int HeaderCount => ChimeraEngine.Instance.ce_project_header_count(_project);
 		public string HeaderKeyAt(int index)

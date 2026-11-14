@@ -688,6 +688,13 @@ CE_API const char *ce_project_branch_marker_text(const ce_project *p, int32_t br
 CE_API int32_t ce_project_branch_marker_keep_state(const ce_project *p, int32_t branch, int32_t index);
 CE_API void ce_project_branch_marker_add(ce_project *p, int32_t branch, int64_t frame, const char *text, int32_t keep_state);
 
+/* What the frontend keeps with a branch for the scripts (their userdata,
+ * issue 534), as text the engine carries verbatim: null for a branch that
+ * keeps none (one made before, or by something with no scripts), which is not
+ * the same as "" (kept, and empty). Set to null to keep none. */
+CE_API const char *ce_project_branch_userdata(const ce_project *p, int32_t index);
+CE_API void ce_project_branch_set_userdata(ce_project *p, int32_t index, const char *text);
+
 /* The headers map: movie metadata the format does not first-class (Author,
  * emulator version, platform facts) as ordered verbatim key/value pairs.
  * set with a NULL value removes; a new key appends. */

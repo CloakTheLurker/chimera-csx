@@ -45,6 +45,14 @@ namespace Chimera.Client.Common
 		public Guid Uuid { get; set; }
 		public string UserText { get; set; }
 
+		/// <summary>
+		/// The scripts' userdata kept with this branch (issue 534), as the Lua
+		/// engine wrote it: text the frontend carries and puts back before
+		/// event.onloadstate; null when the branch keeps none, which is not the
+		/// same as "" (kept, and empty).
+		/// </summary>
+		public string UserData { get; set; }
+
 		internal ForSerialization ForSerial => new(Frame, TimeStamp, Uuid);
 
 		public TasBranch Clone() => (TasBranch)MemberwiseClone();

@@ -11237,3 +11237,18 @@ advertised, which is the same refusal as before.
 
 What is still missing from issue 534's batch: a branch's scripts' userdata in the
 project, and the C# MCP tool surface. The batch is not tagged until they are in.
+
+## Chimera CSX's branches keep a script's userdata (2026-11-14)
+
+A branch made while the Lua Console is open keeps the scripts' userdata bag as
+one text, in the project's branch entry (a "userdata" string the engine carries
+verbatim; "" is a kept, empty bag and null is none). Loading a branch puts it
+back before event.onloadstate runs, so a script that counts hits across branches
+sees the count of the branch it loaded. A branch made with no Lua Console keeps
+none, and a project from before this keeps none for all its branches.
+
+The text is Chimera CSX's own: a line a value with its kind, every byte outside
+letters, digits, dot, underscore and hyphen written %XX, and a fraction as its
+64-bit pattern in hex so -0.0, NaN and the infinities come back exactly.
+Upstream's view model writes %a fractions, which .NET does not; the engine never
+parses the text, so the format is the frontend's to choose.

@@ -461,6 +461,7 @@ namespace Chimera.Client.Common
 					branch.TimeStamp.ToString("o", CultureInfo.InvariantCulture),
 					JoinLogLines(branch.InputLog));
 				var index = p.BranchCount - 1;
+				if (branch.UserData is not null) p.SetBranchUserdata(index, branch.UserData);
 				if (branch.Markers is null) continue;
 				foreach (var marker in branch.Markers)
 				{
@@ -834,6 +835,7 @@ namespace Chimera.Client.Common
 				{
 					Frame = checked((int)p.BranchFrame(i)),
 					UserText = p.BranchName(i),
+					UserData = p.BranchUserdata(i),
 					ChangeLog = new TasMovieChangeLog(this) { MaxSteps = ChangeLog.MaxSteps },
 					InputLog = StringLogUtil.MakeStringLog(),
 					Markers = new TasMovieMarkerList(this),

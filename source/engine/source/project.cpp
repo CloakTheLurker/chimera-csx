@@ -88,6 +88,9 @@ struct Branch
 	std::string time; // carried verbatim (the frontend's timestamp text); "" = none
 	std::string log;
 	std::vector<Marker> markers;
+	/* the scripts' userdata kept with it (issue 534), the frontend's text */
+	bool hasUserdata = false;
+	std::string userdata;
 };
 
 const char *fail(std::string message, const char **error_out)
@@ -486,12 +489,13 @@ static ce_project *openProject(const char *path, const char **error_out)
 		if (!cJSON_IsArray(j)) return rejectP("\"branches\" is not an array");
 		for (cJSON *item = j->child; item != nullptr; item = item->next)
 		{
-			if (const char *k = unknownKey(item, { "name", "frame", "input", "time", "markers" })) return rejectP(std::string("unknown key \"") + k + "\" in a branch");
+			if (const char *k = unknownKey(item, { "name", "frame", "input", "time", "markers", "userdata" })) return rejectP(std::string("unknown key \"") + k + "\" in a branch");
 			cJSON *name = cJSON_GetObjectItemCaseSensitive(item, "name");
 			cJSON *frame = cJSON_GetObjectItemCaseSensitive(item, "frame");
 			cJSON *input = cJSON_GetObjectItemCaseSensitive(item, "input");
 			cJSON *time = cJSON_GetObjectItemCaseSensitive(item, "time");
 			cJSON *markers = cJSON_GetObjectItemCaseSensitive(item, "markers");
+			cJSON *userdata = cJSON_GetObjectItemCaseSensitive(item, "userdata");
 			if (!cJSON_IsString(name) || !cJSON_IsNumber(frame) || !cJSON_IsString(input))
 			{
 				return rejectP("every branch needs string \"name\", number \"frame\" and string \"input\"");
@@ -504,6 +508,12 @@ static ce_project *openProject(const char *path, const char **error_out)
 			{
 				if (!cJSON_IsString(time)) return rejectP("a branch's \"time\" is not a string");
 				b.time = time->valuestring;
+			}
+			if (userdata != nullptr)
+			{
+				if (!cJSON_IsString(userdata)) return rejectP("a branch's \"userdata\" is not a string");
+				b.hasUserdata = true;
+				b.userdata = userdata->valuestring;
 			}
 			if (markers != nullptr)
 			{
@@ -642,6 +652,7 @@ int32_t ce_project_save(ce_project *p, const char *path, const char **error_out)
 		cJSON_AddStringToObject(item, "name", b.name.c_str());
 		cJSON_AddNumberToObject(item, "frame", static_cast<double>(b.frame));
 		if (!b.time.empty()) cJSON_AddStringToObject(item, "time", b.time.c_str());
+		if (b.hasUserdata) cJSON_AddStringToObject(item, "userdata", b.userdata.c_str());
 		cJSON_AddStringToObject(item, "input", b.log.c_str());
 		if (!b.markers.empty())
 		{
@@ -914,6 +925,19 @@ void ce_project_branch_add(ce_project *p, const char *name, int64_t frame, const
 	b.time = time != nullptr ? time : "";
 	if (log_text != nullptr) b.log.assign(log_text, static_cast<size_t>(len));
 	p->branches.push_back(std::move(b));
+}
+
+const char *ce_project_branch_userdata(const ce_project *p, int32_t index)
+{
+	if (index < 0 || index >= ce_project_branch_count(p) || !p->branches[index].hasUserdata) return nullptr;
+	return p->branches[index].userdata.c_str();
+}
+
+void ce_project_branch_set_userdata(ce_project *p, int32_t index, const char *text)
+{
+	if (index < 0 || index >= ce_project_branch_count(p)) return;
+	p->branches[index].hasUserdata = text != nullptr;
+	p->branches[index].userdata = text != nullptr ? text : "";
 }
 
 void ce_project_branch_remove(ce_project *p, int32_t index)

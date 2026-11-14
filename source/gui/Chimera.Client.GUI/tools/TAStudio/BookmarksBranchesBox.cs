@@ -170,6 +170,7 @@ namespace Chimera.Client.GUI
 			var branch = CreateBranch();
 			Movie.Branches.NewBranchText = ""; // reset every time it's used
 			Branches.Add(branch);
+			branch.UserData = ScriptUserData.CaptureText(); // issue 534: the scripts' bag as it is now
 			BranchView.RowCount = Branches.Count;
 			Branches.Current = Branches.Count - 1;
 			Movie.TasSession.UpdateValues(Tastudio.Emulator.Frame, Branches.Current);

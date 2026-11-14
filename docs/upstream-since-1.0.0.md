@@ -188,17 +188,17 @@ These 16 bump miniBox or another submodule. A sandbox change can change how a co
 | 4fa77daa | Revert "revert: "feat(gui): a game opens only in a project"" |
 
 
-## Port batches and the tags they would carry
+## Port batches and the tags they carry
 
-The historical rule applies: a major feature starts a minor version and a smaller feature or fix is a patch. A version tag has to point at a commit in this fork, so none is created until its batch is ported, built and tested the way 1.0.0 was. The names are fixed here so the work and the release cannot disagree.
+The historical rule applies: a major feature starts a minor version and a smaller feature or fix is a patch. A version tag points at a commit in this fork, so it is made when its batch is ported, built and tested. The project format batch is deliberately not implemented (owner, 2026-11-14): it would change the files the C# client writes, and the fork keeps those stable.
 
-| Tag | Kind | Batch | What lands | Precondition |
+| Tag | Kind | Batch | What lands | State |
 | --- | --- | --- | --- | --- |
-| 1.0.1 | patch | engine fixes | the self-contained engine fixes: 6277b09c and the ported c9d78d33, 25848631, af99c84b; no format change | engine tests pass; C# builds; a recorded movie still plays |
-| 1.1.0 | minor | languages | core texts as keys and tables: 8ee74abf, d460b63b, f621249b and the engine half of 999f79dd/7013a849 | engine tests; the C# window shows the same texts |
-| 1.2.0 | minor | project format | project input as columns and entries (c8ae2b47), the zip project format (08ee9de1), the old input string dropped (66d6a944) | C# project open/save and TAStudio work; old projects still open |
-| 1.3.0 | minor | MCP and Lua | engine-side MCP tools and Lua memory callbacks (06066f3c, 52dea77b and the MCP batch) | engine tests; chimera-mcp talks to the C# window |
-| 1.4.0 | minor | cores | the nine roster commits, once each core has a package built against the 1.0.x engine | each package loads and runs in the C# window |
+| 1.0.1 | patch | engine fixes | 6277b09c (build info) and 25848631 (a history of another machine leaves the greenzone as it was). c9d78d33, the Windows anchor fix, is held back: it needs later threading work from upstream and fails the state history test on this tree | done: state history passes and the Windows cross-build passes; C# builds. media and sha1 fail on this case-insensitive, 9p checkout for filesystem reasons, not from these changes |
+| 1.1.0 | minor | player names | ed955dfb, made for chimera-core-unrealspeccyp: a package's input declaration may name its player groups, and TAStudio's column menu and Show toggle use those names instead of "Player n" | done: C# builds; the declaration reaches ControllerDefinition; not opened in a window |
+| 1.2.0 | minor | languages | core texts as keys and tables: 8ee74abf, d460b63b, f621249b, af99c84b and the engine half of 999f79dd/7013a849 | next |
+| 1.3.0 | minor | MCP and Lua | engine-side MCP tools and Lua memory callbacks (06066f3c, 52dea77b and the MCP batch) | not started |
+| 1.4.0 | minor | cores | the nine roster commits, once each core has a package built against the 1.0.x engine | not started |
 
 ## Appendix: every commit
 

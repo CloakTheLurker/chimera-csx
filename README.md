@@ -26,6 +26,8 @@
 
 - **Stronger reproducibility guarantees.** Every core runs inside the [miniBox](https://github.com/ToolAssisted-run/chimera-common-minibox) sandbox, so the same project and input files play the same movie on any machine.
 
+- **Stability.** This fork keeps the WinForms C# frontend that Chimera 1.0.0 shipped, instead of following upstream to a Qt window. It is the interface the existing projects, movies and hotkeys were made with, it starts on Windows with only the .NET Framework and its native libraries, and its behaviour is frozen so that work recorded against it keeps opening the same way.
+
 Chimera is not designed for casual play. For that, use the original emulators directly, or a multi-emulation frontend such as RetroArch.
 
 ## Cores

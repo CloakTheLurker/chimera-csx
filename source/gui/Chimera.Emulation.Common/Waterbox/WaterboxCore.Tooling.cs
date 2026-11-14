@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -22,13 +23,15 @@ namespace Chimera.Emulation.Common.Waterbox
 	/// a 6502 is. Absent exports simply mean the tool is unavailable for that core,
 	/// which the service provider communicates by not registering the service.
 	/// </summary>
-	public sealed partial class WaterboxCore : IDebuggable, ITraceable, ICoreSurfaces, ICoreSaveData
+	public sealed partial class WaterboxCore : IDebuggable, ITraceable, ICoreSurfaces, ICoreSaveData, IMemoryCallbackReplaceable
 	{
 		private string[] _surfaceNames = [ ];
 		private int[][] _surfaceBuffs = [ ];
 		private string[] _regNames = [ ];
 		private ITraceSink? _traceSink;
 		private bool _traceOverflowed;
+		private MemoryCallbackSystem? _memoryCallbacks;
+		private string[] _memoryScopes = [ ];
 
 		/// <summary>
 		/// Reads what the session probed after Init, and unregisters the services no
@@ -81,7 +84,10 @@ namespace Chimera.Emulation.Common.Waterbox
 			}
 
 			if (surfaces is 0) services.Unregister<ICoreSurfaces>();
-			if (_regNames.Length is 0) services.Unregister<IDebuggable>();
+			SetUpMemoryCallbacks();
+			// the debugging service is the registers AND the memory callbacks: a
+			// core with either keeps it, and a core with neither does not advertise it
+			if (_regNames.Length is 0 && _memoryCallbacks is null) services.Unregister<IDebuggable>();
 			if (!_session.TraceAvailable) services.Unregister<ITraceable>();
 			if (!_session.SaveDataAvailable) services.Unregister<ICoreSaveData>();
 		}
@@ -139,8 +145,77 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		// Breakpoints and stepping would need the guest to give up control mid-frame,
 		// which the waterbox ABI (one FrameAdvance call, no re-entry) doesn't allow.
+		// Memory callbacks do not: a core that offers the four exports has the
+		// engine call at each access it watches (issues 496 and 534).
 		public IMemoryCallbackSystem MemoryCallbacks
-			=> throw new NotImplementedException("waterbox cores do not support memory callbacks");
+#pragma warning disable CA1065 // the convention for a feature a core lacks is to throw NIE
+			=> _memoryCallbacks ?? throw new NotImplementedException($"{_cfg.CoreName} does not watch memory");
+#pragma warning restore CA1065
+
+		/// <summary>Which kinds' values this core lets a callback change (issue 534); 0 when it only reports.</summary>
+		public int ReplaceableMemoryKinds => _session.MemoryReplaceable;
+
+		/// <summary>Looks at the engine's scopes once the session is open; a core without them keeps no system.</summary>
+		private void SetUpMemoryCallbacks()
+		{
+			var scopes = _session.MemoryScopes.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+			if (scopes.Length is 0) return;
+			var callbacks = new MemoryCallbackSystem(scopes);
+			callbacks.CallbackAdded += callback => Watch(callback, true);
+			callbacks.CallbackRemoved += callback => Watch(callback, false);
+			_memoryScopes = scopes;
+			_memoryCallbacks = callbacks;
+			_session.SetMemoryCallback(OnMemoryAccess);
+		}
+
+		/// <summary>Tells the core to watch (or stop watching) one callback's place; the engine resolves it.</summary>
+		private void Watch(IMemoryCallback callback, bool on)
+		{
+			var kind = callback.Type switch
+			{
+				MemoryCallbackType.Execute => 0,
+				MemoryCallbackType.Read => 1,
+				MemoryCallbackType.Write => 2,
+				_ => -1,
+			};
+			var scope = Array.IndexOf(_memoryScopes, callback.Scope);
+			if (kind < 0 || scope < 0)
+			{
+				if (on) throw new InvalidOperationException($"{_cfg.CoreName} has no {callback.Scope} to watch");
+				return;
+			}
+			var address = callback.Address ?? ulong.MaxValue; // the engine's CE_ANY_ADDRESS
+			var took = _session.WatchMemory(kind, scope, address, on);
+			if (!on || took) return;
+			// the core refused: take the callback off the list before refusing the
+			// script, so what is registered is what will be called
+			_memoryCallbacks?.Remove(callback.Callback);
+			throw new InvalidOperationException($"{_cfg.CoreName} cannot watch {callback.Scope} for {callback.Type}");
+		}
+
+		/// <summary>Engine's call at a watched access, on the advancing thread; gives the value to use, if changed.</summary>
+		private ulong? OnMemoryAccess(int kind, int scope, ulong address, ulong value, int size)
+		{
+			var callbacks = _memoryCallbacks;
+			if (callbacks is null) return null;
+			uint flags = kind switch
+			{
+				0 => (uint)MemoryCallbackFlags.AccessExecute,
+				1 => (uint)MemoryCallbackFlags.AccessRead,
+				2 => (uint)MemoryCallbackFlags.AccessWrite,
+				_ => 0,
+			};
+			flags |= size switch
+			{
+				1 => (uint)MemoryCallbackFlags.SizeByte,
+				2 => (uint)MemoryCallbackFlags.SizeWord,
+				4 => (uint)MemoryCallbackFlags.SizeLong,
+				_ => 0,
+			};
+			var scopeName = scope >= 0 && scope < _memoryScopes.Length ? _memoryScopes[scope] : _memoryScopes[0];
+			var result = callbacks.CallMemoryCallbacks((uint)address, (uint)value, flags, scopeName);
+			return result != (uint)value ? result : null;
+		}
 
 		public bool CanStep(StepType type) => false;
 

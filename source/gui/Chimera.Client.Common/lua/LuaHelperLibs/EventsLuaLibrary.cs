@@ -86,6 +86,22 @@ namespace Chimera.Client.Common
 		public bool CanUseCallbackParams(string subset = null)
 			=> subset is "memory";
 
+		[LuaMethod("can_replace_value", "Whether the core lets an on_bus_read (kind \"read\") or on_bus_write (kind \"write\") function change the value by giving back a whole number. False for \"exec\", for a core that watches no memory, and for a core that only reports what it sees.")]
+		[LuaMethodExample("if event.can_replace_value(\"read\") then console.log(\"reads can be changed\"); end")]
+		public bool CanReplaceValue(string kind)
+		{
+			var bit = kind switch
+			{
+				"read" => 1 << 1,
+				"write" => 1 << 2,
+				"exec" => 0,
+				_ => -1,
+			};
+			if (bit < 0) throw new ArgumentException($"the kind is \"read\", \"write\" or \"exec\", not {kind}");
+			return bit != 0 && DebuggableCore is IMemoryCallbackReplaceable replaceable
+				&& (replaceable.ReplaceableMemoryKinds & bit) != 0;
+		}
+
 		[LuaMethodExample("local steveonf = event.onframeend(\r\n\tfunction()\r\n\t\tconsole.log( \"Calls the given lua function at the end of each frame, after all emulation and drawing has completed. Note: this is the default behavior of lua scripts\" );\r\n\tend\r\n\t, \"Frame name\" );")]
 		[LuaMethod("onframeend", "Calls the given lua function at the end of each frame, after all emulation and drawing has completed. Note: this is the default behavior of lua scripts")]
 		public string OnFrameEnd(LuaFunction luaf, string name = null)

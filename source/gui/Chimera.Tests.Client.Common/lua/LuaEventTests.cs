@@ -22,6 +22,20 @@ namespace Chimera.Tests.Client.Common.lua
 		}
 
 		[TestMethod]
+		public void CanReplaceValueSaysNoForACoreThatOnlyReports()
+		{
+			// arrange
+			LuaTestContext context = new();
+			context.AddScript("can_replace.lua", true);
+
+			// act
+			context.RunYielding();
+
+			// assert: no core here watches memory, and "bad" is not a kind
+			context.AssertLogMatches("false", "false", "false", "false");
+		}
+
+		[TestMethod]
 		public void ScriptWithRegisteredFunctionShowsAsRunning()
 		{
 			// arrange

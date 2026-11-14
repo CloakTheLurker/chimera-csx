@@ -11220,3 +11220,20 @@ window can take as it is: upstream implements it in the Qt view model. The
 memory-callback flags and replaceable values from the same issue need the
 engine's guest ABI, and branch userdata needs the project format; both are
 still to come, and the batch is not tagged until it is whole.
+
+## Chimera CSX's memory callbacks (2026-11-14)
+
+A core that offers GetMemoryCallbackScopes, SetMemoryCallback, AddMemoryWatch and
+RemoveMemoryWatch (and optionally GetMemoryCallbackReplaceable) now reaches the
+Lua `event.on_bus_*` functions. The waterbox core implements IDebuggable with a
+MemoryCallbackSystem built from the engine's scope names; adding a callback asks
+the engine to watch that place (the whole scope when it names no address),
+removing it stops the watch, and the engine's call maps its kind and size to the
+callback flags the script receives. Where the core says a read's or a write's
+value may change, the whole number a function gives back is written into the
+core's value and used by the machine; event.can_replace_value says whether it
+will. A core that names no scopes keeps no system, and the service is not
+advertised, which is the same refusal as before.
+
+What is still missing from issue 534's batch: a branch's scripts' userdata in the
+project, and the C# MCP tool surface. The batch is not tagged until they are in.

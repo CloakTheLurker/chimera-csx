@@ -1060,6 +1060,18 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract void ce_session_set_input_poll_callback(IntPtr session, IntPtr fn, IntPtr ctx);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_memory_scopes(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_memory_replaceable(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_watch_memory(IntPtr session, int kind, int scope, ulong address, int on);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_session_set_memory_callback(IntPtr session, IntPtr fn, IntPtr ctx);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_savedata_available(IntPtr session);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -3011,6 +3023,68 @@ namespace Chimera.Emulation.Common.Engine
 				}
 			};
 			E.ce_session_set_input_poll_callback(Live, Marshal.GetFunctionPointerForDelegate(_inputPoll), IntPtr.Zero);
+		}
+
+		/// <summary>The scopes the core can watch for memory callbacks (issue 496), a line each; "" when it watches none.</summary>
+		public string MemoryScopes => ChimeraEngine.PtrToStringUtf8(E.ce_session_memory_scopes(Live)) ?? "";
+
+		/// <summary>Which kinds' values the core lets a memory callback change, bit (1 &lt;&lt; kind); 0 when it only reports (issue 534).</summary>
+		public int MemoryReplaceable => E.ce_session_memory_replaceable(Live);
+
+		/// <summary>The address that watches every address of a scope (the engine's CE_ANY_ADDRESS).</summary>
+		public const ulong AnyAddress = ulong.MaxValue;
+
+		/// <summary>
+		/// Watches (or stops watching) an address of a scope for a kind of access (0 an instruction,
+		/// 1 a read, 2 a write; <see cref="AnyAddress"/> for every address), between frames only.
+		/// Returns whether the core took it.
+		/// </summary>
+		public bool WatchMemory(int kind, int scope, ulong address, bool on)
+			=> E.ce_session_watch_memory(Live, kind, scope, address, on ? 1 : 0) is not 0;
+
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+		private delegate int MemoryFn(IntPtr ctx, int kind, int scope, ulong address, ulong value, int size, IntPtr replacement);
+
+		/// <summary>The engine's hold on the callback below, kept alive while the engine may call it.</summary>
+		private MemoryFn? _memory;
+
+		/// <summary>
+		/// Calls <paramref name="onAccess"/> at each watched memory access, part way through a frame,
+		/// on the advancing thread (issues 496 and 534): it gets the kind, scope, address, value and
+		/// size, and may give back the value the machine reads or writes instead, where the core lets
+		/// it (<see cref="MemoryReplaceable"/>); null stops the calls. What it throws is written to the
+		/// error output and goes no further: it must not cross into the engine.
+		/// </summary>
+		public void SetMemoryCallback(Func<int, int, ulong, ulong, int, ulong?>? onAccess)
+		{
+			if (Disposed)
+			{
+				_memory = null;
+				return;
+			}
+			if (onAccess is null)
+			{
+				E.ce_session_set_memory_callback(Live, IntPtr.Zero, IntPtr.Zero);
+				_memory = null;
+				return;
+			}
+			_memory = (ctx, kind, scope, address, value, size, replacement) =>
+			{
+				try
+				{
+					if (onAccess(kind, scope, address, value, size) is { } given)
+					{
+						if (replacement != IntPtr.Zero) Marshal.WriteInt64(replacement, unchecked((long)given));
+						return 1;
+					}
+				}
+				catch (Exception e)
+				{
+					Console.Error.WriteLine($"a memory callback failed: {e.Message}");
+				}
+				return 0;
+			};
+			E.ce_session_set_memory_callback(Live, Marshal.GetFunctionPointerForDelegate(_memory), IntPtr.Zero);
 		}
 
 		public bool SaveDataAvailable => E.ce_session_savedata_available(Live) is not 0;

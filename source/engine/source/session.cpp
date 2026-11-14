@@ -530,6 +530,10 @@ static thread_local ce_session *t_framing = nullptr;
 /* A core read its controls (its call through callback slot 3). The caller's
  * function runs now, inside the frame; the read counts as the core's work. */
 static uintptr_t CE_GUEST_CALLBACK_ABI inputPollDispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+/* A core reached memory the session watches (its call through callback slot
+ * 4: kind, scope, address, value, size, and where a new value may go). The
+ * same, with what the core said. */
+static uintptr_t CE_GUEST_CALLBACK_ABI memoryDispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 #ifdef CE_VK_BRIDGE
 /* The Vulkan bridge's dispatcher, each call counted as work once the driver
@@ -703,6 +707,17 @@ struct ce_session
 	bool inputPollsReported = false;
 	ce_input_poll_fn inputPollFn = nullptr;
 	void *inputPollCtx = nullptr;
+	/* The core stops at memory its machine runs, reads or writes, where the
+	 * session watches it (issue 496): the scopes it names (a line each; "" for
+	 * a core without the exports), the kinds whose value the caller's function
+	 * may change (issue 534), its exports that watch and stop watching, and
+	 * the caller's function, called at each watched access. */
+	std::string memoryScopes;
+	int32_t memoryReplaceable = 0;
+	int32_t (*addMemoryWatch)(int32_t, int32_t, uint64_t) = nullptr;
+	void (*removeMemoryWatch)(int32_t, int32_t, uint64_t) = nullptr;
+	ce_memory_fn memoryFn = nullptr;
+	void *memoryCtx = nullptr;
 	/* The pictures of frames already drawn, shown again when the machine is put
 	 * back on one (kept_pictures.hpp; chimera#190). On by itself for a session
 	 * whose pictures a GPU draws and whose greenzone is on; a caller may say
@@ -2274,6 +2289,36 @@ static ce_session *openSession(
 			{
 				setInputPoll(static_cast<uint64_t>(r.data));
 				s->inputPollsReported = true;
+			}
+		}
+	}
+
+	/* ...and a core that stops at watched memory is handed another (issue
+	 * 496). All four exports or none: a core that names scopes it cannot
+	 * watch, or watches with no way to call, has nothing to offer. */
+	{
+		std::string ignored;
+		auto scopes = reinterpret_cast<uintptr_t (*)()>(s->proc("GetMemoryCallbackScopes", 0, false, ignored));
+		auto setMemoryCallback = reinterpret_cast<void (*)(uint64_t)>(s->proc("SetMemoryCallback", 1, false, ignored));
+		auto add = reinterpret_cast<int32_t (*)(int32_t, int32_t, uint64_t)>(s->proc("AddMemoryWatch", 3, false, ignored));
+		auto remove = reinterpret_cast<void (*)(int32_t, int32_t, uint64_t)>(s->proc("RemoveMemoryWatch", 3, false, ignored));
+		const char *names = scopes != nullptr ? reinterpret_cast<const char *>(scopes()) : nullptr;
+		if (names != nullptr && names[0] != 0 && setMemoryCallback != nullptr && add != nullptr && remove != nullptr)
+		{
+			chimera::WbxReturn r;
+			host->wbx_get_callback_addr(s->obj, reinterpret_cast<void *>(&memoryDispatch), 4, &r);
+			if (!r.ok() || r.data == 0)
+				fprintf(stderr, "chimera memory calls: the sandbox would not take the callback\n");
+			else
+			{
+				setMemoryCallback(static_cast<uint64_t>(r.data));
+				s->memoryScopes = names;
+				/* the one optional fifth: the reads and writes whose value
+				 * the caller may change (issue 534); an instruction has none */
+				if (auto replaceable = reinterpret_cast<int32_t (*)()>(s->proc("GetMemoryCallbackReplaceable", 0, false, ignored)))
+					s->memoryReplaceable = replaceable() & ((1 << 1) | (1 << 2));
+				s->addMemoryWatch = add;
+				s->removeMemoryWatch = remove;
 			}
 		}
 	}
@@ -4658,4 +4703,52 @@ void ce_session_set_input_poll_callback(ce_session *s, ce_input_poll_fn fn, void
 	if (s == nullptr) return;
 	s->inputPollFn = fn;
 	s->inputPollCtx = ctx;
+}
+
+static uintptr_t CE_GUEST_CALLBACK_ABI memoryDispatch(uintptr_t kind, uintptr_t scope, uintptr_t address, uintptr_t value, uintptr_t size,
+	uintptr_t replacement)
+{
+	ce_session *s = t_framing;
+	if (s != nullptr && s->memoryFn != nullptr)
+	{
+		/* the core's own word for the value, in its memory, which the machine
+		 * reads or writes once the call returns: a new value goes there only
+		 * for a kind the core said it lets change */
+		const bool replaceable = replacement != 0 && kind <= 2 && (s->memoryReplaceable & (1 << kind)) != 0;
+		uint64_t now = 0;
+		if (s->memoryFn(s->memoryCtx, static_cast<int32_t>(kind), static_cast<int32_t>(scope), static_cast<uint64_t>(address),
+				static_cast<uint64_t>(value), size <= 8 ? static_cast<int32_t>(size) : 0, replaceable ? &now : nullptr) != 0 &&
+			replaceable)
+			*reinterpret_cast<uint64_t *>(replacement) = now;
+	}
+	guestWorked();
+	return 0;
+}
+
+const char *ce_session_memory_scopes(const ce_session *s)
+{
+	return s != nullptr ? s->memoryScopes.c_str() : "";
+}
+
+int32_t ce_session_memory_replaceable(const ce_session *s)
+{
+	return s != nullptr ? s->memoryReplaceable : 0;
+}
+
+int32_t ce_session_watch_memory(ce_session *s, int32_t kind, int32_t scope, uint64_t address, int32_t on)
+{
+	if (s == nullptr || s->addMemoryWatch == nullptr || kind < 0 || kind > 2 || scope < 0) return 0;
+	if (on == 0)
+	{
+		s->removeMemoryWatch(kind, scope, address);
+		return 1;
+	}
+	return s->addMemoryWatch(kind, scope, address) != 0 ? 1 : 0;
+}
+
+void ce_session_set_memory_callback(ce_session *s, ce_memory_fn fn, void *ctx)
+{
+	if (s == nullptr) return;
+	s->memoryFn = fn;
+	s->memoryCtx = ctx;
 }

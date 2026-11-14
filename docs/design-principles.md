@@ -11206,3 +11206,17 @@ older frontend showed and what tells a core author the table is missing. The
 engine's own text keys (upstream 999f79dd and 7013a849) are not part of this:
 they rewrite every engine text and the Qt window, and this window has no
 keyed-text interface to show them.
+
+## Chimera CSX's event.onloadstate (2026-11-14)
+
+A script may register a function that runs when a branch is loaded, once the
+machine is on its frame, with the branch's name. TAStudio raises it after a
+branch's own state is in; a seek, a rewind, an old-control-scheme move and
+memorysavestate.loadcorestate do not. The function is registered with the
+mid-frame restriction, so it cannot wait for a frame.
+
+The event is the first part of upstream issue 534's Lua work that this C#
+window can take as it is: upstream implements it in the Qt view model. The
+memory-callback flags and replaceable values from the same issue need the
+engine's guest ABI, and branch userdata needs the project format; both are
+still to come, and the batch is not tagged until it is whole.

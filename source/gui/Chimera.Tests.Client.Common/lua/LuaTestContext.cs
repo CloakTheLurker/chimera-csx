@@ -76,6 +76,12 @@ namespace Chimera.Tests.Client.Common.lua
 			lua.ResumeScripts(true);
 		}
 
+		/// <summary>As TAStudio and the Lua engine do when a branch is loaded.</summary>
+		public void CallLoadStateEvent(string branchName)
+		{
+			lua.CallLoadStateEvent(branchName);
+		}
+
 		public void AssertLogMatches(params string[] messages)
 		{
 			Assert.AreEqual(messages.Length, loggedMessages.Count);

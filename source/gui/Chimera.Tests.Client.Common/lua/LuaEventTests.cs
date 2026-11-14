@@ -7,6 +7,21 @@ namespace Chimera.Tests.Client.Common.lua
 	public class LuaEventTests
 	{
 		[TestMethod]
+		public void OnLoadStateIsCalledWithTheBranchName()
+		{
+			// arrange
+			LuaTestContext context = new();
+			context.AddScript("loadstate.lua", true);
+			context.RunYielding();
+
+			// act
+			context.CallLoadStateEvent("branch A");
+
+			// assert
+			context.AssertLogMatches("loaded branch A");
+		}
+
+		[TestMethod]
 		public void ScriptWithRegisteredFunctionShowsAsRunning()
 		{
 			// arrange

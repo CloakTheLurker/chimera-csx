@@ -123,6 +123,7 @@ namespace Chimera.Client.Common
 
 			EmulationLuaLibrary.FrameAdvanceCallback = FrameAdvance;
 			EmulationLuaLibrary.YieldCallback = EmuYield;
+			BranchLoadEvents.Loaded += CallLoadStateEvent;
 		}
 
 		private ApiContainer _apiContainer;
@@ -240,8 +241,28 @@ namespace Chimera.Client.Common
 			}
 		}
 
+		/// <summary>
+		/// A branch was loaded and the machine is on its frame: each script's
+		/// event.onloadstate function is called with the branch's name, once per
+		/// registration; the functions may read memory but may not wait for a
+		/// frame (they are registered with <see cref="ApiGroup.PROHIBITED_MID_FRAME"/>).
+		/// </summary>
+		public void CallLoadStateEvent(string branchName)
+		{
+			if (IsUpdateSupressed) return;
+
+			foreach (LuaFile file in ScriptList)
+			{
+				foreach (var func in file.Functions.Where(static l => l.Event == NamedLuaFunction.EVENT_TYPE_LOADSTATE).ToList())
+				{
+					func.Call(branchName);
+				}
+			}
+		}
+
 		public void Close()
 		{
+			BranchLoadEvents.Loaded -= CallLoadStateEvent;
 			foreach (LuaFile file in ScriptList)
 			{
 				foreach (var closeCallback in file.Functions

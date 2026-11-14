@@ -98,6 +98,12 @@ namespace Chimera.Client.Common
 			=> CreateAndRegisterNamedFunction(luaf, NamedLuaFunction.EVENT_TYPE_PREFRAME, name: name)
 				.GuidStr;
 
+		[LuaMethodExample("event.onloadstate(\r\n\tfunction(name)\r\n\t\tconsole.log( \"loaded \" .. name );\r\n\tend\r\n\t, \"Reset\" );")]
+		[LuaMethod("onloadstate", "Calls the given function each time a branch is loaded, once the machine is on its frame, with the branch's name. Not called for a seek, a rewind, a branch load that only moves the machine, or memorysavestate.loadcorestate. The function may not wait for a frame. Gives back the function's id.")]
+		public string OnLoadState(LuaFunction luaf, string name = null)
+			=> CreateAndRegisterNamedFunction(luaf, NamedLuaFunction.EVENT_TYPE_LOADSTATE, ApiGroup.PROHIBITED_MID_FRAME, name: name)
+				.GuidStr;
+
 		[LuaMethodExample("local ok, steveoni = pcall(event.oninputpoll,\r\n\tfunction()\r\n\t\tconsole.log( \"Calls the given lua function after each time the emulator core polls for input\" );\r\n\tend\r\n\t, \"Frame name\" );\r\nif not ok then console.log( steveoni ); end")]
 		[LuaMethod("oninputpoll", "Calls the given lua function each time the core reads the controls, part way through a frame. Only a core that reports its reads can (its notes say so); any other refuses it with an error, because a core runs in a sandbox that Chimera calls once a frame and cannot otherwise stop part way through one. The function runs inside the frame: it may read memory, but not advance, save or load.")]
 		public string OnInputPoll(LuaFunction luaf, string name = null)

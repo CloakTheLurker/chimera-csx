@@ -1387,6 +1387,10 @@ namespace Chimera.Client.GUI
 			if (branchIndex.HasValue)
 			{
 				BranchLoadedCallback?.Invoke(branchIndex.Value);
+				if (branchIndex.Value >= 0 && branchIndex.Value < CurrentTasMovie.Branches.Count)
+				{
+					BranchLoadEvents.Raise(CurrentTasMovie.Branches[branchIndex.Value].UserText ?? "");
+				}
 			}
 			UpdateTools();
 			if (!branchIndex.HasValue)

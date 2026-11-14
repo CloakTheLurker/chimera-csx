@@ -10,7 +10,7 @@ namespace Chimera.Client.Common
 
 		public const string EVENT_TYPE_INPUTPOLL = "OnInputPoll";
 
-		public const string EVENT_TYPE_LOADSTATE = "OnSavestateLoad";
+		public const string EVENT_TYPE_LOADSTATE = "OnLoadState";
 
 		public const string EVENT_TYPE_MEMEXEC = "OnMemoryExecute";
 

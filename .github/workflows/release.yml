@@ -150,12 +150,14 @@ jobs:
           short="${{ steps.what.outputs.short }}"
           name=$(tools/bundle-name.sh "${{ steps.what.outputs.kind }}" "$short")
           mkdir -p build/release
-          # one top-level folder, named like the archive, so the zip unpacks
-          # into a directory instead of the one it was unzipped in
+          # one top-level folder, named like the archive, so both unpack into a
+          # directory instead of the one they were unpacked in
           cp -r build/bundle-windows "build/$name"
           ( cd build && zip -qr "release/$name.zip" "$name" )
           rm -rf "build/$name"
-          ( cd build/bundle-linux && tar czf "../release/chimera-linux-x64-$short.tar.gz" . )
+          cp -r build/bundle-linux "build/$name"
+          ( cd build && tar czf "release/$name.tar.gz" "$name" )
+          rm -rf "build/$name"
           cp build/bundle-windows/LICENSES.md build/release/LICENSES.md
           cp build/bundle-windows/BUILD.txt build/release/BUILD.txt
           ls -la build/release
@@ -195,7 +197,7 @@ jobs:
             echo "| what | file |"
             echo "| --- | --- |"
             echo "| Windows x64 | \`$name.zip\` |"
-            echo "| Linux x64 | \`chimera-linux-x64-$short.tar.gz\` |"
+            echo "| Linux x64 | \`$name.tar.gz\` |"
             echo
             echo "Both carry the frontend and its natives. They carry **no cores**, and"
             echo "Chimera downloads none: get a core's \`.chimeraCore\` package from the"

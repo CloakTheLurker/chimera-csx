@@ -11280,8 +11280,9 @@ engine together. What came across here is the window's part:
 - seek takes extend: a frame past the movie's end is reached by adding empty
   frames first, as one step of the undo history.
 
-A host step that changes the movie's length now says movie_length_before and
-that the project is unsaved, as upstream does.
+The edit steps that change the movie's length say movie_length_before and that
+the project is unsaved, as upstream does; every seek answer says the movie's
+length.
 
 Not in this batch, because they are engine tools rather than the window's:
 trace_memory, trace_cpu, try_input, snapshot and restore, diff_memory, the

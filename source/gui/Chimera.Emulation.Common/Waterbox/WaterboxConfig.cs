@@ -875,6 +875,13 @@ namespace Chimera.Emulation.Common.Waterbox
 			public List<string>? Buttons { get; set; }
 
 			/// <summary>
+			/// What each P&lt;n&gt; group of buttons is called where the frontend
+			/// lists groups (TAStudio's column menu), keyed by player number
+			/// ("1" -&gt; "Kempston"). A group with no entry keeps "Player n".
+			/// </summary>
+			public Dictionary<string, string>? PlayerNames { get; set; }
+
+			/// <summary>
 			/// The letter each button writes into a movie's text and heads its
 			/// input column with, by the button's name - whole ("P2 Cross") or
 			/// without its player ("Cross", which then serves every pad). The

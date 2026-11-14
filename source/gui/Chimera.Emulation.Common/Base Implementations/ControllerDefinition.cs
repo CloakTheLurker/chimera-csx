@@ -156,6 +156,13 @@ namespace Chimera.Emulation.Common
 		/// </summary>
 		public IDictionary<string, string> CategoryLabels { get; private set; } = new Dictionary<string, string>();
 
+		/// <summary>
+		/// What each P&lt;n&gt; button group is called where the frontend lists
+		/// groups (TAStudio's column menu), keyed by player number ("1" -&gt; "Kempston").
+		/// A group with no entry is shown as "Player n".
+		/// </summary>
+		public IDictionary<string, string> PlayerNames { get; set; } = new Dictionary<string, string>();
+
 		public void ApplyAxisConstraints(string constraintClass, Dictionary<string, int> axes)
 		{
 			if (!Axes.HasContraints) return;

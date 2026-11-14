@@ -413,6 +413,9 @@ namespace Chimera.Emulation.Common.Waterbox
 				var axis = _axes[i];
 				def.Axes.Add(axis.Name ?? $"Axis {i}", new AxisSpec(axis.Min.RangeTo(axis.Max), axis.Neutral));
 			}
+			if ((_machine?.Input ?? _cfg.Input)?.PlayerNames is { } playerNames)
+				foreach (var (number, name) in playerNames)
+					def.PlayerNames[number] = name;
 			return def.MakeImmutable();
 		}
 

@@ -727,7 +727,8 @@ namespace Chimera.Client.GUI
 			playerMenus[0] = parent;
 			for (int i = 1; i < playerMenus.Length; i++)
 			{
-				playerMenus[i] = new ToolStripMenuItem($"Player {i}");
+				var groupName = Emulator.ControllerDefinition.PlayerNames.TryGetValue(i.ToString(), out var named) ? named : $"Player {i}";
+				playerMenus[i] = new ToolStripMenuItem(groupName); // a core that names its groups (waterbox input.playerNames) shows those
 			}
 
 			bool programmaticallyHidingColumns = false;
@@ -852,7 +853,8 @@ namespace Chimera.Client.GUI
 			{
 				ToolStripMenuItem dummyObject = playerMenus[i];
 				if (!dummyObject.HasDropDownItems) continue;
-				ToolStripMenuItem item = new($"Show Player {i}") { CheckOnClick = true };
+				var showName = Emulator.ControllerDefinition.PlayerNames.TryGetValue(i.ToString(), out var showNamed) ? $"Show {showNamed}" : $"Show Player {i}";
+				ToolStripMenuItem item = new(showName) { CheckOnClick = true };
 				dummyObject.DropDownOpening += (_, _) =>
 				{
 					programmaticallyHidingColumns = true;

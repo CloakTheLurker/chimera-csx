@@ -2,6 +2,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Drawing.Imaging;
+using System.IO;
 using System.Linq;
 
 using Chimera.Client.Common;
@@ -28,6 +30,12 @@ namespace Chimera.Client.GUI
 
 		/// <summary>What the window was last asked to move to, by <see cref="McpWindow"/>.</summary>
 		private (int Start, int Frame, bool Until) _mcpAsked;
+
+		/// <summary>
+		/// run_lua with frames (issue 571): the Lua Console the agent's code runs in, and the frame it started on,
+		/// while the frames it waits for are played. The call is answered when they stop.
+		/// </summary>
+		private (LuaConsole Console, int Start)? _mcpLuaFrames;
 
 		/// <summary>
 		/// The frames a capture_series still has to take pictures of, the next first; null when none is
@@ -110,19 +118,42 @@ namespace Chimera.Client.GUI
 
 			public IReadOnlyList<LibraryFunction>? LuaFunctions() => _main.McpLuaConsole()?.Documentation;
 
-			public (object[] Results, string? Error, string Output) RunLua(string code)
+			public (object[] Results, string? Error, string Output) RunLua(string code, double seconds)
 			{
 				var console = _main.McpLuaConsole()!;
-				var (results, error) = console.RunForAgent(code);
+				var (results, error) = console.RunForAgent(code, seconds);
 				return (results, error, console.TakeOutputForAgent());
 			}
 
-			public (bool Running, string Output) LuaScript(string path, bool stop)
+			public (bool Running, string? Error, string Output) LuaScript(string path, bool stop)
 			{
 				var console = _main.McpLuaConsole()!;
+				string? error = null;
 				if (stop) console.RemoveLuaFile(path);
-				else console.StartScriptForAgent(path);
-				return (console.ScriptRunning(path), console.TakeOutputForAgent());
+				else error = console.StartScriptForAgent(path);
+				var running = console.ScriptRunning(path);
+				return (running, running || stop ? null : (error ?? console.LastErrorFor(path)), console.TakeOutputForAgent());
+			}
+
+			public McpLuaConsolePage LuaConsole(long since, int limit)
+				=> _main.McpLuaConsole()!.ConsoleForAgent(since, limit);
+
+			public IReadOnlyList<McpLuaScript> LuaScripts() => _main.McpLuaConsole()!.ScriptsForAgent();
+
+			public (bool Waiting, object[] Results, string? Error, string Output) StartLuaFrames(string code, double seconds)
+			{
+				var console = _main.McpLuaConsole()!;
+				var (waiting, results, error) = console.StartScriptForAgentAcrossFrames(code, seconds);
+				_main._mcpLuaFrames = waiting ? (console, _main.Emulator.Frame) : null;
+				return (waiting, results, error, console.TakeOutputForAgent());
+			}
+
+			public (bool Ended, object[] Results, string? Error, string Output) FinishLuaFrames()
+			{
+				if (_main._mcpLuaFrames is not { } frames) return (false, [ ], null, "");
+				_main._mcpLuaFrames = null;
+				var (ended, results, error) = frames.Console.FinishScriptForAgentAcrossFrames();
+				return (ended, results, error, frames.Console.TakeOutputForAgent());
 			}
 		}
 
@@ -277,6 +308,24 @@ namespace Chimera.Client.GUI
 				{
 					EngineMcp.Answer(session, seek.Id, "The project was closed while the playback position was moving.", isError: true);
 				}
+				else if (_mcpLuaFrames is { } luaFrames)
+				{
+					// run_lua with frames: the script has had them; what it ended on goes back with what it printed
+					try
+					{
+						McpChimera luaChimera = new(this);
+						var (ended, results, error, output) = luaChimera.FinishLuaFrames();
+						var played = Math.Max(0, window.Frame - luaFrames.Start);
+						EngineMcp.Answer(session, seek.Id,
+							McpHostTools.LuaFramesAnswer(window, played, ended, ended ? results : Array.Empty<object>(), error, output),
+							isError: error is not null);
+					}
+					catch (Exception ex)
+					{
+						// the console was closed while the code ran: the agent is told, not left waiting
+						EngineMcp.Answer(session, seek.Id, $"The Lua Console was closed while the code ran: {ex.Message}", isError: true);
+					}
+				}
 				else if (_mcpPictures is { } pictures)
 				{
 					// on a frame of a capture_series: its picture, then on to the next
@@ -307,7 +356,7 @@ namespace Chimera.Client.GUI
 				}
 				else
 				{
-					var arrived = McpHostTools.SeekAnswer(window, seek.Frame, out var interrupted);
+					var arrived = McpHostTools.SeekAnswer(window, tasMovie, seek.Frame, out var interrupted);
 					EngineMcp.Answer(session, seek.Id, arrived, interrupted);
 				}
 				_mcpSeek = null;
@@ -331,6 +380,12 @@ namespace Chimera.Client.GUI
 				bool isError;
 				try
 				{
+					// screenshot with layers "with_lua" is this window's own picture, answered as an image
+					if (tool == "screenshot" && arguments.Contains("\"with_lua\""))
+					{
+						McpAnswerShownPicture(id);
+						continue;
+					}
 					text = McpHostTools.Run(active ? movie as ITasMovie : null, window, tool, arguments, out isError, chimera);
 				}
 				catch (Exception ex)
@@ -350,6 +405,46 @@ namespace Chimera.Client.GUI
 				// what the agent changed is shown at once, as a change made by hand is
 				if (!Emulator.IsNull() && Tools.Has<TAStudio>() && !isError && !tool.StartsWith("list_", StringComparison.Ordinal)) Tools.TAStudio.RefreshDialog();
 			}
+		}
+
+		/// <summary>
+		/// screenshot with layers "with_lua" (issue 571): the window's picture as the person sees it, with the
+		/// padding a script asked for and everything Lua draws, at the game's own pixels; the padding on each side
+		/// is said so a pixel can be turned back into the game's. A run with no window shown refuses.
+		/// </summary>
+		private void McpAnswerShownPicture(ulong id)
+		{
+			if (HeadlessMode.Enabled || Emulator.IsNull() || _presentationPanel.Control.IsDisposed)
+			{
+				EngineMcp.AnswerPicture(id, null, "{}");
+				return;
+			}
+			byte[] png;
+			int width, height;
+			using (var buffer = CaptureLua())
+			using (var picture = buffer.ToSysdrawingBitmap())
+			using (var stream = new MemoryStream())
+			{
+				picture.Save(stream, ImageFormat.Png);
+				png = stream.ToArray();
+				width = picture.Width;
+				height = picture.Height;
+			}
+			var padding = DisplayManager.GameExtraPadding;
+			var facts = new JObject
+			{
+				["layers"] = "with_lua",
+				["width"] = width,
+				["height"] = height,
+				["padding"] = new JObject
+				{
+					["left"] = padding.Left,
+					["top"] = padding.Top,
+					["right"] = padding.Right,
+					["bottom"] = padding.Bottom,
+				},
+			}.ToString(Formatting.None);
+			EngineMcp.AnswerPicture(id, png, facts);
 		}
 
 		/// <summary>What only this window knows, for the status tool: the engine adds the machine's facts.</summary>

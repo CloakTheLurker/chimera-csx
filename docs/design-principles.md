@@ -11252,3 +11252,53 @@ letters, digits, dot, underscore and hyphen written %XX, and a fraction as its
 64-bit pattern in hex so -0.0, NaN and the infinities come back exactly.
 Upstream's view model writes %a fractions, which .NET does not; the engine never
 parses the text, so the format is the frontend's to choose.
+
+## Chimera CSX's window MCP tools from upstream 571 (2026-11-14)
+
+The last part of 1.3.0: the MCP tools that need the C# window rather than the
+engine alone. Upstream added them in issue 571, in the Qt window and the
+engine together. What came across here is the window's part:
+
+- lua_console: what the Lua Console printed, whoever wrote it, as numbered
+  lines (the last 2000 kept), with the number to ask from next.
+- lua_scripts: the scripts in its list, the person's and the agent's, each
+  with its file, running, paused or stopped, and the error it last stopped on.
+- lua_script says that error, with its line, when a script fails to start or
+  stops on one. A Lua file keeps its last error; the console sets it when a
+  start fails and when a frame's resume does.
+- run_lua takes 'seconds' (10 when left out, 1 to 300) and stops code that
+  does not end with a debug hook, and 'frames', which runs the code as a
+  script that may wait for frames: the window plays up to that many frames (not
+  past the movie's end), then the answer says how many were played, whether the
+  code ended, what it returned, the error it stopped on, where the machine is
+  and what it printed. With frames the limit is ten seconds plus one a frame
+  unless the agent gives one.
+- screenshot takes layers "with_lua": the window renders its own picture,
+  padding and Lua drawing included, at the game's pixels, and answers it as an
+  image with the padding on each side. It is answered by ce_mcp_answer_picture,
+  the engine's answer that carries a picture; with no window shown it refuses.
+- seek takes extend: a frame past the movie's end is reached by adding empty
+  frames first, as one step of the undo history.
+
+A host step that changes the movie's length now says movie_length_before and
+that the project is unsaved, as upstream does.
+
+Not in this batch, because they are engine tools rather than the window's:
+trace_memory, trace_cpu, try_input, snapshot and restore, diff_memory, the
+freeze tools, the wider RAM search (8-byte values, misaligned starts, ranges,
+several rounds in one call), registers' names and roles, and the warning when
+chimera-mcp and the window are different builds. They stay engine candidates
+in docs/upstream-since-1.0.0.md.
+
+What was measured: the engine builds for Linux and Windows and its tests are 28
+of 30 (media and sha1 fail on this checkout for filesystem reasons, as before).
+The C# solution builds. The 54 MCP and Lua tests pass, including new ones for
+the numbered lines, the script list, a start error, run_lua's time limit, code
+that waits for frames, and seek with extend; the 6 MCP server form tests pass.
+The whole Client.Common suite is 630 passed, 20 skipped and one failed:
+TasMovieProjectFormatTests.AHistoryFromASessionThatDidNotFinishIsNotTrusted
+cannot delete its recovery folder on Windows while work.journal is still open,
+a filesystem difference this change does not touch. The with_lua picture and
+the window's deferred frames were not seen in a running window on this machine:
+they are covered by the code and the host tests, not by a picture or an agent
+session.

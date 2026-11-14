@@ -35,6 +35,38 @@ namespace Chimera.Tests.Client.Common.lua
 			context.AssertLogMatches("false", "false", "false", "false");
 		}
 
+		/// <summary>run_lua with frames (issue 571): the agent's code may wait for frames, and what it returned comes back when it ends.</summary>
+		[TestMethod]
+		public void AgentTextMayWaitForFrames()
+		{
+			// arrange
+			LuaTestContext context = new();
+			var (waiting, _, error) = context.StartAgentTextAcrossFrames(
+				"for i = 1, 3 do emu.frameadvance() print(i) end return 'done'", 10);
+			Assert.IsTrue(waiting, error);
+
+			// act: three frames are played for it
+			for (var i = 0; i < 3; i++) context.RunFrameWaiting();
+
+			// assert
+			var (ended, results, failed) = context.FinishAgentTextAcrossFrames();
+			Assert.IsTrue(ended, "the code ended after its three frames");
+			Assert.IsNull(failed);
+			CollectionAssert.AreEqual(new object[] { "done" }, results);
+			context.AssertLogMatches("1", "2", "3");
+		}
+
+		/// <summary>run_lua's time limit (issue 571): a loop that never ends is stopped with an error.</summary>
+		[TestMethod]
+		public void AgentTextThatDoesNotEndIsStopped()
+		{
+			LuaTestContext context = new();
+			var (results, error) = context.RunAgentText("while true do end", 1);
+			Assert.AreEqual(0, results.Length);
+			Assert.IsNotNull(error);
+			StringAssert.Contains(error, "still running");
+		}
+
 		[TestMethod]
 		public void ScriptWithRegisteredFunctionShowsAsRunning()
 		{

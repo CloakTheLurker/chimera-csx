@@ -80,6 +80,28 @@ namespace Chimera.Emulation.Common.Engine
 		public static void Answer(IntPtr session, ulong id, string text, bool isError)
 			=> ChimeraEngine.Instance.ce_mcp_answer(session, id, text, isError ? 1 : 0);
 
+		/// <summary>
+		/// Answers a screenshot with layers "with_lua": the window's picture as a PNG, with the facts that go
+		/// beside it (its size and the padding on each side). A null picture refuses, saying no window is shown.
+		/// </summary>
+		public static void AnswerPicture(ulong id, byte[]? png, string factsJson)
+		{
+			if (png is null || png.Length is 0)
+			{
+				ChimeraEngine.Instance.ce_mcp_answer_picture(id, IntPtr.Zero, 0, factsJson);
+				return;
+			}
+			var held = System.Runtime.InteropServices.GCHandle.Alloc(png, System.Runtime.InteropServices.GCHandleType.Pinned);
+			try
+			{
+				ChimeraEngine.Instance.ce_mcp_answer_picture(id, held.AddrOfPinnedObject(), (ulong) png.Length, factsJson);
+			}
+			finally
+			{
+				held.Free();
+			}
+		}
+
 		/// <summary>Where Chimera finds core packages, for list_cores and describe_core.</summary>
 		public static void SetCoresFolders(System.Collections.Generic.IEnumerable<string> folders)
 			=> ChimeraEngine.Instance.ce_mcp_cores_folders(Newtonsoft.Json.JsonConvert.SerializeObject(folders));

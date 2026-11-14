@@ -285,11 +285,11 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.AreEqual(7, window.SoughtTo);
 			// arrived
 			window.Frame = 7;
-			Assert.AreEqual(7, (int) JObject.Parse(McpHostTools.SeekAnswer(window, 7, out isError))["frame"]!);
+			Assert.AreEqual(7, (int) JObject.Parse(McpHostTools.SeekAnswer(window, movie, 7, out isError))["frame"]!);
 			Assert.IsFalse(isError);
 			// stopped somewhere else: said, as a refusal
 			window.Frame = 5;
-			StringAssert.Contains(McpHostTools.SeekAnswer(window, 7, out isError), "stopped on frame 5");
+			StringAssert.Contains(McpHostTools.SeekAnswer(window, movie, 7, out isError), "stopped on frame 5");
 			Assert.IsTrue(isError);
 
 			// the movie's end is the furthest a seek can go; with no window there is nothing to move

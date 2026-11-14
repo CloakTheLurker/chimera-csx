@@ -528,6 +528,22 @@ namespace Chimera.Client.GUI
 		/// <summary>The most the agent's copy of the output keeps, its end kept.</summary>
 		private const int MostForAgent = 64 * 1024;
 
+		/// <summary>
+		/// lua_console (issue 571): the lines this console was written, whoever wrote them, numbered from the window's
+		/// start. The last <see cref="MostLogLines"/> are kept; the first still kept is <see cref="_logFirst"/>.
+		/// </summary>
+		private readonly List<string> _logLines = new();
+
+		private long _logFirst;
+
+		/// <summary>The last line has no line end yet (a script is printing part of a line).</summary>
+		private bool _logOpen;
+
+		private const int MostLogLines = 2000;
+
+		/// <summary>run_lua with frames (issue 571): the script the agent's code is, while it waits for frames.</summary>
+		private LuaFile _agentFrames;
+
 		/// <summary>What this console printed since the last time this was asked, scripts' prints among it.</summary>
 		public string TakeOutputForAgent()
 		{
@@ -537,6 +553,59 @@ namespace Chimera.Client.GUI
 		}
 
 		/// <summary>
+		/// lua_console (issue 571): what this console printed from line <paramref name="since"/> on, whoever wrote it,
+		/// one line a message and the last 2000 kept. <paramref name="limit"/> caps the answer.
+		/// </summary>
+		public McpLuaConsolePage ConsoleForAgent(long since, int limit)
+		{
+			var next = _logFirst + _logLines.Count;
+			var from = since < _logFirst ? _logFirst : since > next ? next : since;
+			var kept = _logLines.ToArray();
+			List<string> lines = new();
+			for (var i = from; i < next && lines.Count < limit; i++) lines.Add(kept[(int) (i - _logFirst)]);
+			return new()
+			{
+				First = from,
+				Lines = lines,
+				Next = from + lines.Count,
+				Total = next,
+				Dropped = since < _logFirst ? _logFirst - Math.Max(since, 0) : 0,
+			};
+		}
+
+		/// <summary>
+		/// lua_scripts (issue 571): the scripts in this console's list, the person's and the agent's, each with its
+		/// file, its state and the error it last stopped on.
+		/// </summary>
+		public IReadOnlyList<McpLuaScript> ScriptsForAgent()
+		{
+			List<McpLuaScript> scripts = new();
+			foreach (var file in _openedFiles.Where(static f => !f.IsSeparator))
+			{
+				scripts.Add(Row(file));
+			}
+			if (_agentFrames is { } agent) scripts.Add(Row(agent));
+			return scripts;
+
+			static McpLuaScript Row(LuaFile file) => new()
+			{
+				Name = Path.GetFileNameWithoutExtension(file.Path),
+				Path = file.Path,
+				State = file.State switch
+				{
+					LuaFile.RunState.Running => "running",
+					LuaFile.RunState.Paused => "paused",
+					_ => "stopped",
+				},
+				LastError = file.LastError,
+			};
+		}
+
+		/// <summary>The error the script of that file last stopped on, or null while it runs or when it stopped cleanly.</summary>
+		public string LastErrorFor(string path)
+			=> _openedFiles.Find(f => !f.IsSeparator && f.Path == Path.GetFullPath(path))?.LastError;
+
+		/// <summary>
 		/// The MCP server's run_lua (issue 355): the agent's Lua, with every library there and what it returned
 		/// handed back. It runs as a script runs, in a coroutine of its own (<see cref="LuaLibraries.RunText"/>):
 		/// an error a function raised from C# took Mono down when it was run as the input line runs a line, with
@@ -544,8 +613,9 @@ namespace Chimera.Client.GUI
 		/// for a frame are refused, as on the input line. The code is shown in the output, as the person's lines
 		/// are, so what the agent ran is seen; Lua functions it registers for events stay, as a line's do.
 		/// </summary>
+		/// <param name="seconds">how long the code may run, 0 for no limit (issue 571)</param>
 		/// <returns>what the code returned, and the error it raised, or null</returns>
-		public (object[] Results, string/*?*/ Error) RunForAgent(string code)
+		public (object[] Results, string/*?*/ Error) RunForAgent(string code, double seconds = 10)
 		{
 			WriteToOutputWindow($"[agent] {code}\n");
 			string/*?*/ error = null;
@@ -554,7 +624,7 @@ namespace Chimera.Client.GUI
 			{
 				error = message;
 				WriteToOutputWindow(message + "\n");
-			});
+			}, seconds);
 			// a function it registered keeps it, beside the input line's own, for its events to run; else it is done
 			if (error is null && agent.ShouldKeepRunning()) LuaImp.ScriptList.Add(agent);
 			else agent.Stop();
@@ -562,8 +632,53 @@ namespace Chimera.Client.GUI
 			return (results, error);
 		}
 
-		/// <summary>The MCP server's lua_script: a script file started, as File &gt; Open Script starts one, or stopped and taken out.</summary>
-		public void StartScriptForAgent(string path) => LoadLuaFile(path);
+		/// <summary>
+		/// run_lua with frames (issue 571): the agent's code started as a script that may wait for frames, where the
+		/// person sees it. Whether it still waits; what it returned if it ended. The window's frames resume it.
+		/// </summary>
+		public (bool Waiting, object[] Results, string/*?*/ Error) StartScriptForAgentAcrossFrames(string code, double seconds)
+		{
+			WriteToOutputWindow($"[agent] {code}\n");
+			string/*?*/ error = null;
+			LuaFile agent = new(Path.Combine(Config.PathEntries.LuaAbsolutePath(), "agent"), UpdateRegisteredFunctionsDialog);
+			LuaImp.ScriptList.Add(agent);
+			var (waiting, results) = LuaImp.RunTextAcrossFrames(agent, code, seconds, message =>
+			{
+				error = message;
+				WriteToOutputWindow(message + "\n");
+			});
+			if (waiting) _agentFrames = agent;
+			else
+			{
+				LuaImp.ScriptList.Remove(agent);
+				agent.Stop();
+			}
+			_messageCount = 0;
+			return (waiting, results, error);
+		}
+
+		/// <summary>
+		/// run_lua with frames, once they are played: whether the code ended by itself, what it returned, and the
+		/// error it stopped on. Code still waiting for a frame is stopped.
+		/// </summary>
+		public (bool Ended, object[] Results, string/*?*/ Error) FinishScriptForAgentAcrossFrames()
+		{
+			if (_agentFrames is not { } agent) return (true, [ ], null);
+			_agentFrames = null;
+			var ended = !agent.Enabled;
+			var error = agent.LastError;
+			var results = ended && error is null ? LuaImp.TakeAgentResults() : [ ];
+			LuaImp.ScriptList.Remove(agent);
+			agent.Stop();
+			return (ended, results, error);
+		}
+
+		/// <summary>The MCP server's lua_script: a script file started, as File &gt; Open Script starts one, or stopped and taken out; the error it failed to start on, or null.</summary>
+		public string StartScriptForAgent(string path)
+		{
+			LoadLuaFile(path);
+			return LastErrorFor(path);
+		}
 
 		/// <summary>Every Lua function, as this console documents them (lua_functions).</summary>
 		public IReadOnlyList<LibraryFunction>/*?*/ Documentation => LuaImp?.Docs;
@@ -572,10 +687,34 @@ namespace Chimera.Client.GUI
 		public bool ScriptRunning(string path)
 			=> _openedFiles.Find(f => !f.IsSeparator && f.Path == Path.GetFullPath(path)) is { Enabled: true };
 
+		/// <summary>
+		/// lua_console's numbered lines (issue 571): what was written is split at line ends, a part-line is joined to
+		/// the next message, and the last <see cref="MostLogLines"/> lines are kept.
+		/// </summary>
+		private void AppendLogLines(string written)
+		{
+			for (var at = 0; ;)
+			{
+				var nl = written.IndexOf('\n', at);
+				var piece = written.Substring(at, nl < 0 ? written.Length - at : nl - at);
+				if (_logOpen && _logLines.Count is not 0) _logLines[_logLines.Count - 1] += piece;
+				else if (nl >= 0 || piece.Length is not 0) _logLines.Add(piece);
+				_logOpen = nl < 0 && (_logOpen || piece.Length is not 0);
+				if (nl < 0) break;
+				at = nl + 1;
+			}
+			while (_logLines.Count > MostLogLines)
+			{
+				_logLines.RemoveAt(0);
+				_logFirst++;
+			}
+		}
+
 		public void WriteToOutputWindow(string message)
 		{
 			_forAgent.Append(message);
 			if (_forAgent.Length > MostForAgent) _forAgent.Remove(0, _forAgent.Length - MostForAgent);
+			AppendLogLines(message);
 			if (!OutputBox.IsHandleCreated || OutputBox.IsDisposed)
 			{
 				return;
@@ -995,10 +1134,11 @@ namespace Chimera.Client.GUI
 			{
 				item.Start(LuaImp.SpawnCoroutineAndSandbox(item.Path));
 			}
-			catch (IOException)
+			catch (IOException ex)
 			{
 				item.Stop();
-				WriteLine($"Unable to access file {item.Path}");
+				item.LastError = $"Unable to access file {item.Path}: {ex.Message}";
+				WriteLine(item.LastError);
 			}
 			catch (LuaException e)
 			{
@@ -1010,11 +1150,14 @@ namespace Chimera.Client.GUI
 					sb.AppendLine(e.InnerException.ToString());
 					sb.AppendLine();
 				}
+				// lua_script gives the error and its line (issue 571)
+				item.LastError = sb.ToString().TrimEnd();
 				WriteToOutputWindow(sb.ToString());
 			}
 			catch (Exception ex)
 			{
 				Console.WriteLine($"[{WindowTitleStatic}] failed to start script {item.Path}:\n{ex}");
+				item.LastError = ex.ToString();
 				DialogController.ShowMessageBox(ex.ToString());
 			}
 		}

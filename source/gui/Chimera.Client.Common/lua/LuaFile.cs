@@ -35,6 +35,12 @@ namespace Chimera.Client.Common
 		public bool FrameWaiting { get; set; }
 		public bool RunningEventsOnly { get; set; } = false;
 
+		/// <summary>
+		/// The error this script last stopped on, with its line, or null for none (issue 571: lua_scripts says it,
+		/// and lua_script gives it when a script fails to start or stops on an error).
+		/// </summary>
+		public string LastError { get; set; }
+
 		public LuaFunctionList Functions { get; }
 
 		private List<IDisposable> _disposables = new();
@@ -92,6 +98,7 @@ namespace Chimera.Client.Common
 			State = RunState.Running;
 			FrameWaiting = false;
 			RunningEventsOnly = false;
+			LastError = null;
 
 			// Execution will not actually begin until the client calls LuaConsole.ResumeScripts
 		}

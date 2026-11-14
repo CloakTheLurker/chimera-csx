@@ -290,7 +290,8 @@ std::string textOf(const chimera::McpResult &result)
  * back. `answerHost`, when not null, is the answer given to a call the engine
  * hands to the frontend. */
 chimera::McpResult callThroughServer(chimera::McpLink &link, const char *tool, const char *arguments,
-	const char *answerHost = nullptr, std::string *hostTool = nullptr, bool refuseToKeep = false)
+	const char *answerHost = nullptr, std::string *hostTool = nullptr, bool refuseToKeep = false,
+	const uint8_t *answerPng = nullptr, uint64_t answerPngLen = 0)
 {
 	chimera::McpResult result;
 	std::atomic<bool> done{ false };
@@ -304,6 +305,7 @@ chimera::McpResult callThroughServer(chimera::McpLink &link, const char *tool, c
 		{
 			if (hostTool != nullptr) *hostTool += std::string(hostTool->empty() ? "" : " | ") + name + " " + args;
 			if (std::strcmp(name, "keep_work") == 0) ce_mcp_answer(nullptr, id, refuseToKeep ? "the disk is full" : "branch 3", refuseToKeep ? 1 : 0);
+			else if (answerPng != nullptr) ce_mcp_answer_picture(id, answerPng, answerPngLen, answerHost != nullptr ? answerHost : "{}");
 			else ce_mcp_answer(nullptr, id, answerHost != nullptr ? answerHost : "", 0);
 		}
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -420,6 +422,18 @@ void theServer()
 	result = callThroughServer(link, "list_markers", "{}", "{\"markers\":[]}", &hostTool);
 	assert(hostTool == "list_markers {}");
 	assert(!result.isError && textOf(result) == "{\"markers\":[]}");
+
+	/* screenshot with layers "with_lua" is the window's picture: handed to it, and answered as an image
+	 * with the facts beside it (issue 571) */
+	hostTool.clear();
+	const uint8_t png[] = { 0x89, 'P', 'N', 'G' };
+	result = callThroughServer(link, "screenshot", "{\"layers\":\"with_lua\"}",
+		"{\"layers\":\"with_lua\",\"width\":4,\"height\":4}", &hostTool, false, png, sizeof png);
+	assert(hostTool == "screenshot {\"layers\":\"with_lua\"}");
+	assert(!result.isError);
+	assert(has(result.content, "\"type\":\"image\""));
+	assert(has(result.content, "iVBORw=="));
+	assert(has(result.content, "with_lua") && has(result.content, "layers"));
 
 	/* allowing changes is remembered until the next start, and logged */
 	ce_mcp_allow_changes(1);

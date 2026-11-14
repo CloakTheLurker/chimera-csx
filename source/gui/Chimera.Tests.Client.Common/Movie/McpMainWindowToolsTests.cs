@@ -64,19 +64,82 @@ namespace Chimera.Tests.Client.Common.Movie
 
 			public (object[] Results, string? Error, string Output) Ran = ([ ], null, "");
 			public string? RanCode;
+			public double RanSeconds;
 
-			public (object[] Results, string? Error, string Output) RunLua(string code)
+			public (object[] Results, string? Error, string Output) RunLua(string code, double seconds)
 			{
 				RanCode = code;
+				RanSeconds = seconds;
 				return Ran;
 			}
 
 			public (string Path, bool Stop)? Script;
+			public string? ScriptError;
 
-			public (bool Running, string Output) LuaScript(string path, bool stop)
+			public (bool Running, string? Error, string Output) LuaScript(string path, bool stop)
 			{
 				Script = (path, stop);
-				return (!stop, stop ? "stopped\n" : "started\n");
+				return (!stop && ScriptError is null, stop ? null : ScriptError, stop ? "stopped\n" : "started\n");
+			}
+
+			public McpLuaConsolePage Page = new();
+			public (long Since, int Limit)? ConsoleAsked;
+
+			public McpLuaConsolePage LuaConsole(long since, int limit)
+			{
+				ConsoleAsked = (since, limit);
+				return Page;
+			}
+
+			public IReadOnlyList<McpLuaScript> Scripts = [ ];
+
+			public IReadOnlyList<McpLuaScript> LuaScripts() => Scripts;
+
+			public (bool Waiting, object[] Results, string? Error, string Output) Started = (false, [ ], null, "");
+			public (bool Ended, object[] Results, string? Error, string Output) Finished = (true, [ ], null, "");
+			public (string Code, double Seconds)? StartedFrames;
+			public int Finishes;
+
+			public (bool Waiting, object[] Results, string? Error, string Output) StartLuaFrames(string code, double seconds)
+			{
+				StartedFrames = (code, seconds);
+				return Started;
+			}
+
+			public (bool Ended, object[] Results, string? Error, string Output) FinishLuaFrames()
+			{
+				Finishes++;
+				return Finished;
+			}
+		}
+
+		/// <summary>The window the tools ask things of, with nothing behind it but a record of what was asked.</summary>
+		private sealed class FakeWindow : IMcpWindow
+		{
+			public int Frame { get; set; }
+			public int SoughtTo = -1;
+			public int PlayingTo = -1;
+
+			public void SeekTo(int frame) => SoughtTo = frame;
+
+			public int SaveBranch(string note) => 1;
+
+			public void LoadBranch(int number)
+			{
+			}
+
+			public bool SetCondition(string argumentsJson, out string why)
+			{
+				why = "";
+				return true;
+			}
+
+			public bool ConditionMet { get; set; }
+
+			public void PlayUntil(int frame) => PlayingTo = frame;
+
+			public void TakePictures(IReadOnlyList<int> frames)
+			{
 			}
 		}
 
@@ -91,6 +154,12 @@ namespace Chimera.Tests.Client.Common.Movie
 		private static (bool IsError, string Text) Run(ITasMovie? movie, IMcpChimera chimera, string tool, string arguments = "{}")
 		{
 			var text = McpHostTools.Run(movie, null, tool, arguments, out var isError, chimera)!;
+			return (isError, text);
+		}
+
+		private static (bool IsError, string Text) Run(ITasMovie? movie, IMcpWindow window, IMcpChimera chimera, string tool, string arguments = "{}")
+		{
+			var text = McpHostTools.Run(movie, window, tool, arguments, out var isError, chimera)!;
 			return (isError, text);
 		}
 
@@ -396,6 +465,137 @@ namespace Chimera.Tests.Client.Common.Movie
 			var (isError, text) = Run(null, chimera, "lua_script", new JObject { ["path"] = Path.Combine(_folder, "nope.lua") }.ToString());
 			Assert.IsTrue(isError);
 			StringAssert.Contains(text, "There is no file");
+		}
+
+		/// <summary>lua_console (issue 571): the numbered lines from where the agent asks, and the number to ask from next.</summary>
+		[TestMethod]
+		public void TheLuaConsoleLinesAreNumberedAndSaidFromWhereToAskNext()
+		{
+			FakeChimera chimera = new()
+			{
+				Functions = Functions(),
+				Page = new() { First = 3, Lines = ["three", "four"], Next = 5, Total = 9, Dropped = 3 },
+			};
+			var answer = JObject.Parse(Run(null, chimera, "lua_console", """{ "since": 0, "limit": 5 }""").Text);
+			Assert.IsNotNull(chimera.ConsoleAsked);
+			Assert.AreEqual(0L, chimera.ConsoleAsked!.Value.Since);
+			Assert.AreEqual(5, chimera.ConsoleAsked.Value.Limit);
+			Assert.AreEqual(3, (int) answer["first"]!);
+			CollectionAssert.AreEqual(new[] { "three", "four" }, answer["lines"]!.Select(static l => (string) l!).ToArray());
+			Assert.AreEqual(5, (int) answer["next"]!);
+			Assert.AreEqual(9, (int) answer["total"]!);
+			Assert.AreEqual(3, (int) answer["dropped"]!);
+
+			var (isError, text) = Run(null, chimera, "lua_console", """{ "limit": 0 }""");
+			Assert.IsTrue(isError);
+			StringAssert.Contains(text, "'limit'");
+		}
+
+		/// <summary>lua_scripts (issue 571): each script of the console's list, its state and the error it last stopped on.</summary>
+		[TestMethod]
+		public void TheLuaScriptsAreListedWithTheirStateAndLastError()
+		{
+			FakeChimera chimera = new()
+			{
+				Functions = Functions(),
+				Scripts =
+				[
+					new() { Name = "watch", Path = "/lua/watch.lua", State = "running" },
+					new() { Name = "broken", Path = "/lua/broken.lua", State = "stopped", LastError = "input:2: nope" },
+				],
+			};
+			var answer = JObject.Parse(Run(null, chimera, "lua_scripts").Text);
+			var scripts = (JArray) answer["scripts"]!;
+			Assert.AreEqual(2, scripts.Count);
+			Assert.AreEqual("running", (string) scripts[0]["state"]!);
+			Assert.IsNull(scripts[0]["last_error"]);
+			Assert.AreEqual("stopped", (string) scripts[1]["state"]!);
+			Assert.AreEqual("input:2: nope", (string) scripts[1]["last_error"]!);
+		}
+
+		/// <summary>lua_script (issue 571): a script that failed to start says the error with its line.</summary>
+		[TestMethod]
+		public void AScriptThatFailedToStartSaysItsError()
+		{
+			var script = Path.Combine(_folder, "broken.lua");
+			File.WriteAllText(script, "nope()");
+			FakeChimera chimera = new() { Functions = Functions(), ScriptError = "input:1: attempt to call a nil value" };
+			var answer = JObject.Parse(Run(null, chimera, "lua_script", new JObject { ["path"] = script }.ToString()).Text);
+			Assert.IsFalse((bool) answer["running"]!);
+			Assert.AreEqual("input:1: attempt to call a nil value", (string) answer["error"]!);
+		}
+
+		/// <summary>run_lua (issue 571): a time limit goes with it, and with frames it plays them and answers after.</summary>
+		[TestMethod]
+		public void RunLuaTakesATimeLimit()
+		{
+			FakeChimera chimera = new() { Functions = Functions(), Ran = ([1L], null, "") };
+			Run(null, chimera, "run_lua", """{ "code": "return 1", "seconds": 3 }""");
+			Assert.AreEqual("return 1", chimera.RanCode);
+			Assert.AreEqual(3.0, chimera.RanSeconds);
+			Run(null, chimera, "run_lua", """{ "code": "return 1" }""");
+			Assert.AreEqual(10.0, chimera.RanSeconds, "ten seconds when left out");
+
+			var (isError, text) = Run(null, chimera, "run_lua", """{ "code": "return 1", "seconds": 0 }""");
+			Assert.IsTrue(isError);
+			StringAssert.Contains(text, "'seconds'");
+		}
+
+		/// <summary>run_lua with frames (issue 571): the code is started across frames and the call is answered after them.</summary>
+		[TestMethod]
+		public void RunLuaWithFramesPlaysThemAndAnswersAfterwards()
+		{
+			var movie = TasMovieTests.MakeMovie(10);
+			FakeWindow window = new() { Frame = 3 };
+			FakeChimera chimera = new()
+			{
+				Functions = Functions(),
+				Started = (true, [ ], null, "printed\n"),
+				Finished = (true, [7L], null, "printed\n"),
+			};
+
+			// waiting for frames: no answer yet, and the window is asked to play them
+			var answer = McpHostTools.Run(movie, window, "run_lua", """{ "code": "emu.frameadvance() return 7", "frames": 4 }""",
+				out var isError, chimera);
+			Assert.IsNull(answer, "answered once the frames are played");
+			Assert.IsFalse(isError);
+			Assert.IsNotNull(chimera.StartedFrames);
+			Assert.AreEqual(("emu.frameadvance() return 7", 14.0), chimera.StartedFrames!.Value, "ten seconds and one a frame");
+			Assert.AreEqual(7, window.PlayingTo, "four frames from where the machine is");
+
+			// the frames are played: answered then
+			var done = JObject.Parse(McpHostTools.LuaFramesAnswer(window, 4, true, [7L], null, "printed\n"));
+			Assert.AreEqual(4, (int) done["frames_played"]!);
+			Assert.IsTrue((bool) done["ended"]!);
+			Assert.AreEqual(7, (int) done["results"]![0]!);
+			Assert.AreEqual("printed\n", (string) done["output"]!);
+
+			// code that ends at once needs no frame
+			chimera.Started = (false, [7L], null, "");
+			answer = McpHostTools.Run(movie, window, "run_lua", """{ "code": "return 7", "frames": 4 }""", out isError, chimera);
+			Assert.IsFalse(isError);
+			var atOnce = JObject.Parse(answer);
+			Assert.AreEqual(0, (int) atOnce["frames_played"]!);
+			Assert.IsTrue((bool) atOnce["ended"]!);
+			Assert.AreEqual(7, (int) atOnce["results"]![0]!);
+		}
+
+		/// <summary>seek with extend (issue 571): empty frames are added to reach past the end, as one undoable step.</summary>
+		[TestMethod]
+		public void SeekWithExtendAddsFramesAsOneUndoableStep()
+		{
+			var movie = TasMovieTests.MakeMovie(10);
+			FakeWindow window = new() { Frame = 2 };
+			Assert.IsNull(McpHostTools.Run(movie, window, "seek", """{ "frame": 15, "extend": true }""", out var isError));
+			Assert.IsFalse(isError);
+			Assert.AreEqual(15, movie.InputLogLength);
+			Assert.AreEqual(15, window.SoughtTo);
+			movie.ChangeLog.Undo();
+			Assert.AreEqual(10, movie.InputLogLength, "one undo takes the frames back");
+
+			var (refused, text) = Run(movie, window, new FakeChimera(), "seek", """{ "frame": 15 }""");
+			Assert.IsTrue(refused);
+			StringAssert.Contains(text, "extend: true");
 		}
 
 		[TestMethod]

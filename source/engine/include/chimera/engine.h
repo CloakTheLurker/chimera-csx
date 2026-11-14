@@ -2078,6 +2078,12 @@ CE_API int32_t ce_mcp_service(ce_session *s, const ce_movie_log *log, int64_t fr
  * added. */
 CE_API void ce_mcp_answer(ce_session *s, uint64_t id, const char *text, int32_t is_error);
 
+/* screenshot with layers "with_lua" (issue 571): the frontend's answer is the
+ * picture as the window shows it, a PNG, with facts_json (its size, the
+ * padding on each side); a null png refuses, saying the window cannot be asked
+ * for its picture (no window is shown). */
+CE_API void ce_mcp_answer_picture(uint64_t id, const uint8_t *png, uint64_t png_len, const char *facts_json);
+
 /* capture_series (issue 355): the frontend plays the movie to each frame of
  * the plan it was handed (its arguments' "frames") and, on each, has the
  * engine take the picture with this, saying the frame it is on as it counts

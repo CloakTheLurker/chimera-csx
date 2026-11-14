@@ -369,17 +369,11 @@ namespace Chimera.Client.Common
 		/// does, a text that did not compile was followed by a crash of Mono on the next call, every time, with
 		/// the bundled Lua library; why was not found, and nothing of the agent's is compiled through NLua now.
 		/// </remarks>
+		/// <param name="seconds">how long the code may run, 0 for no limit (issue 571: a loop that never ends is stopped)</param>
 		/// <returns>what it returned; empty when it raised an error, which <paramref name="onError"/> is told</returns>
-		public object[] RunText(LuaFile file, string code, Action<string> onError)
+		public object[] RunText(LuaFile file, string code, Action<string> onError, double seconds = 0)
 		{
-			// the code as a Lua long string, whose brackets it does not contain
-			var level = new string('=', Enumerable.Range(0, 64).First(n => !code.Contains("]" + new string('=', n) + "]")));
-			var text = $"[{level}[\n{code}]{level}]";
-			var chunk = $"local code = {text}\n"
-				+ "local run, failed = load('return ' .. code, '=input')\n"
-				+ "if not run then run, failed = load(code, '=input') end\n"
-				+ "if not run then error(failed, 0) end\n"
-				+ $"{RunTextResults} = table.pack(run())\n";
+			var chunk = AgentChunk(code, seconds);
 			file.Start(SpawnCoroutineAndSandbox(chunk, "run_lua", Path.GetDirectoryName(file.Path)));
 			LuaStatus? status = null;
 			var failed = false;
@@ -394,6 +388,26 @@ namespace Chimera.Client.Common
 				onError($"The code did not run to its end ({status}).");
 				return [ ];
 			}
+			return TakeAgentResults();
+		}
+
+		/// <summary>
+		/// run_lua with frames (issue 571): the agent's code started as a script that may wait for frames, as a file
+		/// started in the console does. Whether it now waits for one; what it returned if it ended. The window's
+		/// main loop resumes it each frame (<see cref="ResumeScripts"/>), and <see cref="TakeAgentResults"/> reads
+		/// what it returned when it ends.
+		/// </summary>
+		public (bool Waiting, object[] Results) RunTextAcrossFrames(LuaFile file, string code, double seconds, Action<string> onError)
+		{
+			var chunk = AgentChunk(code, seconds);
+			file.Start(SpawnCoroutineAndSandbox(chunk, "run_lua", Path.GetDirectoryName(file.Path)));
+			var (_, terminated) = ResumeScript(file, onError);
+			return terminated ? (false, TakeAgentResults()) : (true, [ ]);
+		}
+
+		/// <summary>What the agent's code returned, as <see cref="RunText"/> left it, and the global is cleared.</summary>
+		public object[] TakeAgentResults()
+		{
 			using var packed = _lua[RunTextResults] as LuaTable;
 			_lua[RunTextResults] = null;
 			if (packed is null) return [ ];
@@ -401,6 +415,35 @@ namespace Chimera.Client.Common
 			var results = new object[count];
 			for (var i = 0; i < count; i++) results[i] = packed[(long) (i + 1)];
 			return results;
+		}
+
+		/// <summary>
+		/// The agent's code as the chunk a coroutine runs: an expression gives its value, as on the console's input
+		/// line, and statements give what they return. With <paramref name="seconds"/> more than 0, a debug hook
+		/// stops it with an error once that much of the machine's time has passed (issue 571).
+		/// </summary>
+		private static string AgentChunk(string code, double seconds)
+		{
+			// the code as a Lua long string, whose brackets it does not contain
+			var level = new string('=', Enumerable.Range(0, 64).First(n => !code.Contains("]" + new string('=', n) + "]")));
+			var text = $"[{level}[\n{code}]{level}]";
+			var guard = "";
+			if (seconds > 0)
+			{
+				var limit = seconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+				guard = "local __chimera_agent_deadline = os.clock() + " + limit + "\n"
+					+ "debug.sethook(function()\n"
+					+ "  if os.clock() >= __chimera_agent_deadline then\n"
+					+ $"    error([==[The code was still running after {limit} seconds, so it was stopped.]==], 0)\n"
+					+ "  end\n"
+					+ "end, \"\", 10000)\n";
+			}
+			return guard
+				+ $"local code = {text}\n"
+				+ "local run, failed = load('return ' .. code, '=input')\n"
+				+ "if not run then run, failed = load(code, '=input') end\n"
+				+ "if not run then error(failed, 0) end\n"
+				+ $"{RunTextResults} = table.pack(run())\n";
 		}
 
 		public LuaThread SpawnBlankCoroutineAndSandbox(string directory)
@@ -432,14 +475,18 @@ namespace Chimera.Client.Common
 					bool shouldStop = true;
 					bool waitForFrame = false;
 					bool hadException = false;
+					string? failure = null;
 					if (!lf.RunningEventsOnly)
 					{
 						(waitForFrame, shouldStop) = ResumeScript(lf, (s) =>
 						{
 							_defaultExceptionCallback(s);
+							failure = s;
 							hadException = true;
 						});
 					}
+					// lua_scripts and lua_script say the error it last stopped on (issue 571)
+					if (failure is not null) lf.LastError = failure;
 					// An exception in a main loop should stop everything. The code meant to run each frame cannot be run anymore.
 					if (hadException)
 						shouldStop = true;

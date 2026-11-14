@@ -82,11 +82,65 @@ namespace Chimera.Client.Common
 		/// <summary>Every Lua function, as the Lua Console documents them; null when Lua cannot run here.</summary>
 		IReadOnlyList<LibraryFunction>? LuaFunctions();
 
-		/// <summary>run_lua: code run as a line typed into the Lua Console is; what it returned, the error it raised, and what the console printed.</summary>
-		(object[] Results, string? Error, string Output) RunLua(string code);
+		/// <summary>
+		/// run_lua: code run as a line typed into the Lua Console is; what it returned, the error it raised, and what
+		/// the console printed. Code still running after <paramref name="seconds"/> is stopped.
+		/// </summary>
+		(object[] Results, string? Error, string Output) RunLua(string code, double seconds);
 
-		/// <summary>lua_script: a script file started in the Lua Console, or stopped; whether it runs now, and what the console printed.</summary>
-		(bool Running, string Output) LuaScript(string path, bool stop);
+		/// <summary>lua_script: a script file started in the Lua Console, or stopped; whether it runs now, the error it failed to start on, and what the console printed.</summary>
+		(bool Running, string? Error, string Output) LuaScript(string path, bool stop);
+
+		/// <summary>lua_console: what the Lua Console printed from a numbered line on, whoever wrote it.</summary>
+		McpLuaConsolePage LuaConsole(long since, int limit);
+
+		/// <summary>lua_scripts: the scripts in the Lua Console's list with their state and the error each last stopped on.</summary>
+		IReadOnlyList<McpLuaScript> LuaScripts();
+
+		/// <summary>
+		/// run_lua with frames: the code started as a script that may wait for frames, where the person sees it.
+		/// Whether it still waits, what it returned if it ended at once, the error it stopped on, and what the
+		/// console printed.
+		/// </summary>
+		(bool Waiting, object[] Results, string? Error, string Output) StartLuaFrames(string code, double seconds);
+
+		/// <summary>
+		/// run_lua with frames, once they are played: whether the code ended by itself, what it returned, the error
+		/// it stopped on, and what the console printed. Code still waiting for a frame is stopped.
+		/// </summary>
+		(bool Ended, object[] Results, string? Error, string Output) FinishLuaFrames();
+	}
+
+	/// <summary>One script in the Lua Console's list, as lua_scripts says it (issue 571).</summary>
+	public sealed class McpLuaScript
+	{
+		public string Name { get; init; } = "";
+
+		public string Path { get; init; } = "";
+
+		/// <summary>running, paused or stopped.</summary>
+		public string State { get; init; } = "stopped";
+
+		/// <summary>The error it last stopped on, with its line, or null for none.</summary>
+		public string? LastError { get; init; }
+	}
+
+	/// <summary>What the Lua Console printed over a range of its numbered lines, as lua_console says it (issue 571).</summary>
+	public sealed class McpLuaConsolePage
+	{
+		/// <summary>The number of the first line in <see cref="Lines"/>.</summary>
+		public long First { get; init; }
+
+		public IReadOnlyList<string> Lines { get; init; } = [ ];
+
+		/// <summary>The line to ask from next.</summary>
+		public long Next { get; init; }
+
+		/// <summary>How many lines were ever written.</summary>
+		public long Total { get; init; }
+
+		/// <summary>How many lines the console no longer keeps, before <see cref="First"/>.</summary>
+		public long Dropped { get; init; }
 	}
 
 	/// <summary>What an agent's create_project asks for (docs/mcp-server.md).</summary>
@@ -191,9 +245,13 @@ namespace Chimera.Client.Common
 				case "lua_functions":
 					return LuaFunctions(chimera, arguments, out isError);
 				case "run_lua":
-					return RunLua(chimera, arguments, out isError);
+					return RunLua(chimera, movie, window, arguments, out isError);
 				case "lua_script":
 					return LuaScript(chimera, arguments, out isError);
+				case "lua_console":
+					return LuaConsole(chimera, arguments, out isError);
+				case "lua_scripts":
+					return LuaScripts(chimera, out isError);
 			}
 			if (movie is null) return Refuse(NoMovie, out isError);
 			try
@@ -449,9 +507,11 @@ namespace Chimera.Client.Common
 
 		/// <summary>
 		/// run_lua: the code run as the Lua Console's input line runs it, which a person sees there. What it
-		/// returned comes back as JSON; a table as an object, or as a list when its keys are 1 to n.
+		/// returned comes back as JSON; a table as an object, or as a list when its keys are 1 to n. Code still
+		/// running after 'seconds' is stopped. With 'frames' the code runs as a script that may wait for frames,
+		/// which the window plays for it; the answer comes after them (issue 571).
 		/// </summary>
-		private static string RunLua(IMcpChimera? chimera, JObject arguments, out bool isError)
+		private static string? RunLua(IMcpChimera? chimera, ITasMovie? movie, IMcpWindow? window, JObject arguments, out bool isError)
 		{
 			isError = false;
 			if (chimera is null) return Refuse(NoChimera, out isError);
@@ -460,20 +520,78 @@ namespace Chimera.Client.Common
 				return Refuse("Give 'code': the Lua to run, such as \"return emu.framecount()\".", out isError);
 			}
 			if (chimera.LuaFunctions() is null) return Refuse(NoLua, out isError);
-			var (results, error, output) = chimera.RunLua((string) given!);
-			if (error is not null)
+			var code = (string) given!;
+			var seconds = 10.0;
+			if (arguments["seconds"] is { } limit)
+			{
+				if (limit.Type is not JTokenType.Integer and not JTokenType.Float || (double) limit is < 1 or > 300)
+				{
+					return Refuse("'seconds' must be a number from 1 to 300.", out isError);
+				}
+				seconds = (double) limit;
+			}
+			if (arguments["frames"] is { } asked)
+			{
+				if (asked.Type is not JTokenType.Integer || (long) asked is < 1 or > 600)
+				{
+					return Refuse("'frames' must be a whole number from 1 to 600.", out isError);
+				}
+				if (window is null || movie is null)
+				{
+					return Refuse("run_lua with 'frames' needs TAStudio open: the playback position moves.", out isError);
+				}
+				var frames = (int) (long) asked;
+				// with frames a second a frame more, unless the agent said how long
+				var allowed = arguments["seconds"] is null ? Math.Min(300, seconds + frames) : seconds;
+				var (waiting, results, error, output) = chimera.StartLuaFrames(code, allowed);
+				if (error is not null)
+				{
+					isError = true;
+					return new JObject { ["error"] = error, ["output"] = output }.ToString(Formatting.None);
+				}
+				if (!waiting) return LuaFramesAnswer(window, 0, true, results, null, output);
+				var target = Math.Min(movie.InputLogLength, window.Frame + frames);
+				if (target <= window.Frame)
+				{
+					var (ended, left, why, tail) = chimera.FinishLuaFrames();
+					return LuaFramesAnswer(window, 0, ended, ended ? left : Array.Empty<object>(), why, tail);
+				}
+				window.PlayUntil(target);
+				// answered when the frames are played: McpHostTools.LuaFramesAnswer
+				return null;
+			}
+			var (ran, raised, printed) = chimera.RunLua(code, seconds);
+			if (raised is not null)
 			{
 				isError = true;
-				return new JObject { ["error"] = error, ["output"] = output }.ToString(Formatting.None);
+				return new JObject { ["error"] = raised, ["output"] = printed }.ToString(Formatting.None);
 			}
 			return new JObject
 			{
-				["results"] = new JArray(results.Select(static r => LuaValue(r, 0))),
-				["output"] = output,
+				["results"] = new JArray(ran.Select(static r => LuaValue(r, 0))),
+				["output"] = printed,
 			}.ToString(Formatting.None);
 		}
 
-		/// <summary>lua_script: a script file started in the Lua Console, which then runs frame after frame, or stopped.</summary>
+		/// <summary>
+		/// The answer to run_lua with frames, once they are played (or at once when none could be): how many, whether
+		/// the code ended, what it returned, the error it stopped on, where the machine is, and what it printed.
+		/// </summary>
+		public static string LuaFramesAnswer(IMcpWindow window, int played, bool ended, object[] results, string? error, string output)
+		{
+			JObject answer = new()
+			{
+				["frames_played"] = Math.Max(played, 0),
+				["ended"] = ended,
+				["frame"] = window.Frame,
+				["output"] = output,
+			};
+			if (error is not null) answer["error"] = error;
+			else if (ended) answer["results"] = new JArray(results.Select(static r => LuaValue(r, 0)));
+			return answer.ToString(Formatting.None);
+		}
+
+		/// <summary>lua_script: a script file started in the Lua Console, which then runs frame after frame, or stopped; the error it failed to start on.</summary>
 		private static string LuaScript(IMcpChimera? chimera, JObject arguments, out bool isError)
 		{
 			isError = false;
@@ -486,8 +604,51 @@ namespace Chimera.Client.Common
 			var stop = arguments["stop"] is { Type: JTokenType.Boolean } flag && (bool) flag!;
 			if (!stop && !File.Exists(path)) return Refuse($"There is no file at '{path}'.", out isError);
 			if (chimera.LuaFunctions() is null) return Refuse(NoLua, out isError);
-			var (running, output) = chimera.LuaScript(path, stop);
-			return new JObject { ["script"] = path, ["running"] = running, ["output"] = output }.ToString(Formatting.None);
+			var (running, error, output) = chimera.LuaScript(path, stop);
+			JObject answer = new() { ["script"] = path, ["running"] = running, ["output"] = output };
+			if (!running && !stop && error is not null) answer["error"] = error;
+			return answer.ToString(Formatting.None);
+		}
+
+		/// <summary>lua_console: what the Lua Console printed from a numbered line on, whoever wrote it (issue 571).</summary>
+		private static string LuaConsole(IMcpChimera? chimera, JObject arguments, out bool isError)
+		{
+			isError = false;
+			if (chimera is null) return Refuse(NoChimera, out isError);
+			if (chimera.LuaFunctions() is null) return Refuse(NoLua, out isError);
+			if (!Number(arguments, "limit", 1, 1000, 200, out var limit)) return Refuse("'limit' must be between 1 and 1000.", out isError);
+			long since = 0;
+			if (arguments["since"] is { } asked)
+			{
+				if (asked.Type is not JTokenType.Integer || (long) asked < 0) return Refuse("'since' must be a line number, 0 or more.", out isError);
+				since = (long) asked;
+			}
+			var page = chimera.LuaConsole(since, limit);
+			JObject answer = new()
+			{
+				["first"] = page.First,
+				["lines"] = new JArray(page.Lines),
+				["next"] = page.Next,
+				["total"] = page.Total,
+			};
+			if (page.Dropped is not 0) answer["dropped"] = page.Dropped;
+			return answer.ToString(Formatting.None);
+		}
+
+		/// <summary>lua_scripts: the scripts in the Lua Console's list, with their states and last errors (issue 571).</summary>
+		private static string LuaScripts(IMcpChimera? chimera, out bool isError)
+		{
+			isError = false;
+			if (chimera is null) return Refuse(NoChimera, out isError);
+			if (chimera.LuaFunctions() is null) return Refuse(NoLua, out isError);
+			JArray scripts = new();
+			foreach (var script in chimera.LuaScripts())
+			{
+				JObject row = new() { ["name"] = script.Name, ["path"] = script.Path, ["state"] = script.State };
+				if (script.LastError is { Length: not 0 } error) row["last_error"] = error;
+				scripts.Add(row);
+			}
+			return new JObject { ["scripts"] = scripts }.ToString(Formatting.None);
 		}
 
 		/// <summary>The most tables within tables a Lua value is followed into.</summary>
@@ -529,13 +690,13 @@ namespace Chimera.Client.Common
 			}
 		}
 
-		/// <summary>The answer to a seek, once the window has stopped moving: where the machine is now.</summary>
-		public static string SeekAnswer(IMcpWindow window, int asked, out bool isError)
+		/// <summary>The answer to a seek, once the window has stopped moving: where the machine is now, and the movie's length.</summary>
+		public static string SeekAnswer(IMcpWindow window, ITasMovie movie, int asked, out bool isError)
 		{
 			isError = window.Frame != asked;
 			return isError
 				? $"The playback position stopped on frame {window.Frame}, not on frame {asked}: the seek was interrupted."
-				: new JObject { ["frame"] = window.Frame }.ToString(Formatting.None);
+				: new JObject { ["frame"] = window.Frame, ["movie_length"] = movie.InputLogLength }.ToString(Formatting.None);
 		}
 
 		/// <summary>
@@ -623,8 +784,11 @@ namespace Chimera.Client.Common
 			return new JObject { ["branches"] = branches }.ToString(Formatting.None);
 		}
 
-		private static string Done(ITasMovie movie, JObject facts)
+		private static string Done(ITasMovie movie, JObject facts, int? before = null)
 		{
+			// a step that changed the movie's length says so, and that the project is unsaved now (issue 571)
+			if (before is int was && was != movie.InputLogLength) facts["movie_length_before"] = was;
+			if (before is not null) facts["unsaved_changes"] = true;
 			facts["movie_length"] = movie.InputLogLength;
 			return facts.ToString(Formatting.None);
 		}
@@ -641,6 +805,7 @@ namespace Chimera.Client.Common
 			{
 				return Refuse("The step to apply is not one the engine makes.", out isError);
 			}
+			var before = movie.InputLogLength;
 			movie.ChangeLog.BeginNewBatch(Label(step));
 			// one invalidation for the whole step, not one for each of up to
 			// ten thousand lines (each a pass over the lag log, the history and
@@ -649,7 +814,7 @@ namespace Chimera.Client.Common
 			{
 				for (var i = 0; i < entries.Count; i++) movie.PokeFrame(frame + i, (string) entries[i]!);
 			});
-			return Done(movie, new JObject { ["frame"] = frame, ["count"] = entries.Count });
+			return Done(movie, new JObject { ["frame"] = frame, ["count"] = entries.Count }, before);
 		}
 
 		private static string InsertFrames(ITasMovie movie, JObject step, out bool isError)
@@ -659,9 +824,10 @@ namespace Chimera.Client.Common
 			{
 				return Refuse("The step to apply is not one the engine makes.", out isError);
 			}
+			var before = movie.InputLogLength;
 			movie.ChangeLog.BeginNewBatch(Label(step));
 			movie.InsertEmptyFrame(frame, count);
-			return Done(movie, new JObject { ["frame"] = frame, ["inserted"] = count });
+			return Done(movie, new JObject { ["frame"] = frame, ["inserted"] = count }, before);
 		}
 
 		private static string DeleteFrames(ITasMovie movie, JObject step, out bool isError)
@@ -672,17 +838,19 @@ namespace Chimera.Client.Common
 			{
 				return Refuse("The step to apply is not one the engine makes.", out isError);
 			}
+			var before = movie.InputLogLength;
 			movie.ChangeLog.BeginNewBatch(Label(step));
 			movie.RemoveFrames(frame, frame + count);
-			return Done(movie, new JObject { ["frame"] = frame, ["deleted"] = count });
+			return Done(movie, new JObject { ["frame"] = frame, ["deleted"] = count }, before);
 		}
 
 		private static string Undo(ITasMovie movie, out bool isError)
 		{
 			isError = false;
 			if (!movie.ChangeLog.CanUndo) return Refuse("There is nothing to undo.", out isError);
+			var before = movie.InputLogLength;
 			movie.ChangeLog.Undo();
-			return Done(movie, new JObject { ["undone"] = true });
+			return Done(movie, new JObject { ["undone"] = true }, before);
 		}
 
 		private static string AddMarker(ITasMovie movie, JObject arguments, out bool isError)
@@ -698,11 +866,35 @@ namespace Chimera.Client.Common
 		{
 			isError = false;
 			if (window is null) return Refuse("TAStudio is not open, so the playback position cannot be moved.", out isError);
-			if (!Number(arguments, "frame", 0, movie.InputLogLength, null, out var frame))
+			var extend = arguments["extend"] is { Type: JTokenType.Boolean } flag && (bool) flag!;
+			if (!Number(arguments, "frame", 0, int.MaxValue - MostFrames, null, out var frame))
 			{
-				return Refuse($"'frame' must be between 0 and the movie's length, {movie.InputLogLength}.", out isError);
+				return Refuse($"'frame' must be a frame number, 0 or more, within {MostFrames} of where the movie ends.", out isError);
 			}
-			if (window.Frame == frame) return new JObject { ["frame"] = frame }.ToString(Formatting.None);
+			var before = movie.InputLogLength;
+			if (frame > before)
+			{
+				if (!extend)
+				{
+					return Refuse($"'frame' must be between 0 and the movie's length, {before}. Give extend: true to add empty frames up to it.", out isError);
+				}
+				if (frame > before + MostFrames)
+				{
+					return Refuse($"The movie ends on frame {before}; seek adds at most {MostFrames} frames past its end.", out isError);
+				}
+				movie.ChangeLog.BeginNewBatch("add frames for seek");
+				movie.InsertEmptyFrame(before, frame - before);
+			}
+			if (window.Frame == frame)
+			{
+				return new JObject
+				{
+					["frame"] = frame,
+					["movie_length_before"] = before,
+					["movie_length"] = movie.InputLogLength,
+					["unsaved_changes"] = true,
+				}.ToString(Formatting.None);
+			}
 			window.SeekTo(frame);
 			// answered when the window has arrived: McpHostTools.SeekAnswer
 			return null;
@@ -772,8 +964,9 @@ namespace Chimera.Client.Common
 					? "The project has no branches."
 					: $"'number' must be between 1 and {movie.Branches.Count}, the branches list_branches gives.", out isError);
 			}
+			var before = movie.InputLogLength;
 			window.LoadBranch(number);
-			return Done(movie, new JObject { ["number"] = number, ["frame"] = window.Frame });
+			return Done(movie, new JObject { ["number"] = number, ["frame"] = window.Frame }, before);
 		}
 	}
 }

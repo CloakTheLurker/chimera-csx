@@ -650,6 +650,9 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract void ce_mcp_answer(IntPtr session, ulong id, string text, int isError);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_mcp_answer_picture(ulong id, IntPtr png, ulong pngLength, string factsJson);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_mcp_capture(IntPtr session, ulong id, long frame, ref IntPtr errorOut);
 
 		[ChimeraImport(CallingConvention.Cdecl)]

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -74,6 +74,40 @@ namespace Chimera.Tests.Client.Common.lua
 			emulator.FrameAdvance(c, true);
 			lua.CallFrameAfterEvent();
 			lua.ResumeScripts(true);
+		}
+
+		/// <summary>run_lua: the agent's text run to its end, with a time limit (issue 571).</summary>
+		public (object[] Results, string? Error) RunAgentText(string code, double seconds)
+		{
+			LuaFile file = new(Path.Combine(Environment.CurrentDirectory, "lua", "agent"), () => { });
+			string? error = null;
+			var results = lua.RunText(file, code, message => error = message, seconds);
+			return (results, error);
+		}
+
+		private LuaFile _agentFrames;
+
+		/// <summary>run_lua with frames: the agent's text started as a script that may wait for frames (issue 571).</summary>
+		public (bool Waiting, object[] Results, string? Error) StartAgentTextAcrossFrames(string code, double seconds)
+		{
+			_agentFrames = new(Path.Combine(Environment.CurrentDirectory, "lua", "agent"), () => { });
+			lua.ScriptList.Add(_agentFrames);
+			string? error = null;
+			var (waiting, results) = lua.RunTextAcrossFrames(_agentFrames, code, seconds, message => error = message);
+			return (waiting, results, error);
+		}
+
+		/// <summary>run_lua with frames: the text once the frames are played; whether it ended on its own, and what it returned (issue 571).</summary>
+		public (bool Ended, object[] Results, string? Error) FinishAgentTextAcrossFrames()
+		{
+			if (_agentFrames is not { } file) return (false, new object[0], null);
+			var ended = !file.Enabled;
+			var error = file.LastError;
+			var results = ended && error is null ? lua.TakeAgentResults() : new object[0];
+			lua.ScriptList.Remove(file);
+			file.Stop();
+			_agentFrames = null;
+			return (ended, results, error);
 		}
 
 		/// <summary>As TAStudio and the Lua engine do when a branch is loaded.</summary>

@@ -68,7 +68,7 @@ env -u DISPLAY bash tests/ui/run-ui-tests.sh     # the interface tests
 - `run-ui-tests.sh` does not build. After a C# change run `dotnet build ... --no-incremental` first, and distrust a test count that did not move.
 - After editing the synthetic core (`tests/synth/package-box/`), run `tests/synth/package-box/build-box.sh` and then `tests/synth/build-package.sh`, or the witness runs the old package.
 - A change to the engine or to miniBox must also compile for Windows (`meson compile -C build/meson-windows`).
-- The contract tests run against any package: `CHIMERA_CORES_DIR=<folder> dotnet test source/gui/Chimera.Tests.Client.Common/Chimera.Tests.Client.Common.csproj -c Release --filter "FullyQualifiedName~InstalledCorePackagesTests|FullyQualifiedName~MnemonicUniquenessTests"`.
+- The contract tests run against any package. On Windows: `CHIMERA_CORES_DIR=<folder> dotnet test source/gui/Chimera.Tests.Client.Common/Chimera.Tests.Client.Common.csproj -c Release --filter "FullyQualifiedName~InstalledCorePackagesTests|FullyQualifiedName~MnemonicUniquenessTests"`. On Linux `dotnet test` no longer runs .NET Framework tests, so build the project and run the test program under Mono: `CHIMERA_CORES_DIR=<folder> LD_LIBRARY_PATH=$PWD/build/dll:$PWD/build mono build/tests/Chimera.Tests.Client.Common.exe --filter "FullyQualifiedName~InstalledCorePackagesTests|FullyQualifiedName~MnemonicUniquenessTests"`.
 - A new test is broken on purpose once and seen to fail ([docs/gates.md](docs/gates.md)).
 
 ## Rules of the repository

@@ -125,6 +125,13 @@ Three, and a core is not done with fewer:
         source/gui/Chimera.Tests.Client.Common/Chimera.Tests.Client.Common.csproj \
         -c Release --filter "FullyQualifiedName~InstalledCorePackagesTests|FullyQualifiedName~MnemonicUniquenessTests"
 
+  On Linux `dotnet test` no longer runs .NET Framework tests. Build the project and run the test program under Mono instead:
+
+      CHIMERA_CORES_DIR=<folder holding the package> \
+        LD_LIBRARY_PATH=<chimera checkout>/build/dll:<chimera checkout>/build \
+        mono <chimera checkout>/build/tests/Chimera.Tests.Client.Common.exe \
+        --filter "FullyQualifiedName~InstalledCorePackagesTests|FullyQualifiedName~MnemonicUniquenessTests"
+
 Content: what a gate runs is named, never "the first file in the folder". What may be distributed lives in the repository (`tests/`); what may not lives outside it (`tests/roms-local`, or a path in an environment variable), its legs say SKIP with the reason where it is absent, and a SKIP is never read as a pass. A core proved on one real game says which; one proved on none says that.
 
 **Windows is the same package.** The guest is one file for both systems, and the host under it is not: run the frontend gate's scenario on Windows before calling a core done. What has failed only there so far was stacks - an emulator's own coroutine stacks need `MAP_STACK`, and a fault on the page the stack pointer is in cannot be delivered.

@@ -110,12 +110,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # the scheduled build publishes only a commit CI has passed
+          # the scheduled build publishes only a commit CI has passed. Any
+          # successful run of this commit counts: the daily run and a push's
+          # run are the same gate, and taking the newest alone fails when the
+          # daily run is still going at 05:00 - GitHub starts these crons hours
+          # late (2026-11-15: CI asked for 04:00 and started at 11:45).
           conclusion=$(gh run list --workflow CI --branch chimera-csx --limit 20 \
             --json headSha,conclusion --jq \
-            "[.[] | select(.headSha == \"$(git rev-parse HEAD)\")] | first | .conclusion")
+            "[.[] | select(.headSha == \"$(git rev-parse HEAD)\" and .conclusion == \"success\")] | first | .conclusion")
           if [ "$conclusion" != "success" ]; then
-            echo "CI has not passed for $(git rev-parse --short HEAD) (conclusion: ${conclusion:-none})" >&2
+            echo "no successful CI run for $(git rev-parse --short HEAD)" >&2
             exit 1
           fi
 

@@ -249,11 +249,15 @@ jobs:
         # Linux: it now aborts with "Running .NET Framework tests is supported
         # on Windows only" before a single test runs. LD_LIBRARY_PATH finds the
         # engine this job built; the runner's own exit code is the verdict.
+        #
+        # The roster and language-table tests are here because this is the one
+        # job holding every core's package: without them a roster split, or a
+        # package whose words the window no longer reads, is checked by nothing.
         run: |
           export LD_LIBRARY_PATH="$PWD/build/dll:$PWD/build:${LD_LIBRARY_PATH:-}"
           status=0
           out="$(mono build/tests/Chimera.Tests.Client.Common.exe \
-            --filter "FullyQualifiedName~InstalledCorePackagesTests|FullyQualifiedName~MnemonicUniquenessTests" 2>&1)" || status=$?
+            --filter "FullyQualifiedName~InstalledCorePackagesTests|FullyQualifiedName~MnemonicUniquenessTests|FullyQualifiedName~RosterNamesTests|FullyQualifiedName~CoreLanguageTableTests" 2>&1)" || status=$?
           printf '%s\n' "$out"
           # The runner's exit code is the verdict, and the count has to be
           # non-zero too, so a filter that matches nothing cannot pass the job.

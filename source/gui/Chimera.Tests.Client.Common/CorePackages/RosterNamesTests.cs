@@ -81,6 +81,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 			if (split.Count is 0) return;
 			if (InstalledPackages.Files.Count is 0) Assert.Inconclusive("no core packages in build/Cores to explain a split name");
 			List<string> unexplained = new();
+			var asked = 0;
 			foreach (var group in split)
 			{
 				HashSet<string> said = new(StringComparer.Ordinal);
@@ -90,9 +91,16 @@ namespace Chimera.Tests.Client.Common.CorePackages
 					var cfg = text is null ? null : WaterboxConfig.FromJson(text);
 					if (cfg?.SystemNames is not { Count: > 0 } declared || !declared.TryGetValue(group.Key, out var name)) continue;
 					said.Add(name);
+					asked++;
 				}
+				// No installed package names this system, so there is nothing here
+				// either to explain the split or to deny it. A folder holding only
+				// the synthetic package is the usual case: the published-core job
+				// asks this with every core's newest package, where it can be judged.
+				if (said.Count is 0) continue;
 				if (said.Count < 2) unexplained.Add($"{group.Key}: {string.Join(" / ", group.Select(static x => $"\"{x.Name}\" ({x.Core})"))}");
 			}
+			if (asked is 0) Assert.Inconclusive("no installed package names a system whose roster row is split");
 			Assert.AreEqual(0, unexplained.Count, string.Join("; ", unexplained));
 		}
 

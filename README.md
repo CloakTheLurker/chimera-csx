@@ -133,8 +133,7 @@ An AI agent (Claude Code, or any program that speaks MCP) can look at the projec
 
 ## Building
 
-The canonical build is Linux-hosted and meson-mediated, and produces the artifacts for both operating systems: the managed frontend is built once (platform-neutral IL, .NET Framework on Windows / Mono on Linux), and every native library is built twice: gcc for Linux, mingw-w64 cross for Windows. Clone with `--recursive`; the repository contains no precompiled binaries, and
-no cores - `tools/fetch-cores.sh` puts the published ones in `build/Cores` if you want a working set without opening the frontend.
+The canonical build is Linux-hosted and meson-mediated, and produces the artifacts for both operating systems: the managed frontend is built once (platform-neutral IL, .NET Framework on Windows / Mono on Linux), and every native library is built twice: gcc for Linux, mingw-w64 cross for Windows. Clone with `--recursive`; the repository contains no precompiled binaries, and no cores - `tools/fetch-cores.sh` puts the published ones in `build/Cores` if you want a working set without opening the frontend.
 
 ```
 meson setup build/meson-linux   --prefix "$(pwd)/build" --libdir dll
@@ -154,17 +153,13 @@ tools/fetch-cores.sh                                # every published core -> bu
 tools/build-bundle.sh --platform linux --out <dir>  # the distributable (no cores)
 ```
 
-To run: `build\Chimera.exe` on Windows, `build/ChimeraMono.sh` on Linux, then
-`File > New Project...` and pick a core. To play a rom with no project, pass
-`--core=<package> <rom>` on the command line.
+To run: `build\Chimera.exe` on Windows, `build/ChimeraMono.sh` on Linux, then `File > New Project...` and pick a core. To play a rom with no project, pass `--core=<package> <rom>` on the command line.
 
 The witness gate runs with `tests/synth/run-witness.sh`. The engineering log (objectives, procedure, and the sharp edges found along the way) is in [docs/history/design-principles.md](docs/history/design-principles.md); the engine migration is chronicled in [docs/history/engine-migration.md](docs/history/engine-migration.md). Building a new core, and joining it to this bundle, is [docs/porting-a-core.md](docs/porting-a-core.md).
 
 ## Reporting a problem
 
-Open an issue on this repository, whichever core it concerns - one inbox,
-and the issue template asks for what a fix needs. What settles most
-reports before anybody opens a debugger:
+Open an issue on this repository, whichever core it concerns - one inbox, and the issue template asks for what a fix needs. What settles most reports before anybody opens a debugger:
 
 - **Help > Report an Issue** shows the link to the report form and fills in its first lines for you: build, core, system, processor and memory, files and changed settings. It can also save the files worth attaching as one zip.
 - **The build strings.** Help > Copy Version Info puts the frontend's build and the running core's version on the clipboard, in the template's words. A frontend and a core from different days may not understand each other's states, so before reporting a save/load problem, match them.

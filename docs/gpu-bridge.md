@@ -1,69 +1,38 @@
 # The GPU bridge
 
-A waterboxed core draws on the CPU. That is the point: a picture decided
-entirely by code Chimera compiles is a picture every machine agrees on, which
-is what a movie needs. For most consoles it is also fast enough.
+A waterboxed core draws on the CPU. That is the point: a picture decided entirely by code Chimera compiles is a picture every machine agrees on, which is what a movie needs. For most consoles it is also fast enough.
 
-For a PlayStation 2 it is not. PCSX2's own software rasteriser is quick but
-skips what the GL renderer does; PCSX2's GL renderer is the one upstream tests,
-and running it against a Mesa softpipe compiled into the sandbox costs about
-eleven times the software rasteriser. Accurate and unusable.
+For a PlayStation 2 it is not. PCSX2's own software rasteriser is quick but skips what the GL renderer does; PCSX2's GL renderer is the one upstream tests, and running it against a Mesa softpipe compiled into the sandbox costs about eleven times the software rasteriser. Accurate and unusable.
 
-The bridge is the way out: the core's OpenGL calls leave the sandbox and land
-on a real context on the machine Chimera is running on.
+The bridge is the way out: the core's OpenGL calls leave the sandbox and land on a real context on the machine Chimera is running on.
 
 ## What it is
 
-The renderer stays in the guest, unmodified. It reaches OpenGL through glad,
-glad fills its table from the bridge's `GetProcAddress`, and every entry point
-it gets back is a generated wrapper that packs its arguments into a struct and
-hands the address to the one callback a guest may call out through. The host
-half is in the same address space, so it reads those arguments - and the vertex
-data and textures they point at - in place. No copying, no marshalling.
+The renderer stays in the guest, unmodified. It reaches OpenGL through glad, glad fills its table from the bridge's `GetProcAddress`, and every entry point it gets back is a generated wrapper that packs its arguments into a struct and hands the address to the one callback a guest may call out through. The host half is in the same address space, so it reads those arguments - and the vertex data and textures they point at - in place. No copying, no marshalling.
 
-Both halves are generated from one list of entry points in miniBox
-(`extern/chimera-common-minibox/source/gl/`). An opcode is an index into
-that master list, so every core and this engine mean the same thing by the same
-number. A guest asks how long the host's list is and declines a host that knows
-fewer entry points than it was built against.
+Both halves are generated from one list of entry points in miniBox (`extern/chimera-common-minibox/source/gl/`). An opcode is an index into that master list, so every core and this engine mean the same thing by the same number. A guest asks how long the host's list is and declines a host that knows fewer entry points than it was built against.
 
-One rule decides most of the safety: **the core is not handed pointers into
-Chimera's memory or the driver's.** A mapped buffer is the one exception left:
-a mapping the core flushes or unmaps is a buffer in the core's own memory,
-copied to the driver's, and only a persistent mapping that is never flushed
-keeps the driver's pointer ("Mapped buffers are the core's own memory",
-below). PCSX2 already had two streaming paths that keep their own CPU buffer,
-for drivers where mapping is slow; the bridged build takes one of those (its
-patch 0015).
+One rule decides most of the safety: **the core is not handed pointers into Chimera's memory or the driver's.** A mapped buffer is the one exception left: a mapping the core flushes or unmaps is a buffer in the core's own memory, copied to the driver's, and only a persistent mapping that is never flushed keeps the driver's pointer ("Mapped buffers are the core's own memory", below). PCSX2 already had two streaming paths that keep their own CPU buffer, for drivers where mapping is slow; the bridged build takes one of those (its patch 0015).
 
 ## Determinism, and what a movie says
 
-A core drawn this way is **not deterministic**. The GPU is outside the sandbox
-and outside the savestate, it differs between machines, and drivers differ
-between versions of themselves.
+A core drawn this way is **not deterministic**. The GPU is outside the sandbox and outside the savestate, it differs between machines, and drivers differ between versions of themselves.
 
 Chimera does not hide that:
 
 - `ce_session_deterministic` returns 0 for a session a GPU drew.
 - A movie recorded on one writes a `GpuRenderer` header naming the driver.
 
-What is NOT affected is the machine. The emulated console's memory does not
-depend on how its picture was rasterised: EE RAM, IOP RAM, the scratchpad, both
-vector units, the audio and the lag count are byte-identical across the
-software rasteriser, the softpipe and the bridge. Only the picture differs -
-which is exactly what a desync would be made of if a game ever read its own
-rendered pixels back, and that case is untested.
+What is NOT affected is the machine. The emulated console's memory does not depend on how its picture was rasterised: EE RAM, IOP RAM, the scratchpad, both vector units, the audio and the lag count are byte-identical across the software rasteriser, the softpipe and the bridge. Only the picture differs - which is exactly what a desync would be made of if a game ever read its own rendered pixels back, and that case is untested.
 
-Measured through the frontend, on a machine with no GPU at all (llvmpipe - so
-this is CPU against CPU, and a real driver should do better):
+Measured through the frontend, on a machine with no GPU at all (llvmpipe - so this is CPU against CPU, and a real driver should do better):
 
 | core | own rasteriser | softpipe in-guest | bridged |
 |---|---|---|---|
 | PCSX2, 900 frames of a disc | 37s | 62s | **36s** |
 | Flycast, 400 frames of a disc | 26s | 47s | **16s** |
 
-The machine's memory was byte-identical across all of them - EE RAM for PCSX2,
-System RAM for Flycast.
+The machine's memory was byte-identical across all of them - EE RAM for PCSX2, System RAM for Flycast.
 
 ## Which cores have it
 
@@ -73,40 +42,18 @@ System RAM for Flycast.
 | Flycast | `opengl-hw` | the same |
 | everything else | no | see below |
 
-A core can only be bridged if its own OpenGL renderer already runs inside the
-sandbox - the bridge answers GL calls, it does not create them. PPSSPP, for
-instance, compiles only its SOFTWARE GPU backend (`GPU/Software`); its GLES
-backend is 9,000 lines that have never been built here and expect a separate
-render thread, which a sandbox does not have. Giving PPSSPP a hardware option
-means porting that backend first, and that is a port, not a wiring job.
+A core can only be bridged if its own OpenGL renderer already runs inside the sandbox - the bridge answers GL calls, it does not create them. PPSSPP, for instance, compiles only its SOFTWARE GPU backend (`GPU/Software`); its GLES backend is 9,000 lines that have never been built here and expect a separate render thread, which a sandbox does not have. Giving PPSSPP a hardware option means porting that backend first, and that is a port, not a wiring job.
 
 ## Turning it on
 
 Two things have to be true, and either may not be:
 
-1. **The project asks.** The core declares a renderer whose value ends in
-   `-hw` (PCSX2's are `opengl-hw` and `vulkan-hw`, shown in the wizard as
-   "Hardware (OpenGL)" and "Hardware (Vulkan)"),
-   and the project chose it. That suffix is the whole convention: the frontend
-   recognises any core's hardware renderer without knowing the core.
-2. **This build has a bridge, and a driver gives it a context.** `-Dgl_bridge`
-   is on by default and needs EGL on Linux (`libegl-dev`) and `opengl32` on
-   Windows.
+1. **The project asks.** The core declares a renderer whose value ends in `-hw` (PCSX2's are `opengl-hw` and `vulkan-hw`, shown in the wizard as "Hardware (OpenGL)" and "Hardware (Vulkan)"), and the project chose it. That suffix is the whole convention: the frontend recognises any core's hardware renderer without knowing the core.
+2. **This build has a bridge, and a driver gives it a context.** `-Dgl_bridge` is on by default and needs EGL on Linux (`libegl-dev`) and `opengl32` on Windows.
 
-The context is the same kind on both systems: the newest OpenGL the driver
-has, 3.3 at the least, with the core profile, which leaves out the old
-fixed-function calls (owner, 2026-10-19; Windows had the compatibility
-profile before, so a call a renderer still made from the old OpenGL worked on
-Windows and failed on Linux). The newest version is asked for first because a
-driver may give exactly what is asked: NVIDIA's, asked for 3.3, made a 3.3
-context. A Windows driver without `WGL_ARB_create_context` keeps the old kind,
-and a driver below 3.3 is refused.
+The context is the same kind on both systems: the newest OpenGL the driver has, 3.3 at the least, with the core profile, which leaves out the old fixed-function calls (owner, 2026-10-19; Windows had the compatibility profile before, so a call a renderer still made from the old OpenGL worked on Windows and failed on Linux). The newest version is asked for first because a driver may give exactly what is asked: NVIDIA's, asked for 3.3, made a 3.3 context. A Windows driver without `WGL_ARB_create_context` keeps the old kind, and a driver below 3.3 is refused.
 
-When either fails the core draws the way it draws without a GPU - the
-deterministic way - and the session simply does not claim otherwise. A run that
-did get one says so on screen when it starts ("GPU: <driver> - this run is not
-deterministic"), which is the only place a person can see WHICH driver drew.
-There is a line on standard error either way:
+When either fails the core draws the way it draws without a GPU - the deterministic way - and the session simply does not claim otherwise. A run that did get one says so on screen when it starts ("GPU: <driver> - this run is not deterministic"), which is the only place a person can see WHICH driver drew. There is a line on standard error either way:
 
     chimera gl: 4.5 (Core Profile) Mesa 25.2.8 on llvmpipe, core profile    <- a context
     chimera gl: no context (...); drawing in software         <- no context
@@ -115,40 +62,19 @@ There is a line on standard error either way:
 
 ## The strings are the guest's own
 
-`glGetString` and `glGetStringi` answer with a pointer into the driver, which
-a guest cannot read. The host copies each answer to the guest's side and the
-generated wrapper keeps it in a place of its own, one per (name, index), so
-that a renderer holding its vendor, renderer and version at once holds three
-strings (miniBox `source/gl/gl-string-keep.inc`; until 2026-10-09 it held the
-last one three times). The place is guest memory and a state carries it: a
-state loaded on another machine gets that machine's answers the next time the
-renderer asks, which a rebuild after a load does.
+`glGetString` and `glGetStringi` answer with a pointer into the driver, which a guest cannot read. The host copies each answer to the guest's side and the generated wrapper keeps it in a place of its own, one per (name, index), so that a renderer holding its vendor, renderer and version at once holds three strings (miniBox `source/gl/gl-string-keep.inc`; until 2026-10-09 it held the last one three times). The place is guest memory and a state carries it: a state loaded on another machine gets that machine's answers the next time the renderer asks, which a rebuild after a load does.
 
 ## The context is borrowed, never kept
 
-"Current context" is one slot per thread, and the frontend draws its own
-picture - the emulated screen, the OSD, everything - through that same slot.
-The bridge takes it at the first GL call of a frame and gives back exactly what
-was there when the frame ends (`ce_gl_release`, called by the engine after each
-frame advance, after Init, and after a savestate load).
+"Current context" is one slot per thread, and the frontend draws its own picture - the emulated screen, the OSD, everything - through that same slot. The bridge takes it at the first GL call of a frame and gives back exactly what was there when the frame ends (`ce_gl_release`, called by the engine after each frame advance, after Init, and after a savestate load).
 
-Keeping it is not merely rude, it is invisible. Chimera binds its context
-through SDL, and `SDL_GL_MakeCurrent` short-circuits on SDL's own cache when it
-believes its context is already current - which it does, because
-`DisplayManager` deliberately never releases it ("workaround for slow context
-switching on intel GPUs"). A raw `wglMakeCurrent` behind SDL's back therefore
-makes the frontend go on drawing into the bridge's hidden 64x64 window for the
-rest of the session. The symptom is a pitch black screen with working sound and
-no OSD, and it is what Windows did the first time this ran against a real
-display.
+Keeping it is not merely rude, it is invisible. Chimera binds its context through SDL, and `SDL_GL_MakeCurrent` short-circuits on SDL's own cache when it believes its context is already current - which it does, because `DisplayManager` deliberately never releases it ("workaround for slow context switching on intel GPUs"). A raw `wglMakeCurrent` behind SDL's back therefore makes the frontend go on drawing into the bridge's hidden 64x64 window for the rest of the session. The symptom is a pitch black screen with working sound and no OSD, and it is what Windows did the first time this ran against a real display.
 
 ## A seek does not draw, and one renderer noticed
 
-Reported from use: a PlayStation 2 project's picture degrades as you re-record,
-without desyncing, and playing the movie from the beginning puts it right.
+Reported from use: a PlayStation 2 project's picture degrades as you re-record, without desyncing, and playing the movie from the beginning puts it right.
 
-It is none of the things that sounds like. Measured on a GTX 1060, Marvel vs
-Capcom 2, 3000 frames:
+It is none of the things that sounds like. Measured on a GTX 1060, Marvel vs Capcom 2, 3000 frames:
 
 | | |
 |---|---|
@@ -160,35 +86,17 @@ Capcom 2, 3000 frames:
 | **a straight run with no rewind at all, composing only the last frame** | **the same 7.29%** |
 | the same on the SOFTWARE renderer | 7.56% |
 
-The last two rows are the answer. It is not cumulative, not the savestate, and
-not the GPU. **A seek replays with drawing off** - correctly, nobody is looking
-at the frames on the way - and PCSX2's turbo patch implements "off" by returning
-from `GSRenderer::VSync` before `Merge`. Merge is not only composition: it
-decrements a scanmask countdown, advances the deinterlace phase, and leaves the
-device holding the frame a blend deinterlacer needs next time. Skip it for
-fifteen hundred frames and the one frame that IS composed is composed from state
-that never saw them.
+The last two rows are the answer. It is not cumulative, not the savestate, and not the GPU. **A seek replays with drawing off** - correctly, nobody is looking at the frames on the way - and PCSX2's turbo patch implements "off" by returning from `GSRenderer::VSync` before `Merge`. Merge is not only composition: it decrements a scanmask countdown, advances the deinterlace phase, and leaves the device holding the frame a blend deinterlacer needs next time. Skip it for fifteen hundred frames and the one frame that IS composed is composed from state that never saw them.
 
-The first fix was a WARM-UP: draw the last few frames before a seek's
-destination. Drawing the last frame only is 7.29% wrong here, the last two
-3.87%, the last five exactly right, so PCSX2 declared ten and the frontend drew
-them. **That was wrong, and the next section is why.**
+The first fix was a WARM-UP: draw the last few frames before a seek's destination. Drawing the last frame only is 7.29% wrong here, the last two 3.87%, the last five exactly right, so PCSX2 declared ten and the frontend drew them. **That was wrong, and the next section is why.**
 
-**Dolphin and Ruffle were measured the same way and need nothing** - 0.00%
-either way. Dolphin because its XFB always decodes from the machine's own memory
-(the fix in the previous section), Ruffle because its rendering-off path skips
-only the readback and still runs `Player::render`. That is the shape to copy:
-skip what is pure output, never what the renderer will need next frame.
+**Dolphin and Ruffle were measured the same way and need nothing** - 0.00% either way. Dolphin because its XFB always decodes from the machine's own memory (the fix in the previous section), Ruffle because its rendering-off path skips only the readback and still runs `Player::render`. That is the shape to copy: skip what is pure output, never what the renderer will need next frame.
 
 ## A warm-up cannot be long enough (2026-09-11)
 
-Marvel vs Capcom 2 is a fighting game. It redraws the whole screen sixty times a
-second, so five frames of warm-up really does put its renderer back where a
-straight playback would have left it. Take a title screen instead and the floor
-falls out.
+Marvel vs Capcom 2 is a fighting game. It redraws the whole screen sixty times a second, so five frames of warm-up really does put its renderer back where a straight playback would have left it. Take a title screen instead and the floor falls out.
 
-Flycast, Re-Volt, a seek to frame 1500 - which is its title screen, painted once
-somewhere around frame 1350 and then left alone:
+Flycast, Re-Volt, a seek to frame 1500 - which is its title screen, painted once somewhere around frame 1350 and then left alone:
 
 | frames drawn before the destination | picture |
 |---|---|
@@ -196,58 +104,30 @@ somewhere around frame 1350 and then left alone:
 | 8, 12, 30, 60, 120 | the same 72.60% |
 | **300** | 0.00% |
 
-Nothing between 1 and 120 is better than 1. The picture is not a slightly wrong
-composition; it is the previous screen entirely. What a warm-up assumes - that
-a renderer's state decays and a few frames of running rebuilds it - is not what
-is happening. **What the renderer draws lives on the far side of the bridge and
-STAYS there.** A screen a game paints once is painted by exactly one frame; skip
-that frame and no later frame repaints it, because the game has nothing more to
-say. Only a warm-up that reaches back past the paint is right, and how far back
-that is depends on the game, not the core. There is no number to declare.
+Nothing between 1 and 120 is better than 1. The picture is not a slightly wrong composition; it is the previous screen entirely. What a warm-up assumes - that a renderer's state decays and a few frames of running rebuilds it - is not what is happening. **What the renderer draws lives on the far side of the bridge and STAYS there.** A screen a game paints once is painted by exactly one frame; skip that frame and no later frame repaints it, because the game has nothing more to say. Only a warm-up that reaches back past the paint is right, and how far back that is depends on the game, not the core. There is no number to declare.
 
-The same game at frame 2000 converges at 8, because the screen is fading out and
-therefore being redrawn. That is what a warm-up number really measures: how
-recently the content happened to change. Gran Turismo 4 on PCSX2, three
-different points in its boot, all still 1.3% to 2.8% wrong with the ten frames
-PCSX2 had declared.
+The same game at frame 2000 converges at 8, because the screen is fading out and therefore being redrawn. That is what a warm-up number really measures: how recently the content happened to change. Gran Turismo 4 on PCSX2, three different points in its boot, all still 1.3% to 2.8% wrong with the ten frames PCSX2 had declared.
 
 ### So the core keeps drawing, and only the readback is skipped
 
-`video.drawEveryFrame`. The engine reads it at session open and never sends
-`SetRenderingEnabled(0)`; `render == 0` then means only that the host does not
-copy the picture out. It is read in the engine, not a frontend, because it is a
-property of the core and must hold for every host that opens the package.
+`video.drawEveryFrame`. The engine reads it at session open and never sends `SetRenderingEnabled(0)`; `render == 0` then means only that the host does not copy the picture out. It is read in the engine, not a frontend, because it is a property of the core and must hold for every host that opens the package.
 
-The reason this is affordable at all is that the drawing was never the expensive
-part. 1500 frames on the GTX 1060:
+The reason this is affordable at all is that the drawing was never the expensive part. 1500 frames on the GTX 1060:
 
 | | turbo | drawing, no readback | drawing AND reading back |
 |---|---|---|---|
 | PCSX2, Gran Turismo 4 | 8.28 s | **8.30 s** | 9.75 s |
 | Flycast, Re-Volt | 14.8 s | **15.0 s** | 17.5 s |
 
-The readback is 0.98 ms a frame on PCSX2 and 1.8 ms on Flycast - a 1.2 MB
-`glReadPixels` across the bridge, synchronous. The drawing is 0.017 ms and
-within noise respectively. Turbo keeps all of the saving and loses the bug.
+The readback is 0.98 ms a frame on PCSX2 and 1.8 ms on Flycast - a 1.2 MB `glReadPixels` across the bridge, synchronous. The drawing is 0.017 ms and within noise respectively. Turbo keeps all of the saving and loses the bug.
 
-Verified with the declaration alone, no command-line flag: Flycast/Re-Volt at
-frame 1500 after three rewinds, and PCSX2/Gran Turismo 4 at frames 900, 1500 and
-2400 after three rewinds, are all byte-identical to a straight run that drew
-every frame.
+Verified with the declaration alone, no command-line flag: Flycast/Re-Volt at frame 1500 after three rewinds, and PCSX2/Gran Turismo 4 at frames 900, 1500 and 2400 after three rewinds, are all byte-identical to a straight run that drew every frame.
 
-**Only two cores needed it, and it is the same two that had a turbo patch which
-skips DRAWING**: PCSX2 (patch 0016, returns from `GSRenderer::VSync` before
-`Merge`) and Flycast (patch 0010, returns from `OpenGLRenderer::Render` before
-the pass that reaches a screen). xemu and RPCS3 export no `SetRenderingEnabled`
-at all and so were never told to stop; Dolphin has none either; Ruffle has one
-that skips only the readback. Every core that was measured clean was clean for
-that reason.
+**Only two cores needed it, and it is the same two that had a turbo patch which skips DRAWING**: PCSX2 (patch 0016, returns from `GSRenderer::VSync` before `Merge`) and Flycast (patch 0010, returns from `OpenGLRenderer::Render` before the pass that reaches a screen). xemu and RPCS3 export no `SetRenderingEnabled` at all and so were never told to stop; Dolphin has none either; Ruffle has one that skips only the readback. Every core that was measured clean was clean for that reason.
 
 ### The sweep the rest of this section came from
 
-Every bridged core, with content to run it, on the GTX 1060, 2026-09-11. Two
-tests: a straight run of the same movie twice, and three passes of
-seek-back-and-replay against it. The picture column is the last frame, drawn.
+Every bridged core, with content to run it, on the GTX 1060, 2026-09-11. Two tests: a straight run of the same movie twice, and three passes of seek-back-and-replay against it. The picture column is the last frame, drawn.
 
 | core | content | straight run twice | rewind x3: machine | rewind x3: picture |
 |---|---|---|---|---|
@@ -258,68 +138,27 @@ seek-back-and-replay against it. The picture column is the last frame, drawn.
 | xemu | Prince of Persia: Sands of Time | identical | System RAM identical | identical |
 | RPCS3 | GTA San Andreas | identical | MainRAM identical | identical |
 
-PCSX2 was also put through a savestate round trip before every one of 3000
-frames (`chimera-run --rerecord`): picture and EE RAM identical at every
-checkpoint. Whatever the bridge does to a rewind, it is not that.
+PCSX2 was also put through a savestate round trip before every one of 3000 frames (`chimera-run --rerecord`): picture and EE RAM identical at every checkpoint. Whatever the bridge does to a rewind, it is not that.
 
-xemu and RPCS3 were measured for the first time in this round. xemu needed
-nothing: its EEPROM is optional and the built-in identity is what a movie wants
-anyway. RPCS3 took a fix - it died before its first frame on any disc carrying a
-boot jingle, because `play_music_during_boot` hands an overlay to a video source
-a headless build does not have and `overlay_audio.cpp` `ensure()`s it.
+xemu and RPCS3 were measured for the first time in this round. xemu needed nothing: its EEPROM is optional and the built-in identity is what a movie wants anyway. RPCS3 took a fix - it died before its first frame on any disc carrying a boot jingle, because `play_music_during_boot` hands an overlay to a video source a headless build does not have and `overlay_audio.cpp` `ensure()`s it.
 
 ## The fallback that did not fall back (Windows, 2026-09-11; cause found 2026-09-12)
 
-"When either fails the core draws the way it draws without a GPU" is what this
-document says a few sections up, and on Windows it was not true for PCSX2. With
-`renderer` set to `opengl` - or to `opengl-hw` with no bridge to be had, which
-is the same path - the core ran for about a thousand frames and then took an
-access violation. Bisected on Marvel vs Capcom 2: 800 frames fine, 1200 dead,
-and dead at the same guest address every time, straight run or re-record.
+"When either fails the core draws the way it draws without a GPU" is what this document says a few sections up, and on Windows it was not true for PCSX2. With `renderer` set to `opengl` - or to `opengl-hw` with no bridge to be had, which is the same path - the core ran for about a thousand frames and then took an access violation. Bisected on Marvel vs Capcom 2: 800 frames fine, 1200 dead, and dead at the same guest address every time, straight run or re-record.
 
-The address symbolises to `_x86_64_get_dispatch` in Mesa's glapi
-(`src/mapi/glapi/gen/glapi_x86-64.S`), which reads the GL dispatch table out of
-thread-local storage through **%fs**, and miniBox said in the same log that the
-guest's %fs was zero. The explanation first written here - that miniBox repairs
-%fs at syscall boundaries, and a GL call between two syscalls gets there first -
-had the WHEN wrong, and being wrong about when is what made it look unfixable.
+The address symbolises to `_x86_64_get_dispatch` in Mesa's glapi (`src/mapi/glapi/gen/glapi_x86-64.S`), which reads the GL dispatch table out of thread-local storage through **%fs**, and miniBox said in the same log that the guest's %fs was zero. The explanation first written here - that miniBox repairs %fs at syscall boundaries, and a GL call between two syscalls gets there first - had the WHEN wrong, and being wrong about when is what made it look unfixable.
 
-Measured on the Windows box on 2026-09-12 with a five-line program: `wrfsbase`,
-then plain arithmetic with no fault, no syscall and no yield of any kind. The
-base survived `SwitchToThread`, was gone after `Sleep(1)`, and was gone after
-47 ms and 16 million iterations of pure computation - one scheduler quantum.
-Windows does not keep a user-mode FS base across a context switch at all; it
-restores 0. So the loss has no boundary to be repaired at, and a guest that
-reads a thread local often is dead within a second of starting.
+Measured on the Windows box on 2026-09-12 with a five-line program: `wrfsbase`, then plain arithmetic with no fault, no syscall and no yield of any kind. The base survived `SwitchToThread`, was gone after `Sleep(1)`, and was gone after 47 ms and 16 million iterations of pure computation - one scheduler quantum. Windows does not keep a user-mode FS base across a context switch at all; it restores 0. So the loss has no boundary to be repaired at, and a guest that reads a thread local often is dead within a second of starting.
 
-The repair now happens at the fault instead (miniBox's Windows VEH): guest code
-that faults while %fs holds anything but its thread pointer gets the pointer put
-back and the instruction retried, which is safe because it faulted before it had
-any architectural effect. A fault that is really the guest's own comes back at
-once with %fs correct and is handled as it always was, which bounds the retry to
-a single pass.
+The repair now happens at the fault instead (miniBox's Windows VEH): guest code that faults while %fs holds anything but its thread pointer gets the pointer put back and the instruction retried, which is safe because it faulted before it had any architectural effect. A fault that is really the guest's own comes back at once with %fs correct and is handled as it always was, which bounds the retry to a single pass.
 
-None of it is the bridge - it happens with no bridge at all, and the bridged
-path never touches Mesa's glapi, which is why a GPU run does not see it. It
-reaches any core that compiles Mesa into the guest, which since 2026-09-11
-includes Ruffle's default software renderer: that core died inside twenty frames
-on Windows before the repair, and runs after it.
+None of it is the bridge - it happens with no bridge at all, and the bridged path never touches Mesa's glapi, which is why a GPU run does not see it. It reaches any core that compiles Mesa into the guest, which since 2026-09-11 includes Ruffle's default software renderer: that core died inside twenty frames on Windows before the repair, and runs after it.
 
 ## A pitch-black picture, looked for and not found (2026-09-11)
 
-Reported from use: "the PS2 OpenGL hardware renderer no longer produces an
-image, the picture is pitch black". It does not reproduce, and the flag added
-the same day is not what it would be if it did.
+Reported from use: "the PS2 OpenGL hardware renderer no longer produces an image, the picture is pitch black". It does not reproduce, and the flag added the same day is not what it would be if it did.
 
-`video.drawEveryFrame` was ruled out by an A/B rather than by reading: the
-installed PCSX2 package was repacked with the key set to `false`, which puts the
-engine back on the old contract (`SetRenderingEnabled(0)` really is sent, turbo
-really does skip the drawing), and both packages were driven through the same
-frontend, the same movie and the same destination. The two pictures agree. The
-flag can only ever add drawing, and the guest is still told `1` once on the
-first frame, which is what it was already doing: `renderingSent` starts at -1,
-the first `wantRendering` call sends 1, and PCSX2's `chimera_render_enabled`
-is 1 before anyone says anything.
+`video.drawEveryFrame` was ruled out by an A/B rather than by reading: the installed PCSX2 package was repacked with the key set to `false`, which puts the engine back on the old contract (`SetRenderingEnabled(0)` really is sent, turbo really does skip the drawing), and both packages were driven through the same frontend, the same movie and the same destination. The two pictures agree. The flag can only ever add drawing, and the guest is still told `1` once on the first frame, which is what it was already doing: `renderingSent` starts at -1, the first `wantRendering` call sends 1, and PCSX2's `chimera_render_enabled` is 1 before anyone says anything.
 
 What was driven, all on the GTX 1060, all showing a picture:
 
@@ -334,247 +173,96 @@ What was driven, all on the GTX 1060, all showing a picture:
 | frontend in a WINDOW, and fullscreen | correct, photographed from outside |
 | frontend, core rebooted twice in one process | correct, 120 fps |
 
-Two of those looked black before the ground truth was checked, and neither was:
-frame 702 of Marvel vs Capcom 2 is black **with that project's input** and lit
-with a blank movie, and frames 400 and 600 are black under any input. A black
-screenshot means nothing until the same frame of the same movie has been drawn
-by `chimera-run` beside it.
+Two of those looked black before the ground truth was checked, and neither was: frame 702 of Marvel vs Capcom 2 is black **with that project's input** and lit with a blank movie, and frames 400 and 600 are black under any input. A black screenshot means nothing until the same frame of the same movie has been drawn by `chimera-run` beside it.
 
-What the report probably is, then, is the picture being WRONG rather than
-absent - issues 55 and 56 - which is what the section above is about, and what
-`drawEveryFrame` fixes. PCSX2's `renderer` now defaults to `software` for the
-same reason: the deterministic rasteriser is the one that cannot degrade, and on
-this box it costs a little over twice the time (2401 frames of Gran Turismo 4,
-20.6s against 9.6s) for a picture that is byte-identical run to run, with EE RAM
-the same under either renderer.
+What the report probably is, then, is the picture being WRONG rather than absent - issues 55 and 56 - which is what the section above is about, and what `drawEveryFrame` fixes. PCSX2's `renderer` now defaults to `software` for the same reason: the deterministic rasteriser is the one that cannot degrade, and on this box it costs a little over twice the time (2401 frames of Gran Turismo 4, 20.6s against 9.6s) for a picture that is byte-identical run to run, with EE RAM the same under either renderer.
 
 ## Telling the two failures apart
 
-A core drawn by a GPU and a core drawn by nobody fail differently, and on a
-machine that is not here the difference is otherwise a rebuild away. Two
-environment variables answer it without one:
+A core drawn by a GPU and a core drawn by nobody fail differently, and on a machine that is not here the difference is otherwise a rebuild away. Two environment variables answer it without one:
 
-- `CHIMERA_NO_GPU=1` refuses the bridge for the run whatever the project asked
-  for. The engine says `chimera gl: refused by CHIMERA_NO_GPU`, the core draws
-  in software or not at all, and everything else about the machine is
-  unchanged.
-- `CHIMERA_TRACE=<n>` prints the machine's own numbers on stderr every n
-  frames: cumulative lag, thread count, whether it is running, machine time,
-  the main-memory digest, the frame size, a checksum of the picture the engine
-  received and how many pixels of it were not black. The per-core diagnostic
-  runners print a line of the same shape, so a machine that misbehaves under
-  the frontend and behaves under the runner can be diffed on one machine
-  instead of guessed at from two. It also forwards whatever the machine wrote
-  to its own TTY.
+- `CHIMERA_NO_GPU=1` refuses the bridge for the run whatever the project asked for. The engine says `chimera gl: refused by CHIMERA_NO_GPU`, the core draws in software or not at all, and everything else about the machine is unchanged.
+- `CHIMERA_TRACE=<n>` prints the machine's own numbers on stderr every n frames: cumulative lag, thread count, whether it is running, machine time, the main-memory digest, the frame size, a checksum of the picture the engine received and how many pixels of it were not black. The per-core diagnostic runners print a line of the same shape, so a machine that misbehaves under the frontend and behaves under the runner can be diffed on one machine instead of guessed at from two. It also forwards whatever the machine wrote to its own TTY.
 
-A black picture with a moving digest and a checksum that changes is a picture
-lost above the engine; a black picture with a still digest is a machine that
-stopped.
+A black picture with a moving digest and a checksum that changes is a picture lost above the engine; a black picture with a still digest is a machine that stopped.
 
 ## What is not proven
 
-- **Hardware.** Every measurement so far is on a machine with no GPU, against
-  llvmpipe; a real driver should do better, and nobody has checked.
-- ~~**Windows.** No frame drawn through it has been seen on a screen there.~~
-  Settled 2026-09-11: the frontend was run windowed and fullscreen on the GTX
-  1060 (`4.6.0 NVIDIA 581.42`) with `renderer=opengl-hw`, and the window was
-  photographed from outside the process showing Gran Turismo 4 at 60 and 120
-  fps. What is still unproven there is a LONG session: everything measured is
-  thousands of frames, not hours.
-- **Readback.** A game that reads rendered pixels into machine state would feed
-  GPU output into the savestate, and that is where a desync stops being a
-  possibility and becomes a certainty.
+- **Hardware.** Every measurement so far is on a machine with no GPU, against llvmpipe; a real driver should do better, and nobody has checked.
+- ~~**Windows.** No frame drawn through it has been seen on a screen there.~~ Settled 2026-09-11: the frontend was run windowed and fullscreen on the GTX 1060 (`4.6.0 NVIDIA 581.42`) with `renderer=opengl-hw`, and the window was photographed from outside the process showing Gran Turismo 4 at 60 and 120 fps. What is still unproven there is a LONG session: everything measured is thousands of frames, not hours.
+- **Readback.** A game that reads rendered pixels into machine state would feed GPU output into the savestate, and that is where a desync stops being a possibility and becomes a certainty.
 
 ## A state is good in the session that made it, and no other
 
-The renderer keeps its OpenGL objects - textures, programs, vertex arrays,
-framebuffers - by the NAMES the driver handed it, and those names live in guest
-memory. A savestate carries them faithfully, which is exactly the problem: load
-one into a later session and every name refers to an object in a context that
-no longer exists. The driver refuses each call (`GL_INVALID_VALUE`,
-`GL_INVALID_OPERATION`) and the guest is never told, because a GL error raised
-out here is invisible to it. The machine runs on - threads alive, memory
-changing, audio playing - and draws nothing.
+The renderer keeps its OpenGL objects - textures, programs, vertex arrays, framebuffers - by the NAMES the driver handed it, and those names live in guest memory. A savestate carries them faithfully, which is exactly the problem: load one into a later session and every name refers to an object in a context that no longer exists. The driver refuses each call (`GL_INVALID_VALUE`, `GL_INVALID_OPERATION`) and the guest is never told, because a GL error raised out here is invisible to it. The machine runs on - threads alive, memory changing, audio playing - and draws nothing.
 
-That is what reopening a saved PlayStation 3 project did: a black screen, and
-then a crash. Measured on GTA San Andreas, one state saved at frame 150 and
-loaded into a fresh process:
+That is what reopening a saved PlayStation 3 project did: a black screen, and then a crash. Measured on GTA San Andreas, one state saved at frame 150 and loaded into a fresh process:
 
     [trace] frame 9 ... digest 0a684eb5... video 1920x1080 sum 0 lit 0
     [ce-gl!] op=649 raised 0x501   (glProgramUniform4f)
     [ce-gl!] op=115 raised 0x502   (glBindVertexArray)
 
-36 GL errors a frame against 1.2 in the same run without the load, and every
-failing call one that names an object.
+36 GL errors a frame against 1.2 in the same run without the load, and every failing call one that names an object.
 
 ### Noticing, and building them again
 
-A renderer can be told which context its calls are landing on: `GL_OP_CONTEXT_ID`
-answers with an identity the bridge mints for each SESSION that takes it, and
-afresh on every state load, unless the package declines that (see "Per load,
-too" below; 0 means "cannot tell" - no bridge, or a host older than the
-question, and a guest must read that as "assume nothing moved"). A renderer
-that stores that number beside its objects can see, at the top of any frame,
-that the ground has moved - and rebuild.
+A renderer can be told which context its calls are landing on: `GL_OP_CONTEXT_ID` answers with an identity the bridge mints for each SESSION that takes it, and afresh on every state load, unless the package declines that (see "Per load, too" below; 0 means "cannot tell" - no bridge, or a host older than the question, and a guest must read that as "assume nothing moved"). A renderer that stores that number beside its objects can see, at the top of any frame, that the ground has moved - and rebuild.
 
-Per session, not per context, and the difference is the whole of issue #43. The
-GL context is made once per process and shared by every session, because there
-is only ever one machine; but the objects a renderer holds belong to the SESSION
-that made them, not to the long-lived context. Close a project and open one
-again without restarting Chimera and the second session inherits the first's
-context - so an id minted per context would not move, the guest would keep the
-dead session's object names, and the first draw would bind a gone framebuffer
-and abort (the sandbox reports it as unimplemented syscall 200). Minting the id
-afresh each time a session takes the bridge is what makes the greenzone reload
-on reopen present a changed id, the same signal a fresh process already gets.
+Per session, not per context, and the difference is the whole of issue #43. The GL context is made once per process and shared by every session, because there is only ever one machine; but the objects a renderer holds belong to the SESSION that made them, not to the long-lived context. Close a project and open one again without restarting Chimera and the second session inherits the first's context - so an id minted per context would not move, the guest would keep the dead session's object names, and the first draw would bind a gone framebuffer and abort (the sandbox reports it as unimplemented syscall 200). Minting the id afresh each time a session takes the bridge is what makes the greenzone reload on reopen present a changed id, the same signal a fresh process already gets.
 
-RPCS3 does. Its `on_init_thread` and `on_exit` were split into the half that
-belongs to the CONTEXT (every GL object) and the half that belongs to the
-MACHINE (`rsx::thread::on_exit` sets the thread's exit flag, and must never run
-mid-game); the FIFO loop compares the two ids, and on a difference tears the
-context's half down, builds it again and marks the whole pipeline dirty. The
-objects come back from emulated memory, which is where they came from the first
-time: the surface cache reads its render targets out of RSX memory, the texture
-cache re-uploads, the program cache recompiles.
+RPCS3 does. Its `on_init_thread` and `on_exit` were split into the half that belongs to the CONTEXT (every GL object) and the half that belongs to the MACHINE (`rsx::thread::on_exit` sets the thread's exit flag, and must never run mid-game); the FIFO loop compares the two ids, and on a difference tears the context's half down, builds it again and marks the whole pipeline dirty. The objects come back from emulated memory, which is where they came from the first time: the surface cache reads its render targets out of RSX memory, the texture cache re-uploads, the program cache recompiles.
 
-One upstream bug had to go first. `gl::glsl::shader::remove()` did not clear
-`m_is_compiled`, and `compile()` returns early when it is set ("another thread
-compiled this already") - so a shader object destroyed and made again linked
-UNCOMPILED, and every uniform lookup on the resulting program failed forever.
-Nobody upstream re-creates a shader in one process. A renderer rebuilding after
-context loss does, twice, for the two overlay passes.
+One upstream bug had to go first. `gl::glsl::shader::remove()` did not clear `m_is_compiled`, and `compile()` returns early when it is set ("another thread compiled this already") - so a shader object destroyed and made again linked UNCOMPILED, and every uniform lookup on the resulting program failed forever. Nobody upstream re-creates a shader in one process. A renderer rebuilding after context loss does, twice, for the two overlay passes.
 
-Measured on the same disc, a state saved at frame 150 and loaded in a fresh
-process: the picture returns (1280x720, 20322 lit pixels, against `lit 0`
-forever); GL errors are 137 in the rebuild frame and 3 a frame after it, which
-is the rate an ordinary run has anyway.
+Measured on the same disc, a state saved at frame 150 and loaded in a fresh process: the picture returns (1280x720, 20322 lit pixels, against `lit 0` forever); GL errors are 137 in the rebuild frame and 3 a frame after it, which is the rate an ordinary run has anyway.
 
-The in-process reopen was measured on xemu (issue #43): a state saved at frame
-150, the session freed, another opened over the same GL context, and the state
-loaded into it - exactly what closing and reopening a project does. Before the
-per-session id it aborted on the first draw (the framebuffer assert above);
-after it, the id has moved, the renderer rebuilds, and the picture returns
-(640x480, ~305k lit pixels) with 3 GL errors, the ordinary rate. Confirmed on
-an NVIDIA GTX 1060 (581.42) and on llvmpipe, so it is the rebuild logic that
-was never triggered rather than anything a particular driver does.
+The in-process reopen was measured on xemu (issue #43): a state saved at frame 150, the session freed, another opened over the same GL context, and the state loaded into it - exactly what closing and reopening a project does. Before the per-session id it aborted on the first draw (the framebuffer assert above); after it, the id has moved, the renderer rebuilds, and the picture returns (640x480, ~305k lit pixels) with 3 GL errors, the ordinary rate. Confirmed on an NVIDIA GTX 1060 (581.42) and on llvmpipe, so it is the rebuild logic that was never triggered rather than anything a particular driver does.
 
 ### Per load, too (issue #43 again, 2026-09-15)
 
-A state loaded into the session that made it has the opposite problem: every
-name still means an object, just not the object the state remembers. The frames
-after the restored one went on reallocating, redrawing and reattaching, and none
-of that is in guest memory. A renderer's caches come back from the state saying
-what each name held at that frame, and the driver holds something else.
+A state loaded into the session that made it has the opposite problem: every name still means an object, just not the object the state remembers. The frames after the restored one went on reallocating, redrawing and reattaching, and none of that is in guest memory. A renderer's caches come back from the state saying what each name held at that frame, and the driver holds something else.
 
-Found on the reporter's FlatOut 2 project with a seeded TAStudio stress on the
-GTX 1060. Both the build they used and the current one died on the same step,
-three minutes in: an insert behind the playhead, a restore to frame 272, then
-a replay. xemu's surface cache said texture 56 was a 512x512 `DEPTH_COMPONENT16`
-buffer, and the driver refused to attach it:
+Found on the reporter's FlatOut 2 project with a seeded TAStudio stress on the GTX 1060. Both the build they used and the current one died on the same step, three minutes in: an insert behind the playhead, a restore to frame 272, then a replay. xemu's surface cache said texture 56 was a 512x512 `DEPTH_COMPONENT16` buffer, and the driver refused to attach it:
 
     [ce-gl!] op=178 raised 0x502   (glFramebufferTexture2D)
     [ce-gl!] op=168 raised 0x506   (glDrawArrays)
     [fbo] status=8cd6 ... ifmt=81a5 att=8d00 w=512 h=512 buf=56
     Assertion failed: glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE
 
-`CHIMERA_GL_STATEAUDIT` showed all four restores with 0 objects deleted since
-and 0 handed out again, so nothing a lifetime check can see was wrong. Without
-`CHIMERA_GL_CHECK` the same state fails one assert earlier
-(`glGetError() == GL_NO_ERROR`, render_surface_to). A renderer with fewer asserts
-would not stop at all; it would draw from the wrong texture.
+`CHIMERA_GL_STATEAUDIT` showed all four restores with 0 objects deleted since and 0 handed out again, so nothing a lifetime check can see was wrong. Without `CHIMERA_GL_CHECK` the same state fails one assert earlier (`glGetError() == GL_NO_ERROR`, render_surface_to). A renderer with fewer asserts would not stop at all; it would draw from the wrong texture.
 
-Upstream xemu has its own protocol for this: before a savestate it downloads
-every dirty surface into VRAM, and after a load it flushes its caches. A sandbox
-snapshot takes the whole machine from underneath and runs neither.
+Upstream xemu has its own protocol for this: before a savestate it downloads every dirty surface into VRAM, and after a load it flushes its caches. A sandbox snapshot takes the whole machine from underneath and runs neither.
 
-So `ce_gl_state_loaded` moves the id, and a load is a reopen as far as a core
-can tell: it rebuilds its objects from emulated memory, as described above.
-The fix is in the engine, because every bridged core already rebuilds on a
-moved id. The same stress ran its whole 20 minutes (212 steps) with it.
-`CHIMERA_GL_KEEP_OBJECTS_ON_LOAD` keeps the old behaviour for A/B.
+So `ce_gl_state_loaded` moves the id, and a load is a reopen as far as a core can tell: it rebuilds its objects from emulated memory, as described above. The fix is in the engine, because every bridged core already rebuilds on a moved id. The same stress ran its whole 20 minutes (212 steps) with it. `CHIMERA_GL_KEEP_OBJECTS_ON_LOAD` keeps the old behaviour for A/B.
 
 ### And a fresh context with it (user-decided, 2026-10-19)
 
-Moving the id left the old objects where they were. Nothing in the restored
-machine names the objects the frames after the restored one made, so they
-stayed in the driver until the session ended: RPCS3 left about 55 objects
-and 600 MB with each rewind. Since 2026-10-19 a load that moves the id also
-replaces the context, as the Vulkan bridge does: a new context is made, the
-old one is destroyed with everything in it, and the core rebuilds in the new
-one. Not while a second session holds the context (its objects are in it),
-and not for a core that declares it keeps its objects across a load.
+Moving the id left the old objects where they were. Nothing in the restored machine names the objects the frames after the restored one made, so they stayed in the driver until the session ended: RPCS3 left about 55 objects and 600 MB with each rewind. Since 2026-10-19 a load that moves the id also replaces the context, as the Vulkan bridge does: a new context is made, the old one is destroyed with everything in it, and the core rebuilds in the new one. Not while a second session holds the context (its objects are in it), and not for a core that declares it keeps its objects across a load.
 
-A new context hands out names from 1 again, and a restored state can still
-hold names from the old one: a texture the core deletes after it has
-rebuilt, a sampler it forgot. If a new object were given one of those
-numbers, the stale call would reach it - a delete would free it, a bind would
-draw the wrong thing, with no error (Ruffle did exactly this on 2026-09-15,
-by itself). So the bridge keeps the names the core holds, by kind, as the
-calls that make and delete objects cross it (`gl_names.h`), and in the new
-context it takes every one of them again, empty, before the core runs. A
-stale name then names nothing, and no new object gets one. The driver hands
-out the lowest free names, so taking names up to the highest the core holds
-and giving back the rest leaves exactly the core's; a driver that did not
-would be said once on standard error.
+A new context hands out names from 1 again, and a restored state can still hold names from the old one: a texture the core deletes after it has rebuilt, a sampler it forgot. If a new object were given one of those numbers, the stale call would reach it - a delete would free it, a bind would draw the wrong thing, with no error (Ruffle did exactly this on 2026-09-15, by itself). So the bridge keeps the names the core holds, by kind, as the calls that make and delete objects cross it (`gl_names.h`), and in the new context it takes every one of them again, empty, before the core runs. A stale name then names nothing, and no new object gets one. The driver hands out the lowest free names, so taking names up to the highest the core holds and giving back the rest leaves exactly the core's; a driver that did not would be said once on standard error.
 
-What a fresh context finds out about a core is whether it really rebuilds.
-A core that let an object survive the rebuild, kept a binding, or set some of
-the context's settings only once or only when the machine changed them,
-worked only because the old context lived on. Dolphin did all of these (its
-patch 0031, six fixes): after one rewind its RAM differed from a straight
-run's. Two kinds of help find them:
+What a fresh context finds out about a core is whether it really rebuilds. A core that let an object survive the rebuild, kept a binding, or set some of the context's settings only once or only when the machine changed them, worked only because the old context lived on. Dolphin did all of these (its patch 0031, six fixes): after one rewind its RAM differed from a straight run's. Two kinds of help find them:
 
-- `CHIMERA_GL_STALE=1` lists the first uses of a name held from before the
-  fresh context, or of one no call made, each with the calls before it.
-  Note that a core which deletes an old name and makes a new object can get
-  the same number back from the driver, so a stale use of that number is not
-  always reported: compare what each draw does, too.
-- A state that is set rarely - the viewport, a uniform block binding - is
-  not a name at all. In a fresh context it is OpenGL's default (a 0x0
-  viewport without a surface), and the first draws after a load go nowhere.
-  Comparing `glGet` answers at the first draw after a load, with the same
-  context and with a fresh one, is what found Dolphin's last two.
+- `CHIMERA_GL_STALE=1` lists the first uses of a name held from before the fresh context, or of one no call made, each with the calls before it. Note that a core which deletes an old name and makes a new object can get the same number back from the driver, so a stale use of that number is not always reported: compare what each draw does, too.
+- A state that is set rarely - the viewport, a uniform block binding - is not a name at all. In a fresh context it is OpenGL's default (a 0x0 viewport without a surface), and the first draws after a load go nowhere. Comparing `glGet` answers at the first draw after a load, with the same context and with a fresh one, is what found Dolphin's last two.
 
 `CHIMERA_GL_SAME_CONTEXT_ON_LOAD=1` keeps the same context, for A/B.
 
 ### The one state that did not rebuild: the frame-0 anchor (issue #126, 2026-09-21)
 
-"Every bridged core already rebuilds on a moved id" was true of every state but
-one, and the exception was in each core rather than here.
+"Every bridged core already rebuilds on a moved id" was true of every state but one, and the exception was in each core rather than here.
 
-A core stores the id beside its objects in a guest static that starts at ZERO
-and is first written the first time it looks - which is at the top of a frame
-advance, because that is where a renderer can safely be torn down. Every core
-that has this reads its own stored zero the same way:
+A core stores the id beside its objects in a guest static that starts at ZERO and is first written the first time it looks - which is at the top of a frame advance, because that is where a renderer can safely be torn down. Every core that has this reads its own stored zero the same way:
 
     if (live == 0 || live == s_chimera_gl_context) return;   /* nothing moved */
     if (s_chimera_gl_context != 0) { ...rebuild... }          /* <- the hole */
     s_chimera_gl_context = live;
 
-`live == 0` really does mean "cannot tell" and a core is right to assume
-nothing moved. A STORED zero is a different statement, and it was being read as
-the same one. It means "this state was taken before the core ever looked", and
-there is exactly one such state in every session: **the greenzone's frame-0
-anchor**, captured right after Init and before the first frame advance - by
-which time the renderer's device exists and holds objects. Load it and the core
-concluded it had nothing to rebuild, while the objects in the driver were
-whatever the frames after the anchor had left: textures resized, render targets
-deleted and handed out again, framebuffers reattached. The renderer then drew
-from guest memory describing frame 0 into driver objects as of frame N. That is
-the same hazard as the section above, arriving through the one door it left
-open.
+`live == 0` really does mean "cannot tell" and a core is right to assume nothing moved. A STORED zero is a different statement, and it was being read as the same one. It means "this state was taken before the core ever looked", and there is exactly one such state in every session: **the greenzone's frame-0 anchor**, captured right after Init and before the first frame advance - by which time the renderer's device exists and holds objects. Load it and the core concluded it had nothing to rebuild, while the objects in the driver were whatever the frames after the anchor had left: textures resized, render targets deleted and handed out again, framebuffers reattached. The renderer then drew from guest memory describing frame 0 into driver objects as of frame N. That is the same hazard as the section above, arriving through the one door it left open.
 
-Reported on PCSX2 and Maximo: Ghosts to Glory - the movie played from frame 0
-or frame 1 is corrupt and from frame 2 is clean, and the branch state clears
-it. The frame numbers are the proof rather than a coincidence: TAStudio goes to
-a frame by loading the state BEFORE it and emulating forward one
-(`PriorStateForFramebuffer` is `Nearest(frame - 1)`), so frames 0 and 1 both
-reach for the frame-0 anchor and frame 2 is the first that does not.
+Reported on PCSX2 and Maximo: Ghosts to Glory - the movie played from frame 0 or frame 1 is corrupt and from frame 2 is clean, and the branch state clears it. The frame numbers are the proof rather than a coincidence: TAStudio goes to a frame by loading the state BEFORE it and emulating forward one (`PriorStateForFramebuffer` is `Nearest(frame - 1)`), so frames 0 and 1 both reach for the frame-0 anchor and frame 2 is the first that does not.
 
-Measured with `chimera-run --gpu --greenzone 4096 --rewind-loop N,1` under
-`CHIMERA_GL_TRACE=1 CHIMERA_GL_STATEAUDIT=1`, counting the calls that cross the
-bridge on the frame after the restore (PCSX2, a GS device rebuild is ~4500
-calls, an idle frame is 1):
+Measured with `chimera-run --gpu --greenzone 4096 --rewind-loop N,1` under `CHIMERA_GL_TRACE=1 CHIMERA_GL_STATEAUDIT=1`, counting the calls that cross the bridge on the frame after the restore (PCSX2, a GS device rebuild is ~4500 calls, an idle frame is 1):
 
 | restore to | before | after |
 |---|---|---|
@@ -583,20 +271,11 @@ calls, an idle frame is 1):
 | frame 2 | 4542 | 4542 |
 | a fresh boot (no load at all) | no rebuild | no rebuild, unchanged |
 
-The engine's side of the contract is unchanged and was never wrong: it mints on
-every load, and it cannot write the guest's static. The fix is a core's, and
-it is to stop inferring "a state was loaded" from the number. Chimera already
-tells every core that, through the optional `StateLoaded()` export
-(docs/porting-a-core.md), and after one of those the stored zero cannot be
-trusted:
+The engine's side of the contract is unchanged and was never wrong: it mints on every load, and it cannot write the guest's static. The fix is a core's, and it is to stop inferring "a state was loaded" from the number. Chimera already tells every core that, through the optional `StateLoaded()` export (docs/porting-a-core.md), and after one of those the stored zero cannot be trusted:
 
     if (s_chimera_gl_context != 0 || aStateWasLoadedSinceWeLastLooked) rebuild;
 
-**This shape was in every bridged core** - it was copied between them, which is
-how it came to be identical in each. Every one has now been surveyed, and each
-that was affected is fixed the same way: implement the engine's optional
-`StateLoaded()`, set the flag AFTER the load so the load cannot wipe it, and OR
-it into the guard.
+**This shape was in every bridged core** - it was copied between them, which is how it came to be identical in each. Every one has now been surveyed, and each that was affected is fixed the same way: implement the engine's optional `StateLoaded()`, set the flag AFTER the load so the load cannot wipe it, and OR it into the guard.
 
 | core | verdict | fix | calls on the frame after restoring frame 0 |
 |---|---|---|---|
@@ -608,113 +287,33 @@ it into the guard.
 | xemu | not this hole, but see below | 22637fb | - |
 | PPSSPP | not bridged at all | - | - |
 
-Where each core's zero came from differs, and the difference is only in which
-line writes the id first: flycast's `OpenGLRenderer::Init()` runs inside core
-Init (322 GL calls before frame 1) and leaves 38 live objects behind a stored
-zero; Dolphin's `s_saved_context` is first written at the top of `FrameAdvance`
-while Init has already booted to a pause with the OGL backend up; Ruffle's
-`Machine::gl_context` is a literal 0 in Init's struct and is only written at the
-BOTTOM of `FrameAdvance`; RPCS3's `m_chimera_gl_context` is first written in
-`do_local_task`, after `on_init_thread` has built every object the renderer
-holds. PPSSPP has no bridge symbols in `waterbox/` at all, no `-hw` renderer and
-only the software GPU compiled, so the reason recorded for it elsewhere in this
-document still holds.
+Where each core's zero came from differs, and the difference is only in which line writes the id first: flycast's `OpenGLRenderer::Init()` runs inside core Init (322 GL calls before frame 1) and leaves 38 live objects behind a stored zero; Dolphin's `s_saved_context` is first written at the top of `FrameAdvance` while Init has already booted to a pause with the OGL backend up; Ruffle's `Machine::gl_context` is a literal 0 in Init's struct and is only written at the BOTTOM of `FrameAdvance`; RPCS3's `m_chimera_gl_context` is first written in `do_local_task`, after `on_init_thread` has built every object the renderer holds. PPSSPP has no bridge symbols in `waterbox/` at all, no `-hw` renderer and only the software GPU compiled, so the reason recorded for it elsewhere in this document still holds.
 
-**xemu escapes this hole by accident, and that is worth writing down**:
-`nv2a_reset` drains the pfifo during `qemu_init`, so the id is written before
-the anchor is captured and the anchor is rebuilt anyway, reporting a non-zero
-context. The survey found a worse frame-0 bug there instead and fixed it in
-22637fb - loading the anchor ABORTED the core inside `StateLoaded`'s `tb_flush`
-on `!runstate_is_running()`, because the anchor is the one state that comes back
-saying RUNNING.
+**xemu escapes this hole by accident, and that is worth writing down**: `nv2a_reset` drains the pfifo during `qemu_init`, so the id is written before the anchor is captured and the anchor is rebuilt anyway, reporting a non-zero context. The survey found a worse frame-0 bug there instead and fixed it in 22637fb - loading the anchor ABORTED the core inside `StateLoaded`'s `tb_flush` on `!runstate_is_running()`, because the anchor is the one state that comes back saying RUNNING.
 
-**Two honesty notes.** No wrong PICTURE was reproduced on any core, PCSX2
-included; what connects each fix to issue #126 is the frame boundary the
-reporter described, not an observed corruption on this hardware. And flycast
-cannot test the frame-2 half at all - `triangle.elf` renders on exactly one
-frame of its life and flycast's check runs only when the renderer is about to
-draw, so a restore to frame 1 or 2 reads the same with the bug and without it.
-The control used there is the same drawing frame with no restore, which is
-gates.md mode E and is recorded in flycast's PLAN.md; a render-every-frame test
-program would settle it and that repo has none.
+**Two honesty notes.** No wrong PICTURE was reproduced on any core, PCSX2 included; what connects each fix to issue #126 is the frame boundary the reporter described, not an observed corruption on this hardware. And flycast cannot test the frame-2 half at all - `triangle.elf` renders on exactly one frame of its life and flycast's check runs only when the renderer is about to draw, so a restore to frame 1 or 2 reads the same with the bug and without it. The control used there is the same drawing frame with no restore, which is gates.md mode E and is recorded in flycast's PLAN.md; a render-every-frame test program would settle it and that repo has none.
 
-**A leg that cannot go red is not a leg.** Each core's leg was watched failing
-on the build that had the bug (PCSX2's and RPCS3's `gl:rebuild-at-zero` among
-them). Where the flag's absence genuinely cannot be observed - because the id is
-already non-zero by the time the anchor is captured - the survey ran a POSITIVE
-control instead, a build whose guard was the after-load flag ALONE, proving the
-export reaches the renderer, and said plainly in that core's PLAN.md that the
-flag's absence is unobservable. Say which of the two a leg is.
+**A leg that cannot go red is not a leg.** Each core's leg was watched failing on the build that had the bug (PCSX2's and RPCS3's `gl:rebuild-at-zero` among them). Where the flag's absence genuinely cannot be observed - because the id is already non-zero by the time the anchor is captured - the survey ran a POSITIVE control instead, a build whose guard was the after-load flag ALONE, proving the export reaches the renderer, and said plainly in that core's PLAN.md that the flag's absence is unobservable. Say which of the two a leg is.
 
-One trap for anyone borrowing another core's leg: PCSX2's asserts that the
-frame after a restore crosses the bridge thousands of times, because an idle
-frame of its program crosses it once. That test PASSES on a broken RPCS3, whose
-frame-0 restore replays the program's own gcm setup - 3549 calls with or without
-a rebuild. The obvious A/B, the same restore under
-`CHIMERA_GL_KEEP_OBJECTS_ON_LOAD`, is not a control at frame 0 either: that
-switch only stops the engine MINTING, and a stored zero differs from the live id
-however little it moved. A borrowed threshold is not a borrowed test.
+One trap for anyone borrowing another core's leg: PCSX2's asserts that the frame after a restore crosses the bridge thousands of times, because an idle frame of its program crosses it once. That test PASSES on a broken RPCS3, whose frame-0 restore replays the program's own gcm setup - 3549 calls with or without a rebuild. The obvious A/B, the same restore under `CHIMERA_GL_KEEP_OBJECTS_ON_LOAD`, is not a control at frame 0 either: that switch only stops the engine MINTING, and a stored zero differs from the live id however little it moved. A borrowed threshold is not a borrowed test.
 
 ### ...unless the core says otherwise (user-decided, 2026-09-17)
 
-For one core the rebuild is the damage rather than the repair. RPCS3 keeps the
-picture in the render targets and texture cache that a rebuild tears down, and
-a rewind then clears the window to opaque black while the machine rewinds and
-plays on correctly - measured on Prince of Persia (BLUS30214) on the GTX 1060 as
-100% near-black and ONE colour, against a rewind with the rebuild skipped that
-reproduced a straight run byte for byte. Drawing 1, 5, 30 or 100 frames before
-the capture changed nothing, so it is not the warm-up problem PCSX2 had; three
-rewinds and the RSX thread aborted inside the emptied texture cache, taking all
-26 threads with it.
+For one core the rebuild is the damage rather than the repair. RPCS3 keeps the picture in the render targets and texture cache that a rebuild tears down, and a rewind then clears the window to opaque black while the machine rewinds and plays on correctly - measured on Prince of Persia (BLUS30214) on the GTX 1060 as 100% near-black and ONE colour, against a rewind with the rebuild skipped that reproduced a straight run byte for byte. Drawing 1, 5, 30 or 100 frames before the capture changed nothing, so it is not the warm-up problem PCSX2 had; three rewinds and the RSX thread aborted inside the emptied texture cache, taking all 26 threads with it.
 
-The two events were being asked one question. A cross-session REOPEN really is
-a new context and every core must rebuild. A same-session LOAD is not: the
-context is alive and the objects are valid, and whether rebuilding helps depends
-on where the core keeps its picture.
+The two events were being asked one question. A cross-session REOPEN really is a new context and every core must rebuild. A same-session LOAD is not: the context is alive and the objects are valid, and whether rebuilding helps depends on where the core keeps its picture.
 
-So a core answers for itself with `video.rebuildOnStateLoad`, and ABSENT MEANS
-TRUE - a package that never mentions it behaves exactly as before, and only
-RPCS3, which declares false, is changed. A reopen still mints at `ce_gl_start`,
-so the rebuild described above still happens where it is needed. The engine
-parses and applies it beside `video.drawEveryFrame`, for that declaration's own
-reason: it is a property of the core, and every host that opens the package -
-the frontend, chimera-run, a gate - needs it to hold without being told.
+So a core answers for itself with `video.rebuildOnStateLoad`, and ABSENT MEANS TRUE - a package that never mentions it behaves exactly as before, and only RPCS3, which declares false, is changed. A reopen still mints at `ce_gl_start`, so the rebuild described above still happens where it is needed. The engine parses and applies it beside `video.drawEveryFrame`, for that declaration's own reason: it is a property of the core, and every host that opens the package - the frontend, chimera-run, a gate - needs it to hold without being told.
 
-Still open: WHY the flip produces black. The window is cleared to opaque black
-exactly when `image_to_flip` is null, and the CPU-upload fallback that should
-prevent that fires during normal forward play while the picture is correct.
-Five source-level explanations were checked and all were wrong.
+Still open: WHY the flip produces black. The window is cleared to opaque black exactly when `image_to_flip` is null, and the CPU-upload fallback that should prevent that fires during normal forward play while the picture is correct. Five source-level explanations were checked and all were wrong.
 
-RESOLVED the same day. The cause was found by bisecting RPCS3's teardown with a
-runtime-selectable skip per step: `gl::driver_state` caches what is bound so a
-redundant call can be skipped, and the rebuild never reset it. Teardown frees
-the stream buffers' texture views, the driver hands the just-freed names
-straight back, and `bind_texture` finds the name "already bound" and skips the
-bind - while deleting the old texture had unbound it, so every vertex fetch read
-nothing. A full rebuild minus ONLY the stream-buffer reset drew a picture (the
-new names differed, so the cache missed). Fixed in the core (rpcs3 patch 0024,
-`driver_state::reset()` between teardown and setup), with patch 0025 for the
-texture cache's `clear()` sentinel that caused the abort. RPCS3 therefore no
-longer declares `video.rebuildOnStateLoad` and rebuilds on a load like every
-other core; the declaration stays in the engine, default true, for a core that
-genuinely needs it. Verified: rebuild active, five rewinds, 12.34% near-black
-and 44,375 colours against a straight-run control of 12.34% / 44,384.
+RESOLVED the same day. The cause was found by bisecting RPCS3's teardown with a runtime-selectable skip per step: `gl::driver_state` caches what is bound so a redundant call can be skipped, and the rebuild never reset it. Teardown frees the stream buffers' texture views, the driver hands the just-freed names straight back, and `bind_texture` finds the name "already bound" and skips the bind - while deleting the old texture had unbound it, so every vertex fetch read nothing. A full rebuild minus ONLY the stream-buffer reset drew a picture (the new names differed, so the cache missed). Fixed in the core (rpcs3 patch 0024, `driver_state::reset()` between teardown and setup), with patch 0025 for the texture cache's `clear()` sentinel that caused the abort. RPCS3 therefore no longer declares `video.rebuildOnStateLoad` and rebuilds on a load like every other core; the declaration stays in the engine, default true, for a core that genuinely needs it. Verified: rebuild active, five rewinds, 12.34% near-black and 44,375 colours against a straight-run control of 12.34% / 44,384.
 
-Running every core's rebuild after every rewind turned up a bug in the bridge's
-buffer pool (see `bufferPool()` in gl_bridge.cpp). Dolphin crashed on its first
-pass: its JIT vertex loader wrote a batch of vertices to address 0. The same run
-with the id left alone went 19 passes, and with `CHIMERA_GL_NO_POOL` it passed
-too. A log in Dolphin's `ResetBuffer` found the cause:
+Running every core's rebuild after every rewind turned up a bug in the bridge's buffer pool (see `bufferPool()` in gl_bridge.cpp). Dolphin crashed on its first pass: its JIT vertex loader wrote a batch of vertices to address 0. The same run with the id left alone went 19 passes, and with `CHIMERA_GL_NO_POOL` it passed too. A log in Dolphin's `ResetBuffer` found the cause:
 
     [chimera-vm] vertex Map NULL: err=0 ours=3 isBuffer=1 bound=3 bound_mapped=1
 
-The pool keeps a deleted buffer's name instead of deleting it, on the grounds
-that a guest will call `glBufferData` on it again and replace everything. That
-holds for mutable storage only. Dolphin's stream buffers are
-`glBufferStorage`, immutable and persistently mapped, and its rebuild deletes
-them. A recycled name came back still mapped, or with its storage fixed, and the
-new buffer's storage call and map failed. `CHIMERA_GL_POOL_TRACE` showed the last
-case exactly:
+The pool keeps a deleted buffer's name instead of deleting it, on the grounds that a guest will call `glBufferData` on it again and replace everything. That holds for mutable storage only. Dolphin's stream buffers are `glBufferStorage`, immutable and persistently mapped, and its rebuild deletes them. A recycled name came back still mapped, or with its storage fixed, and the new buffer's storage call and map failed. `CHIMERA_GL_POOL_TRACE` showed the last case exactly:
 
     [pool] storage target=0x8c2a bound=0 size=16777216 ...  (texel buffer 5)
     [pool] delete 5: ours=1 mapped=0 immutable=0 -> pooled
@@ -722,87 +321,27 @@ case exactly:
     [pool] storage target=0x8892 bound=5 size=67108864 flags=0xc2 err=0x502
     [pool] mapRange target=0x8892 bound=5 access=0xc2 -> 0000000000000000
 
-The texel buffer lives on `GL_TEXTURE_BUFFER`, a target the tracking did not yet
-know, so it was never marked immutable. It came back as the vertex buffer,
-`glBufferStorage` refused it, and the map handed Dolphin NULL.
+The texel buffer lives on `GL_TEXTURE_BUFFER`, a target the tracking did not yet know, so it was never marked immutable. It came back as the vertex buffer, `glBufferStorage` refused it, and the map handed Dolphin NULL.
 
-The pool now notes maps, unmaps and immutable storage as they cross, on every
-buffer target GL has, and never recycles a buffer that is mapped or immutable;
-deleting one is a real delete. A map or storage call on a target it cannot
-identify turns the pool off for the rest of the process. A reopen could hit the
-same path; rewinding just hits it more often.
+The pool now notes maps, unmaps and immutable storage as they cross, on every buffer target GL has, and never recycles a buffer that is mapped or immutable; deleting one is a real delete. A map or storage call on a target it cannot identify turns the pool off for the rest of the process. A reopen could hit the same path; rewinding just hits it more often.
 
-A second bug in the same pool showed up on Ruffle (2026-09-15). After a rewind
-its picture came back with the background missing, and `CHIMERA_GL_CHECK` showed
-glBufferSubData refused with GL_INVALID_VALUE after every rebuild; with
-`CHIMERA_GL_NO_POOL` the picture was exact. A name already in the pool still
-counted as one the pool had made, so a guest deleting it a second time pushed it
-again, and two later gens were served the same buffer. The second owner's
-`glBufferData` shrank the first owner's storage. Deleting a deleted name is
-legal GL, and after a restore it is ordinary: the restored renderer lets go of
-handles whose buffers were already deleted by the frames after the restored
-one. A pooled name is now marked, and a delete of it does nothing, as the
-driver would. The bookkeeping is in `gl_buffer_pool.h`, and
-`test_gl_buffer_pool` checks it without a driver.
+A second bug in the same pool showed up on Ruffle (2026-09-15). After a rewind its picture came back with the background missing, and `CHIMERA_GL_CHECK` showed glBufferSubData refused with GL_INVALID_VALUE after every rebuild; with `CHIMERA_GL_NO_POOL` the picture was exact. A name already in the pool still counted as one the pool had made, so a guest deleting it a second time pushed it again, and two later gens were served the same buffer. The second owner's `glBufferData` shrank the first owner's storage. Deleting a deleted name is legal GL, and after a restore it is ordinary: the restored renderer lets go of handles whose buffers were already deleted by the frames after the restored one. A pooled name is now marked, and a delete of it does nothing, as the driver would. The bookkeeping is in `gl_buffer_pool.h`, and `test_gl_buffer_pool` checks it without a driver.
 
 ### What the frontend does with that
 
-A core declares `video.gpuStatesSurviveTheContext` when its renderer does this,
-and a project records it (`GpuStatesSurvive`) so that the answer is there when
-the cached states are opened - by which time there is no core to ask. Since
-2026-09-13 the declaration is recorded but NOT honored: a machine a GPU drew
-keeps its states for its own session whatever it declares. The project writes
-none into its greenzone and uses none from an older one, branch states
-included, and says so when it opens. What changed it: a Ruffle greenzone saved
-by one process and restored twenty-one frames deep in the next crashed inside
-the NVIDIA driver (0xc0000409), reproducibly - a path the old
-drop-everything-ahead capture had kept anyone from reaching (see
-docs/history/design-principles.md, "A GPU core's word that its states survive is not
-taken"). The in-process reopen below still works; it is the cross-process
-restore that is unproven. It was honored again on 2026-09-14 and withdrawn the same day, when a history written by a session that was already corrupting its guest crashed the driver on every open of the project (docs/history/design-principles.md, "A GPU core's word is withdrawn again, after it bricked a project"). Rewind and branches within a session keep their states
-either way - a load there moves the id and the core rebuilds (see "Per load,
-too" above) - and a project that loses its cache replays,
-which is what an empty greenzone has always meant.
+A core declares `video.gpuStatesSurviveTheContext` when its renderer does this, and a project records it (`GpuStatesSurvive`) so that the answer is there when the cached states are opened - by which time there is no core to ask. Since 2026-09-13 the declaration is recorded but NOT honored: a machine a GPU drew keeps its states for its own session whatever it declares. The project writes none into its greenzone and uses none from an older one, branch states included, and says so when it opens. What changed it: a Ruffle greenzone saved by one process and restored twenty-one frames deep in the next crashed inside the NVIDIA driver (0xc0000409), reproducibly - a path the old drop-everything-ahead capture had kept anyone from reaching (see docs/history/design-principles.md, "A GPU core's word that its states survive is not taken"). The in-process reopen below still works; it is the cross-process restore that is unproven. It was honored again on 2026-09-14 and withdrawn the same day, when a history written by a session that was already corrupting its guest crashed the driver on every open of the project (docs/history/design-principles.md, "A GPU core's word is withdrawn again, after it bricked a project"). Rewind and branches within a session keep their states either way - a load there moves the id and the core rebuilds (see "Per load, too" above) - and a project that loses its cache replays, which is what an empty greenzone has always meant.
 
-What stands now: the greenzone of a GPU-drawn machine is kept across a clean
-close for the cores whose states have been SHOWN to reload in another process,
-and since 2026-10-06 a branch's state is kept under exactly the same rule
-(docs/history/design-principles.md, "A branch's state follows the greenzone's rule").
+What stands now: the greenzone of a GPU-drawn machine is kept across a clean close for the cores whose states have been SHOWN to reload in another process, and since 2026-10-06 a branch's state is kept under exactly the same rule (docs/history/design-principles.md, "A branch's state follows the greenzone's rule").
 
 ### Keeping the greenzone across sessions (user-decided, 2026-10-18)
 
-Which cores those are is the core's own declaration, `video.greenzoneSurvivesReload`
-in its `waterbox.config`. Until 2026-10-18 it was a list of seven core names in
-the interface, which the rule that no core is known by name forbids. A core
-declares it only on evidence, measured in its own repository: a project's
-greenzone saved by one process, loaded by another, and the frame after it drawn
-the same, pixel for pixel, with no guest death and a control frame that really
-differs. `gpuStatesSurviveTheContext` is not that evidence and is not enough on
-its own. Each save writes what the running core declares into the project
-(header `GreenzoneSurvivesReload`), because a project is read before its core is
-booted; a core that stops declaring it stops having its greenzone kept from the
-next save on. A project saved before 2026-10-18 has no such header, so its
-greenzone starts empty the first time it is opened, and is kept after its next
-save.
+Which cores those are is the core's own declaration, `video.greenzoneSurvivesReload` in its `waterbox.config`. Until 2026-10-18 it was a list of seven core names in the interface, which the rule that no core is known by name forbids. A core declares it only on evidence, measured in its own repository: a project's greenzone saved by one process, loaded by another, and the frame after it drawn the same, pixel for pixel, with no guest death and a control frame that really differs. `gpuStatesSurviveTheContext` is not that evidence and is not enough on its own. Each save writes what the running core declares into the project (header `GreenzoneSurvivesReload`), because a project is read before its core is booted; a core that stops declaring it stops having its greenzone kept from the next save on. A project saved before 2026-10-18 has no such header, so its greenzone starts empty the first time it is opened, and is kept after its next save.
 
-Every core that draws on the host's GPU now says yes. Saying it is not the same
-as doing it, so `tests/gpu/run-reopen.sh` asks: open, play, save, close, open
-again IN THE SAME PROCESS, load the state, keep playing. A fresh process per run
-never asks the question, which is why this went unnoticed for so long.
+Every core that draws on the host's GPU now says yes. Saying it is not the same as doing it, so `tests/gpu/run-reopen.sh` asks: open, play, save, close, open again IN THE SAME PROCESS, load the state, keep playing. A fresh process per run never asks the question, which is why this went unnoticed for so long.
 
-What "keep playing" has to mean is the whole of it. Not crashing is not the
-check: a renderer holding a dead context's objects comes back garbled, or
-silent, or stuck on one frame, and every one of those passes "it did not crash
-and something was lit". So the reopened run is compared against a run that never
-stopped. Where a core exposes memory domains, RAM is the assertion - a hardware
-renderer's picture may legitimately wobble, but a TAS is only a TAS because the
-same inputs from the same state produce the same MACHINE - and the picture is
-measured beside it. Where a core exposes none, as ruffle does, the picture and
-the sound are all anyone outside can see, and they become the assertion instead.
+What "keep playing" has to mean is the whole of it. Not crashing is not the check: a renderer holding a dead context's objects comes back garbled, or silent, or stuck on one frame, and every one of those passes "it did not crash and something was lit". So the reopened run is compared against a run that never stopped. Where a core exposes memory domains, RAM is the assertion - a hardware renderer's picture may legitimately wobble, but a TAS is only a TAS because the same inputs from the same state produce the same MACHINE - and the picture is measured beside it. Where a core exposes none, as ruffle does, the picture and the sound are all anyone outside can see, and they become the assertion instead.
 
-Measured 2026-09-08, one game each, on llvmpipe AND on a GTX 1060 (NVIDIA
-581.42) - both, because a renderer that mishandles a context change can easily
-do it on one driver and not the other:
+Measured 2026-09-08, one game each, on llvmpipe AND on a GTX 1060 (NVIDIA 581.42) - both, because a renderer that mishandles a context change can easily do it on one driver and not the other:
 
 | core | reopens onto its own states |
 |---|---|
@@ -813,452 +352,139 @@ do it on one driver and not the other:
 | dolphin | yes, once fixed - see below |
 | rpcs3 | not known: it will not boot on this machine, failing in its own audio overlay setup |
 
-Both failures reproduced identically on the two drivers, so neither was a driver
-quirk. Both were fixed in their own repos; what follows is what they were,
-because they are the two shapes this bridge's contract can be got wrong in.
+Both failures reproduced identically on the two drivers, so neither was a driver quirk. Both were fixed in their own repos; what follows is what they were, because they are the two shapes this bridge's contract can be got wrong in.
 
-**Ruffle rebuilt its renderer but not its quality.** The stage's quality lives
-in the player and is pushed down to the backend only when it is SET
-(`Stage::set_quality` ends in `renderer.set_quality`), so a backend built during
-a rebuild started at its own default - which for wgpu decides the MSAA sample
-count. The movie carried on being drawn with anti-aliasing effectively off:
-11.6% of pixels differed at the default `high`, 0% at `low`, where there is
-nothing smoothed to lose. Reading the quality back off the player and setting it
-again re-pushes it. Verified by rebuilding the core: identical at low, high and
-best, and the reopened run now lands on the high-quality pixel count it used to
-miss.
+**Ruffle rebuilt its renderer but not its quality.** The stage's quality lives in the player and is pushed down to the backend only when it is SET (`Stage::set_quality` ends in `renderer.set_quality`), so a backend built during a rebuild started at its own default - which for wgpu decides the MSAA sample count. The movie carried on being drawn with anti-aliasing effectively off: 11.6% of pixels differed at the default `high`, 0% at `low`, where there is nothing smoothed to lose. Reading the quality back off the player and setting it again re-pushes it. Verified by rebuilding the core: identical at low, high and best, and the reopened run now lands on the high-quality pixel count it used to miss.
 
-**Dolphin needed two fixes, and the second one was the interesting one.** The
-crash was a null framebuffer: the rebuild cleared `m_current_framebuffer` and
-the machine draws through `BPFunctions::SetScissorAndViewport` as soon as it
-runs, which dereferences it. Binding the EFB afterwards fixes that.
+**Dolphin needed two fixes, and the second one was the interesting one.** The crash was a null framebuffer: the rebuild cleared `m_current_framebuffer` and the machine draws through `BPFunctions::SetScissorAndViewport` as soon as it runs, which dereferences it. Binding the EFB afterwards fixes that.
 
-Underneath was a picture that came back wrong and never recovered - 62% of the
-pixels 40 frames after the load, 99.7% after 240. `GetXFBTexture`, asked for the
-picture, prefers a copy of the XFB kept in VRAM: the crisp one, rendered at
-internal resolution and never round-tripped through the console's YUV
-framebuffer. That copy lives in a GL context and nowhere in the machine, so no
-savestate carries it, and a reopened run had only the RAM decode to fall back
-on. Dolphin now always decodes the XFB from the machine's own memory.
+Underneath was a picture that came back wrong and never recovered - 62% of the pixels 40 frames after the load, 99.7% after 240. `GetXFBTexture`, asked for the picture, prefers a copy of the XFB kept in VRAM: the crisp one, rendered at internal resolution and never round-tripped through the console's YUV framebuffer. That copy lives in a GL context and nowhere in the machine, so no savestate carries it, and a reopened run had only the RAM decode to fall back on. Dolphin now always decodes the XFB from the machine's own memory.
 
-That is the rule the core already applied to the copies themselves
-(`SKIP_XFB_COPY_TO_RAM` off, "the machine's video memory stays machine state");
-presenting from VRAM while hashing RAM was the half that had been left out, and
-it meant what you watched was not what the machine held. The check that it is
-the right way round: the GL renderer now agrees with the software renderer,
-which has no VRAM to prefer and is the machine's own answer. It costs the
-upscaled presentation - a fidelity a TAS has no business depending on.
+That is the rule the core already applied to the copies themselves (`SKIP_XFB_COPY_TO_RAM` off, "the machine's video memory stays machine state"); presenting from VRAM while hashing RAM was the half that had been left out, and it meant what you watched was not what the machine held. The check that it is the right way round: the GL renderer now agrees with the software renderer, which has no VRAM to prefer and is the machine's own answer. It costs the upscaled presentation - a fidelity a TAS has no business depending on.
 
-A reopened dolphin run is now byte-identical to one that never stopped, across
-RAM, ARAM, the L1 cache, audio and every pixel, at 40, 120 and 240 frames past
-the load. Its package declares `gpuStatesSurviveTheContext: true` again.
+A reopened dolphin run is now byte-identical to one that never stopped, across RAM, ARAM, the L1 cache, audio and every pixel, at 40, 120 and 240 frames past the load. Its package declares `gpuStatesSurviveTheContext: true` again.
 
-Getting there took three wrong explanations - the EFB framebuffer, then EFB
-copies, then the texture cache as a whole - each of them reasoned rather than
-measured, and each disproved by building the core without the part it blamed.
-What finally pointed at the XFB was counting what the cache actually held at
-rebuild time: ten entries, none of them EFB copies, and keeping only the single
-XFB one made the reopen identical.
+Getting there took three wrong explanations - the EFB framebuffer, then EFB copies, then the texture cache as a whole - each of them reasoned rather than measured, and each disproved by building the core without the part it blamed. What finally pointed at the XFB was counting what the cache actually held at rebuild time: ten entries, none of them EFB copies, and keeping only the single XFB one made the reopen identical.
 
-The isolation that found both is worth keeping in mind: reload into the session
-that MADE the state, and reopen with no GPU bridge at all. When those two are
-byte-identical and only the reopen-with-bridge differs, the rebuild is the only
-thing left.
+The isolation that found both is worth keeping in mind: reload into the session that MADE the state, and reopen with no GPU bridge at all. When those two are byte-identical and only the reopen-with-bridge differs, the rebuild is the only thing left.
 
-Dolphin declares that its states survive and has the patch that ought to make
-them (`0020-chimera-the-renderer-rebuilds-its-gl-objects-when-the-context-is-gone`),
-but the rebuild itself falls over. What was established:
+Dolphin declares that its states survive and has the patch that ought to make them (`0020-chimera-the-renderer-rebuilds-its-gl-objects-when-the-context-is-gone`), but the rebuild itself falls over. What was established:
 
 - It is the GPU bridge. With no host context the same reopen works.
-- It is not savestates. Reloading into the session that MADE the state works,
-  with the bridge live and the OGL backend running.
-- It is the rebuild path, which only runs when the context id has changed - the
-  one thing that differs between those two cases.
-- It dies on the very first frame after the load, at the first instruction of
-  `AbstractGfx::ConvertFramebufferRectangle(const Rectangle&, const AbstractFramebuffer*)`,
-  which immediately dereferences that pointer for `GetWidth()`. The fault reads
-  address 0x3c, so the framebuffer is null.
+- It is not savestates. Reloading into the session that MADE the state works, with the bridge live and the OGL backend running.
+- It is the rebuild path, which only runs when the context id has changed - the one thing that differs between those two cases.
+- It dies on the very first frame after the load, at the first instruction of `AbstractGfx::ConvertFramebufferRectangle(const Rectangle&, const AbstractFramebuffer*)`, which immediately dereferences that pointer for `GetWidth()`. The fault reads address 0x3c, so the framebuffer is null.
 
-`ChimeraRebuildGLObjects` ends by setting `m_current_framebuffer = nullptr`, and
-something draws before anything binds one again. That is the thing to look at
-first in `chimera-core-dolphin`; the fix belongs there and not here, since the
-engine's side of the contract - mint an id per session, answer `GL_OP_CONTEXT_ID`
-with it - is doing exactly what the other four cores rebuild on.
+`ChimeraRebuildGLObjects` ends by setting `m_current_framebuffer = nullptr`, and something draws before anything binds one again. That is the thing to look at first in `chimera-core-dolphin`; the fix belongs there and not here, since the engine's side of the contract - mint an id per session, answer `GL_OP_CONTEXT_ID` with it - is doing exactly what the other four cores rebuild on.
 
 ## What the bridge will not do for a core (2026-10-18)
 
 Found by the engine analysis of 2026-10-18; each used to end Chimera.
 
-- **A function the driver does not provide.** glad leaves its pointer null,
-  and the core is given a wrapper for every name, so a renderer that checks a
-  function pointer rather than the version or the extension string reached a
-  call through null. Every case, generated or written here, now answers 0, as
-  a call the driver refused, and the log says which function, once.
-- **Memory the core does not have.** Before the driver reads a buffer the core
-  hands it (glBufferData, glBufferSubData, the named and storage forms) or a
-  readback writes into the core's memory, the range is asked of the sandbox
-  (wbx_guest_range_ok): allocated pages with the access needed. A pointer into
-  memory the core gave back is a refused call, said once, not a fault in the
-  driver. An unsized readback is checked as far as its first byte. Other GL
-  calls that take a pointer are not checked yet.
-- **The readback guard.** With a pack row length smaller than the width the
-  rows overlap and GL writes more than rowStride * height; the guard's buffer
-  was sized for the smaller number and the driver wrote past it, into
-  Chimera's heap. And with a row length larger than the width, or rows padded
-  to the pack alignment, the bytes between rows are the core's own: the guard
-  copied its whole buffer back, handing the core whatever an earlier readback
-  had left there (xemu reads surfaces straight into console RAM, so the
-  machine depended on what was read before it). The buffer now covers what GL
-  writes, and only GL's rows are copied back.
+- **A function the driver does not provide.** glad leaves its pointer null, and the core is given a wrapper for every name, so a renderer that checks a function pointer rather than the version or the extension string reached a call through null. Every case, generated or written here, now answers 0, as a call the driver refused, and the log says which function, once.
+- **Memory the core does not have.** Before the driver reads a buffer the core hands it (glBufferData, glBufferSubData, the named and storage forms) or a readback writes into the core's memory, the range is asked of the sandbox (wbx_guest_range_ok): allocated pages with the access needed. A pointer into memory the core gave back is a refused call, said once, not a fault in the driver. An unsized readback is checked as far as its first byte. Other GL calls that take a pointer are not checked yet.
+- **The readback guard.** With a pack row length smaller than the width the rows overlap and GL writes more than rowStride * height; the guard's buffer was sized for the smaller number and the driver wrote past it, into Chimera's heap. And with a row length larger than the width, or rows padded to the pack alignment, the bytes between rows are the core's own: the guard copied its whole buffer back, handing the core whatever an earlier readback had left there (xemu reads surfaces straight into console RAM, so the machine depended on what was read before it). The buffer now covers what GL writes, and only GL's rows are copied back.
 
 ## Mapped buffers are the core's own memory (user-decided, 2026-10-19)
 
-When a renderer maps a GL buffer (glMapBufferRange, glMapBuffer and their
-named forms), the driver answers with a pointer to memory of its own. The
-bridge used to hand that pointer to the core, and the core wrote outside its
-sandbox: those bytes were in no saved state, and the pointer pointed at
-nothing once the context was replaced (a load that rebuilds makes a fresh
-one). Now a mapping the core flushes or unmaps is a buffer in the core's own
-memory, a "shadow":
+When a renderer maps a GL buffer (glMapBufferRange, glMapBuffer and their named forms), the driver answers with a pointer to memory of its own. The bridge used to hand that pointer to the core, and the core wrote outside its sandbox: those bytes were in no saved state, and the pointer pointed at nothing once the context was replaced (a load that rebuilds makes a fresh one). Now a mapping the core flushes or unmaps is a buffer in the core's own memory, a "shadow":
 
-- The core's wrapper for the map call (generated in miniBox,
-  `source/gl/gen-gl-bridge.py`) allocates the shadow and hands it in.
-  Chimera maps the driver's buffer and answers the shadow. The wrapper keeps
-  one freed shadow for the next map of a like size: RPCS3 maps 3.6 MB
-  and unmaps it every two or three frames, and new memory each time made
-  its first 900 frames about 1.5 seconds slower on the GTX 1060 (every page
-  faulted in again).
-- The shadow is filled from the driver only when the core may read it, or
-  when the unmap copies all of it back (then the bytes the core did not
-  write must stay as they were). A map that lets the old bytes go, or that
-  is written and flushed range by range, is not filled: reading a mapping a
-  driver made for writing is slow (the Vulkan bridge measured 25 ms for 2 MB
-  on a GTX 1060).
-- Each glFlushMappedBufferRange copies the flushed bytes to the driver. The
-  unmap copies the whole range, unless the core flushes range by range or
-  only reads, and hands the shadow back for the wrapper to free.
-- A whole-buffer map asks Chimera for the buffer's size first
-  (`GL_OP_BUFFER_SIZE` in miniBox `gl-bridge.h`).
-- A persistent mapping that is not flushed explicitly (a coherent one, or
-  one that is only read) keeps the driver's pointer, as before. Its writes
-  reach the GPU with no call at all, so there is no moment to copy them
-  except before every draw. The owner chose this split.
-- After a load that keeps the context (a core that declares
-  `video.rebuildOnStateLoad` false, or a second session holding the
-  context), a mapping still open that is not persistent was made by the
-  frames the load threw away. At the first GL call after the load the
-  driver's mapping is closed; nothing is copied, and the shadow is not handed
-  back, since the restored core does not know it and freeing it could free
-  memory the restored core uses. The core's next map of that buffer works.
-  Persistent shadows stay open: the restored core holds the same one.
+- The core's wrapper for the map call (generated in miniBox, `source/gl/gen-gl-bridge.py`) allocates the shadow and hands it in. Chimera maps the driver's buffer and answers the shadow. The wrapper keeps one freed shadow for the next map of a like size: RPCS3 maps 3.6 MB and unmaps it every two or three frames, and new memory each time made its first 900 frames about 1.5 seconds slower on the GTX 1060 (every page faulted in again).
+- The shadow is filled from the driver only when the core may read it, or when the unmap copies all of it back (then the bytes the core did not write must stay as they were). A map that lets the old bytes go, or that is written and flushed range by range, is not filled: reading a mapping a driver made for writing is slow (the Vulkan bridge measured 25 ms for 2 MB on a GTX 1060).
+- Each glFlushMappedBufferRange copies the flushed bytes to the driver. The unmap copies the whole range, unless the core flushes range by range or only reads, and hands the shadow back for the wrapper to free.
+- A whole-buffer map asks Chimera for the buffer's size first (`GL_OP_BUFFER_SIZE` in miniBox `gl-bridge.h`).
+- A persistent mapping that is not flushed explicitly (a coherent one, or one that is only read) keeps the driver's pointer, as before. Its writes reach the GPU with no call at all, so there is no moment to copy them except before every draw. The owner chose this split.
+- After a load that keeps the context (a core that declares `video.rebuildOnStateLoad` false, or a second session holding the context), a mapping still open that is not persistent was made by the frames the load threw away. At the first GL call after the load the driver's mapping is closed; nothing is copied, and the shadow is not handed back, since the restored core does not know it and freeing it could free memory the restored core uses. The core's next map of that buffer works. Persistent shadows stay open: the restored core holds the same one.
 
-A core and Chimera built on either side of this work together. A core built
-before it hands in no shadow and gets the driver's pointer. A core built with
-it, on an older Chimera, gets the driver's pointer too: the older Chimera
-ignores the shadow and answers 0 to the size question, and the wrapper frees
-the shadow.
+A core and Chimera built on either side of this work together. A core built before it hands in no shadow and gets the driver's pointer. A core built with it, on an older Chimera, gets the driver's pointer too: the older Chimera ignores the shadow and answers 0 to the size question, and the wrapper frees the shadow.
 
-`CHIMERA_GL_SHADOW_TRACE=1` prints the first 20 shadows and then every power
-of two, with the buffer, its size, and whether it was filled.
+`CHIMERA_GL_SHADOW_TRACE=1` prints the first 20 shadows and then every power of two, with the buffer, its size, and whether it was filled.
 
 ## The flight recorder (2026-09-13)
 
-A driver that finds its own state corrupt fast-fails: the process ends inside
-the GL call, and no trace switch, handler or flush runs after it. The crash
-that made the rule above (nvoglv64.dll, 0xc0000409, restoring a Ruffle state in
-a new process) was read from the Windows event log - a module and an offset,
-and nothing about what the renderer had just asked the driver to do.
+A driver that finds its own state corrupt fast-fails: the process ends inside the GL call, and no trace switch, handler or flush runs after it. The crash that made the rule above (nvoglv64.dll, 0xc0000409, restoring a Ruffle state in a new process) was read from the Windows event log - a module and an offset, and nothing about what the renderer had just asked the driver to do.
 
-So the bridge keeps a flight recorder, always on: a fixed ring of the last 8192
-crossings in libchimera's memory (`ce_gl_flight_recorder` hands out its address
-and size). Each GL call writes its opcode BEFORE the driver is called, so a
-crash inside a call leaves that call newest. Markers share the ring: a frame
-taking the context and giving it back (with the calls it made), a state loaded
-(with the frame it went to), a session taking the bridge (a fresh context id),
-the context destroyed. It costs two stores and an increment a call, nothing
-beside a crossing, and it is written unsynchronised - a restore on another
-thread can tear one entry. It is always on because the crash that needs it is
-never the run somebody switched a trace on for.
+So the bridge keeps a flight recorder, always on: a fixed ring of the last 8192 crossings in libchimera's memory (`ce_gl_flight_recorder` hands out its address and size). Each GL call writes its opcode BEFORE the driver is called, so a crash inside a call leaves that call newest. Markers share the ring: a frame taking the context and giving it back (with the calls it made), a state loaded (with the frame it went to), a session taking the bridge (a fresh context id), the context destroyed. It costs two stores and an increment a call, nothing beside a crossing, and it is written unsynchronised - a restore on another thread can tear one entry. It is always on because the crash that needs it is never the run somebody switched a trace on for.
 
-Nothing in Chimera reads it. The frontend puts its address in the crash block
-(docs/project.md, "Crash notes"); the crash module, running in WerFault.exe,
-reads the ring out of the dead process and writes the last calls into the note,
-oldest first, repeats folded (`glUniform4fv x37`), named from miniBox's master
-list - generated into the module at build time, so the numbering is the
-bridge's. `test_gl_flight` holds the layout to what the module reads.
+Nothing in Chimera reads it. The frontend puts its address in the crash block (docs/project.md, "Crash notes"); the crash module, running in WerFault.exe, reads the ring out of the dead process and writes the last calls into the note, oldest first, repeats folded (`glUniform4fv x37`), named from miniBox's master list - generated into the module at build time, so the numbering is the bridge's. `test_gl_flight` holds the layout to what the module reads.
 
-**Vulkan commands too (2026-10-15, chimera issues 276 and 278).** Two Vulkan
-drivers (AMD's for Xenia, Intel's for Dolphin) crashed with notes that named
-the driver and nothing it had been given. miniBox's Vulkan host now tells a
-hook each command before the driver sees it
-(`chimera_vk_host_set_call_hook`); the session points it at
-`ce_vk_flight_note`, which writes the opcode plus 0x40000000 into the same
-ring. The crash module names those from miniBox's Vulkan list
-(`source/crash/gen-vk-names.py`), so a note now reads `vk vkCmdEndRenderPass`
-among the GL calls and markers, and a crash inside a Vulkan driver leaves its
-command last. The note's heading says "gl and vk".
+**Vulkan commands too (2026-10-15, chimera issues 276 and 278).** Two Vulkan drivers (AMD's for Xenia, Intel's for Dolphin) crashed with notes that named the driver and nothing it had been given. miniBox's Vulkan host now tells a hook each command before the driver sees it (`chimera_vk_host_set_call_hook`); the session points it at `ce_vk_flight_note`, which writes the opcode plus 0x40000000 into the same ring. The crash module names those from miniBox's Vulkan list (`source/crash/gen-vk-names.py`), so a note now reads `vk vkCmdEndRenderPass` among the GL calls and markers, and a crash inside a Vulkan driver leaves its command last. The note's heading says "gl and vk".
 
 ## The picture after a load
 
-A state load rewinds the machine and not the renderer. What the bridge
-rebuilds, it rebuilds as the game touches it (above), and for the frames in
-between the picture read back can be wrong on a real card. The session keeps
-the picture of every frame it shows and, for a while after a load, shows the
-kept one for a frame that has it (engine.h, `ce_session_greenzone_pictures`;
-docs/history/design-principles.md, chimera#190). It is on by itself for a session a
-GPU draws for, and it helps frames already seen, not frames drawn for the
-first time after an edit.
+A state load rewinds the machine and not the renderer. What the bridge rebuilds, it rebuilds as the game touches it (above), and for the frames in between the picture read back can be wrong on a real card. The session keeps the picture of every frame it shows and, for a while after a load, shows the kept one for a frame that has it (engine.h, `ce_session_greenzone_pictures`; docs/history/design-principles.md, chimera#190). It is on by itself for a session a GPU draws for, and it helps frames already seen, not frames drawn for the first time after an edit.
 
-How long a renderer is wrong is measured, not presumed: `chimera-run
---settle-probe <frame>,<count>` on the card in question, with
-`--greenzone-period 1 --greenzone-max-stride 1` so the load lands on the
-frame before. On a GTX 1060 xemu was one frame behind after a load in one
-game and wrong for five frames in another (docs/history/design-principles.md, "What
-a real card shows").
+How long a renderer is wrong is measured, not presumed: `chimera-run --settle-probe <frame>,<count>` on the card in question, with `--greenzone-period 1 --greenzone-max-stride 1` so the load lands on the frame before. On a GTX 1060 xemu was one frame behind after a load in one game and wrong for five frames in another (docs/history/design-principles.md, "What a real card shows").
 
-That was not the renderer being slow. What it had drawn was not in the state:
-a core whose GPU surfaces reach the machine's memory only when the machine
-reads them is told before a state is taken, through the optional
-`StateSaving()` export, and writes them out then (docs/porting-a-core.md;
-docs/history/design-principles.md, "A core is told before a state is taken of it").
-xemu does, and its first frame after a load is the frame's own picture.
+That was not the renderer being slow. What it had drawn was not in the state: a core whose GPU surfaces reach the machine's memory only when the machine reads them is told before a state is taken, through the optional `StateSaving()` export, and writes them out then (docs/porting-a-core.md; docs/history/design-principles.md, "A core is told before a state is taken of it"). xemu does, and its first frame after a load is the frame's own picture.
 
 ## A state taken by another process (user-decided, 2026-10-24)
 
-After a load the bridge gives the guest a fresh context and, before the guest
-runs, takes every GL name the guest still holds again, empty, so that no new
-object gets a number an old call could still reach. It used to know those
-names only by watching them being made in its own process. A state taken by
-another process, which is what opening a project again loads, held names the
-new process had never seen; Dolphin's rebuild deleted a vertex array by its
-old number, the array another format had just been given, and a screen drew
-black (chimera#367). A guest built from miniBox's generator now keeps the
-highest name of each kind it has been given in its own memory
-(`GL_OP_NAME_MARKS`, miniBox's source/gl/README.md), so every state carries
-it, and after a load the bridge keeps every number up to those marks from new
-objects. A core gets this when it is built again; until then it has only the
-names seen in the process, as before. The core gate test for it is Dolphin's
-gl:load-in-new-process.
+After a load the bridge gives the guest a fresh context and, before the guest runs, takes every GL name the guest still holds again, empty, so that no new object gets a number an old call could still reach. It used to know those names only by watching them being made in its own process. A state taken by another process, which is what opening a project again loads, held names the new process had never seen; Dolphin's rebuild deleted a vertex array by its old number, the array another format had just been given, and a screen drew black (chimera#367). A guest built from miniBox's generator now keeps the highest name of each kind it has been given in its own memory (`GL_OP_NAME_MARKS`, miniBox's source/gl/README.md), so every state carries it, and after a load the bridge keeps every number up to those marks from new objects. A core gets this when it is built again; until then it has only the names seen in the process, as before. The core gate test for it is Dolphin's gl:load-in-new-process.
 
 ## The Vulkan bridge (user-decided, 2026-10-10)
 
-For a core whose renderer has no OpenGL. The owner, on a request for an
-Xbox 360 core whose emulator draws with Vulkan or Direct3D 12 and nothing
-else: "Developing a Vulkan bridge for Chimera is something I wanted us to do
-anyway."
+For a core whose renderer has no OpenGL. The owner, on a request for an Xbox 360 core whose emulator draws with Vulkan or Direct3D 12 and nothing else: "Developing a Vulkan bridge for Chimera is something I wanted us to do anyway."
 
-It is the same seam - a guest's one callback, an opcode and a pointer to an
-argument block - and the same request: a renderer whose value ends in `-hw`,
-`chimera-run --gpu`, refused by `CHIMERA_NO_GPU`. A core takes it by
-exporting `SetVulkanBridge` where an OpenGL core exports `SetGpuBridge`; a
-core that exports both is handed both ("A renderer that also has OpenGL",
-below). The engine's part is a hand-over and three calls:
+It is the same seam - a guest's one callback, an opcode and a pointer to an argument block - and the same request: a renderer whose value ends in `-hw`, `chimera-run --gpu`, refused by `CHIMERA_NO_GPU`. A core takes it by exporting `SetVulkanBridge` where an OpenGL core exports `SetGpuBridge`; a core that exports both is handed both ("A renderer that also has OpenGL", below). The engine's part is a hand-over and three calls:
 
-- before `Init`, the bridge's dispatcher is registered with the sandbox and
-  its address given to the core;
-- after every load - a state, a greenzone restore, a seek - the bridge is
-  told (`chimera_vk_host_state_loaded`), which destroys everything the guest
-  had made and makes the next call land on a new context;
+- before `Init`, the bridge's dispatcher is registered with the sandbox and its address given to the core;
+- after every load - a state, a greenzone restore, a seek - the bridge is told (`chimera_vk_host_state_loaded`), which destroys everything the guest had made and makes the next call land on a new context;
 - when the session ends, the bridge is shut down.
 
-Everything else is miniBox's (`extern/chimera-common-minibox/source/vk`,
-whose README says how it is put together): the host half is ONE file, the
-same one a core's own test runner compiles, built into the engine with its
-dispatch generated from the Vulkan registry miniBox carries. It links
-against nothing. The machine's Vulkan loader is looked for when a core asks,
-so a machine without one loses this and nothing else, and the engine makes
-no instance and no device of its own - the guest's renderer asks for them
-through the bridge, and the bridge decides which device answers.
+Everything else is miniBox's (`extern/chimera-common-minibox/source/vk`, whose README says how it is put together): the host half is ONE file, the same one a core's own test runner compiles, built into the engine with its dispatch generated from the Vulkan registry miniBox carries. It links against nothing. The machine's Vulkan loader is looked for when a core asks, so a machine without one loses this and nothing else, and the engine makes no instance and no device of its own - the guest's renderer asks for them through the bridge, and the bridge decides which device answers.
 
 What is different from the OpenGL bridge, and why:
 
-- **No driver handle reaches the guest.** A Vulkan handle is a pointer into
-  the driver, different in every process, and it would be written into the
-  guest's memory and so into every savestate. The guest holds counters into
-  a table the host keeps; one that names nothing refuses its call and the
-  driver never sees it.
-  That was not true of every call until 2026-10-11: a handle passed by
-  value was looked up after the check that refuses a bad call, so a handle
-  from before a load reached the driver as null and ended the host. Fixed in
-  miniBox 25955f4, with a test that keeps a card across a load.
-  One more such call was found on 2026-10-12: `vkUpdateDescriptorSets`
-  with a write to a set the bridge does not know reached the driver with a
-  null set. It is refused since miniBox a348f60.
-- **A load is always a new context.** The OpenGL bridge learned this
-  ("Per load, too", above); the Vulkan one starts there. So the question a
-  core must answer is not whether its objects survived but how it makes them
-  again, and `gpuStatesSurviveTheContext` is the core's promise that it does.
-- **Mapped memory is a buffer of the guest's own**, copied when the guest
-  says the bytes matter (a flush, an invalidate) and at no other time; every
-  memory type is reported as not coherent, so a correct renderer says so.
-  Making a mapping fetches what the memory holds, except for memory nothing
-  has written yet (nothing flushed into it, and no queue given work since it
-  was allocated): that holds nothing, and nothing is copied (miniBox
-  c1ee3e6).
-- **There is no borrowed context** to give back: nothing here is bound to a
-  thread, so `ce_gl_release` has no counterpart.
+- **No driver handle reaches the guest.** A Vulkan handle is a pointer into the driver, different in every process, and it would be written into the guest's memory and so into every savestate. The guest holds counters into a table the host keeps; one that names nothing refuses its call and the driver never sees it. That was not true of every call until 2026-10-11: a handle passed by value was looked up after the check that refuses a bad call, so a handle from before a load reached the driver as null and ended the host. Fixed in miniBox 25955f4, with a test that keeps a card across a load. One more such call was found on 2026-10-12: `vkUpdateDescriptorSets` with a write to a set the bridge does not know reached the driver with a null set. It is refused since miniBox a348f60.
+- **A load is always a new context.** The OpenGL bridge learned this ("Per load, too", above); the Vulkan one starts there. So the question a core must answer is not whether its objects survived but how it makes them again, and `gpuStatesSurviveTheContext` is the core's promise that it does.
+- **Mapped memory is a buffer of the guest's own**, copied when the guest says the bytes matter (a flush, an invalidate) and at no other time; every memory type is reported as not coherent, so a correct renderer says so. Making a mapping fetches what the memory holds, except for memory nothing has written yet (nothing flushed into it, and no queue given work since it was allocated): that holds nothing, and nothing is copied (miniBox c1ee3e6).
+- **There is no borrowed context** to give back: nothing here is bound to a thread, so `ce_gl_release` has no counterpart.
 
-Which extensions a core is offered is a list in miniBox (`kDeviceExtensions`
-in `source/vk/vk-host.c`), and which commands it may call is another
-(`source/vk/vk-entry-points.txt`). A renderer that needs something missing
-from either has it added there. Added on 2026-10-12 for PCSX2's renderer
-(issue 248, miniBox a348f60): `VK_KHR_push_descriptor` with its command, and
-the `KHR` names of the two dynamic rendering commands, which the bridge
-knew only by their newer names. The list of commands grew from 224 to 228,
-and a core built against the longer list does not start in a Chimera built
-before it; cores built against the shorter one are not affected.
+Which extensions a core is offered is a list in miniBox (`kDeviceExtensions` in `source/vk/vk-host.c`), and which commands it may call is another (`source/vk/vk-entry-points.txt`). A renderer that needs something missing from either has it added there. Added on 2026-10-12 for PCSX2's renderer (issue 248, miniBox a348f60): `VK_KHR_push_descriptor` with its command, and the `KHR` names of the two dynamic rendering commands, which the bridge knew only by their newer names. The list of commands grew from 224 to 228, and a core built against the longer list does not start in a Chimera built before it; cores built against the shorter one are not affected.
 
-The core's export `StateSaving`, which the engine already calls before a
-state is made, is how a Vulkan core brings into the machine what only the
-device holds; the Xenia core uses it for its render targets.
+The core's export `StateSaving`, which the engine already calls before a state is made, is how a Vulkan core brings into the machine what only the device holds; the Xenia core uses it for its render targets.
 
-Measured (2026-10-10, Linux, llvmpipe from Mesa 25.2.8, the Xenia core's
-package - a local build, not published):
+Measured (2026-10-10, Linux, llvmpipe from Mesa 25.2.8, the Xenia core's package - a local build, not published):
 
-- `chimera-run --gpu`, 120 frames recorded and played back: the bridge is
-  handed over (`chimera vk: the bridge was handed over`) and the picture the
-  engine is given at frame 60 is, byte for byte, the picture the core's own
-  runner has there and the picture the emulator draws with no sandbox at
-  all.
-- the same movie with `--rerecord` - the engine's own save and load before
-  every frame, each load a new context - runs to the end.
+- `chimera-run --gpu`, 120 frames recorded and played back: the bridge is handed over (`chimera vk: the bridge was handed over`) and the picture the engine is given at frame 60 is, byte for byte, the picture the core's own runner has there and the picture the emulator draws with no sandbox at all.
+- the same movie with `--rerecord` - the engine's own save and load before every frame, each load a new context - runs to the end.
 
-And on Windows, on a real card (the same day, `chimera-run.exe` cross-built
-here and run through WSL's interop, the same package):
+And on Windows, on a real card (the same day, `chimera-run.exe` cross-built here and run through WSL's interop, the same package):
 
     chimera vk: the bridge was handed over
     chimera vk: NVIDIA GeForce GTX 1060 6GB (Vulkan 1.4.312, driver 69.168.0)
 
-The second line is written after `Init`, which is where the core makes its
-device, and is the one place a person can see which card drew. A movie of
-100 frames records and plays back; with `--rerecord` it plays to the end,
-and its picture at frame 80 is the picture without (the same 1280x720, not
-blank). Against the software Vulkan's picture of the same frame the card's
-differs by at most 4 in 255 in any channel - the same picture from another
-rasteriser. 2400 frames ran to the game's title screen.
+The second line is written after `Init`, which is where the core makes its device, and is the one place a person can see which card drew. A movie of 100 frames records and plays back; with `--rerecord` it plays to the end, and its picture at frame 80 is the picture without (the same 1280x720, not blank). Against the software Vulkan's picture of the same frame the card's differs by at most 4 in 255 in any channel - the same picture from another rasteriser. 2400 frames ran to the game's title screen.
 
-Not proven: the interface (only `chimera-run` has run it), and the on-screen
-"GPU: <driver>" line, which still names the OpenGL driver and so says
-nothing for a Vulkan core.
+Not proven: the interface (only `chimera-run` has run it), and the on-screen "GPU: <driver>" line, which still names the OpenGL driver and so says nothing for a Vulkan core.
 
 ### A command has more than one name (2026-10-13, issue 268)
 
-A Vulkan command that came through an extension and later joined a version
-of Vulkan has two names: `vkCmdSetEvent2KHR` and `vkCmdSetEvent2` are one
-command. A renderer asks for the name it was written against, and a driver
-answers the newer name only to a program that asked for that version and the
-extension's name only where the extension is on. So the bridge answers a
-core under every name of a command it carries, and asks the driver under
-each name in turn.
+A Vulkan command that came through an extension and later joined a version of Vulkan has two names: `vkCmdSetEvent2KHR` and `vkCmdSetEvent2` are one command. A renderer asks for the name it was written against, and a driver answers the newer name only to a program that asked for that version and the extension's name only where the extension is on. So the bridge answers a core under every name of a command it carries, and asks the driver under each name in turn.
 
-What it looked like before: the RPCS3 core asked for `vkCmdSetEvent2KHR`,
-was answered with nothing, and called address 0 (Tekken 6, frame 67). A core
-that asks the device for a command by name must still check the answer: four
-commands of offered extensions are not carried, and the design log's section
-of this date names them.
+What it looked like before: the RPCS3 core asked for `vkCmdSetEvent2KHR`, was answered with nothing, and called address 0 (Tekken 6, frame 67). A core that asks the device for a command by name must still check the answer: four commands of offered extensions are not carried, and the design log's section of this date names them.
 
 ### A renderer that also has OpenGL (2026-10-12, issue 248)
 
-A core may export both `SetGpuBridge` and `SetVulkanBridge`. The engine
-hands it both, and the core uses the one its Renderer setting names. The
-Vita3K core is the first: `opengl-hw` and `vulkan-hw` are both values of its
-setting, and the default did not change.
+A core may export both `SetGpuBridge` and `SetVulkanBridge`. The engine hands it both, and the core uses the one its Renderer setting names. The Vita3K core is the first: `opengl-hw` and `vulkan-hw` are both values of its setting, and the default did not change.
 
-What an emulator's Vulkan renderer needed before it ran over the bridge, in
-the order it was met. The other cores' renderers will need the same:
+What an emulator's Vulkan renderer needed before it ran over the bridge, in the order it was met. The other cores' renderers will need the same:
 
-- **A picture without a window.** No surface and no swapchain cross the
-  bridge. The renderer draws to an image of its own and copies it to a
-  mapped buffer when a frame is presented.
-- **To say when mapped bytes matter** (above), and **to ask for cached
-  memory** for every buffer it maps. Renderers ask for write-combined memory
-  for what they only write, which is right on a desktop and very slow here:
-  through the bridge a mapping is read once when it is made and again at
-  every invalidate, and reading write-combined memory took 25 ms for a 2 MB
-  picture and 0.94 s for one mapping on the GTX 1060 - ten frames a second
-  on a test app that runs at eighty with cached memory. Software Vulkan does
-  not show this at all. `CHIMERA_VK_STATS=1` does, in one run.
-- **To make everything again after a load.** The renderer asks which context
-  the calls land on where it would otherwise draw, and when it moved lets go
-  of every object with its own cleanup code and starts again. While it lets
-  go, the core keeps its calls from crossing (the function it gave
-  `chimera_vk_install` answers "done"), so nothing is asked of a device that
-  is gone and the cleanup frees what it kept on its own side. An emulator's
-  cleanup followed by its start-up is seldom a clean start, because desktop
-  users seldom go that way: in Vita3K four things survived it that should
-  not have, and one of them wrote through a freed pointer.
-- **To put what only the GPU holds into the machine's memory** before a
-  state is made, or as each scene ends, so that a state holds the pictures.
-- **To be made again quickly.** Every load pays for the renderer's start-up,
-  and a desktop renderer's start-up was written to run once. xemu's cost
-  1.0 s a load on the GTX 1060 where its OpenGL renderer costs 0.3 s, and
-  came down to about 0.35 s. What it was made of, largest first: compiling
-  its shaders again (kept now by their text, since what a compiler makes of
-  a text does not depend on the device); the copy made with every mapping,
-  176 MiB of buffers that held nothing yet (the bridge no longer copies
-  that, above); a copy of the console's whole memory into a vertex buffer
-  (marked as changed instead, and copied as it is drawn from); stopping and
-  starting the shader compiler; a table of fifty thousand entries made and
-  walked. `CHIMERA_VK_STATS=1` shows the bridge's and the driver's share;
-  the core's own is found by timing the pieces of its start-up.
-- **Answers about the GPU's progress do not depend on its speed.** A
-  fence's status, a timed wait and the like are answered after the device
-  has finished what was submitted, so the answer depends only on what was
-  submitted (on since 2026-10-19, the owner's decision; under 1% on the
-  GTX 1060, miniBox's `source/vk/README.md`). `CHIMERA_VK_SETTLED=0` turns
-  it off.
-- **To be compared with the core's other renderer in several games, on a
-  real card.** Software Vulkan and test programs passed everything in two
-  cores whose first runs of games on the GTX 1060 then showed faults:
-  Flycast's pictures one drawn frame late and its small textures black,
-  xemu's start-up crashing the driver with a memory type of -1 (it had asked
-  for coherent memory, found none, and passed "none" on as a number).
+- **A picture without a window.** No surface and no swapchain cross the bridge. The renderer draws to an image of its own and copies it to a mapped buffer when a frame is presented.
+- **To say when mapped bytes matter** (above), and **to ask for cached memory** for every buffer it maps. Renderers ask for write-combined memory for what they only write, which is right on a desktop and very slow here: through the bridge a mapping is read once when it is made and again at every invalidate, and reading write-combined memory took 25 ms for a 2 MB picture and 0.94 s for one mapping on the GTX 1060 - ten frames a second on a test app that runs at eighty with cached memory. Software Vulkan does not show this at all. `CHIMERA_VK_STATS=1` does, in one run.
+- **To make everything again after a load.** The renderer asks which context the calls land on where it would otherwise draw, and when it moved lets go of every object with its own cleanup code and starts again. While it lets go, the core keeps its calls from crossing (the function it gave `chimera_vk_install` answers "done"), so nothing is asked of a device that is gone and the cleanup frees what it kept on its own side. An emulator's cleanup followed by its start-up is seldom a clean start, because desktop users seldom go that way: in Vita3K four things survived it that should not have, and one of them wrote through a freed pointer.
+- **To put what only the GPU holds into the machine's memory** before a state is made, or as each scene ends, so that a state holds the pictures.
+- **To be made again quickly.** Every load pays for the renderer's start-up, and a desktop renderer's start-up was written to run once. xemu's cost 1.0 s a load on the GTX 1060 where its OpenGL renderer costs 0.3 s, and came down to about 0.35 s. What it was made of, largest first: compiling its shaders again (kept now by their text, since what a compiler makes of a text does not depend on the device); the copy made with every mapping, 176 MiB of buffers that held nothing yet (the bridge no longer copies that, above); a copy of the console's whole memory into a vertex buffer (marked as changed instead, and copied as it is drawn from); stopping and starting the shader compiler; a table of fifty thousand entries made and walked. `CHIMERA_VK_STATS=1` shows the bridge's and the driver's share; the core's own is found by timing the pieces of its start-up.
+- **Answers about the GPU's progress do not depend on its speed.** A fence's status, a timed wait and the like are answered after the device has finished what was submitted, so the answer depends only on what was submitted (on since 2026-10-19, the owner's decision; under 1% on the GTX 1060, miniBox's `source/vk/README.md`). `CHIMERA_VK_SETTLED=0` turns it off.
+- **To be compared with the core's other renderer in several games, on a real card.** Software Vulkan and test programs passed everything in two cores whose first runs of games on the GTX 1060 then showed faults: Flycast's pictures one drawn frame late and its small textures black, xemu's start-up crashing the driver with a memory type of -1 (it had asked for coherent memory, found none, and passed "none" on as a number).
 
-Measured with the Vita3K core's package "Development build c4560f31" on the GTX 1060
-(Windows, `chimera-run.exe`): a game's 1500 frames take 17.2 s with Vulkan
-and 17.1 s with OpenGL and the pictures are the same; a state saved with
-Vulkan and loaded in a new process shows the unbroken run's picture 450
-frames later, byte for byte. A load costs 0.6 s with Vulkan against 0.2 s
-with OpenGL. Of that, 185 ms is the driver making a new device, which the
-bridge asks for after every load, and 68 ms is the bridge copying two
-freshly mapped blocks to the guest. Both are the bridge's to improve.
+Measured with the Vita3K core's package "Development build c4560f31" on the GTX 1060 (Windows, `chimera-run.exe`): a game's 1500 frames take 17.2 s with Vulkan and 17.1 s with OpenGL and the pictures are the same; a state saved with Vulkan and loaded in a new process shows the unbroken run's picture 450 frames later, byte for byte. A load costs 0.6 s with Vulkan against 0.2 s with OpenGL. Of that, 185 ms is the driver making a new device, which the bridge asks for after every load, and 68 ms is the bridge copying two freshly mapped blocks to the guest. Both are the bridge's to improve.
 
 ### The instance and the device are made on a thread of their own (Windows, 2026-10-18, issues 278, 306, 307, 308)
 
-Two users with Intel's legacy driver for 6th- to 9th-generation graphics
-(31.0.101.2111 and 31.0.101.2112, on an HD Graphics 520 and on a UHD 630
-beside an NVIDIA card) saw Chimera close when a Vulkan core started: Dolphin
-(278), RPCS3's pre-compile (306, 307) and xemu (308). The crash notes are one
-place: the driver raises a C++ exception of its own inside
-`vkCreateInstance`, called from `vkb_special_vkCreateInstance`, and nothing
-catches it. Read with the published nightly's own `libchimera.dll`
-(2026-10-17, 67224ec2), whose symbols name the function. The driver offsets
-match on both machines.
+Two users with Intel's legacy driver for 6th- to 9th-generation graphics (31.0.101.2111 and 31.0.101.2112, on an HD Graphics 520 and on a UHD 630 beside an NVIDIA card) saw Chimera close when a Vulkan core started: Dolphin (278), RPCS3's pre-compile (306, 307) and xemu (308). The crash notes are one place: the driver raises a C++ exception of its own inside `vkCreateInstance`, called from `vkb_special_vkCreateInstance`, and nothing catches it. Read with the published nightly's own `libchimera.dll` (2026-10-17, 67224ec2), whose symbols name the function. The driver offsets match on both machines.
 
-The minidumps rule out running short of memory (each machine had gigabytes
-of commit to spare) and an old Vulkan loader (one machine has 1.4.309).
-Standalone Dolphin starts on the same driver. One difference a core cannot
-see is the thread: a core calls in on the thread that runs it, which in
-Chimera is the window's, and .NET makes that a single-threaded COM
-apartment. On Windows the bridge now creates the instance, chooses the
-device and creates the device on a thread of its own (no COM apartment, an
-8 MB stack). Vulkan allows an object made on one thread to be used on
-another. The thread is made once and kept, so whatever a driver ties to the
-thread that made its instance lives as long as the instance. The window
-thread waits for it while still answering messages other threads send to
-its windows, so a driver or an overlay that sends one during creation
-cannot hang Chimera (the first version, 5ed4270, waited without answering
-and made a new thread each time; the miniBox analysis of 2026-10-18 caught
-it).
+The minidumps rule out running short of memory (each machine had gigabytes of commit to spare) and an old Vulkan loader (one machine has 1.4.309). Standalone Dolphin starts on the same driver. One difference a core cannot see is the thread: a core calls in on the thread that runs it, which in Chimera is the window's, and .NET makes that a single-threaded COM apartment. On Windows the bridge now creates the instance, chooses the device and creates the device on a thread of its own (no COM apartment, an 8 MB stack). Vulkan allows an object made on one thread to be used on another. The thread is made once and kept, so whatever a driver ties to the thread that made its instance lives as long as the instance. The window thread waits for it while still answering messages other threads send to its windows, so a driver or an overlay that sends one during creation cannot hang Chimera (the first version, 5ed4270, waited without answering and made a new thread each time; the miniBox analysis of 2026-10-18 caught it).
 
-What is known: on the GTX 1060, PCSX2's Vulkan renderer through the new
-path draws Street Fighter EX3 the same as its OpenGL renderer, byte for
-byte, at frames 600, 899 and 2,400; and from a state at frame 2,300, 100
-frames with a save and a load around each (a new device each time, on the
-kept thread) reach the straight run's frame 2,400, byte for byte. What is
-not: whether this is the cause
-on Intel's driver. There is no such card here, and the exception's type
-lives in the driver's memory, which the minidumps do not hold. A driver's
-C++ exception cannot be caught by code from Chimera's compiler (MinGW's
-`catch (...)` does not catch one; tried), so if the thread is not the cause
-the crash remains, and OpenGL is the way on those machines.
+What is known: on the GTX 1060, PCSX2's Vulkan renderer through the new path draws Street Fighter EX3 the same as its OpenGL renderer, byte for byte, at frames 600, 899 and 2,400; and from a state at frame 2,300, 100 frames with a save and a load around each (a new device each time, on the kept thread) reach the straight run's frame 2,400, byte for byte. What is not: whether this is the cause on Intel's driver. There is no such card here, and the exception's type lives in the driver's memory, which the minidumps do not hold. A driver's C++ exception cannot be caught by code from Chimera's compiler (MinGW's `catch (...)` does not catch one; tried), so if the thread is not the cause the crash remains, and OpenGL is the way on those machines.

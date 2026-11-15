@@ -1,0 +1,3 @@
+# Markdown is prose: one line a paragraph, and LF in every checkout.
+*.md text eol=lf
+

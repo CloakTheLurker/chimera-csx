@@ -1,223 +1,54 @@
 # The Chimera project: TAS-only refocus
 
-Decided with the user 2026-08-26. Chimera is a TAS tool, not a frontend for
-casual gaming. There is exactly one use case: open a project, work in
-TAStudio. Everything below follows from that.
+Decided with the user 2026-08-26. Chimera is a TAS tool, not a frontend for casual gaming. There is exactly one use case: open a project, work in TAStudio. Everything below follows from that.
 
 ## The entry point
 
-Chimera's entry point is not "load core" nor "load rom": it is the project.
-The GUI opens on a start screen - New Chimera Project, Open Project, recent
-projects - and nothing else. Creating or opening a project leads directly
-into TAStudio; TAStudio is no longer a tool among others, it is the
-application. The casual paths are fully removed: no Load ROM menu, no
-runtime Emulator > Core picker, no live settings dialogs. Core
-development and debugging needs are covered headlessly by chimera-run,
-which learns to take a project file.
+Chimera's entry point is not "load core" nor "load rom": it is the project. The GUI opens on a start screen - New Chimera Project, Open Project, recent projects - and nothing else. Creating or opening a project leads directly into TAStudio; TAStudio is no longer a tool among others, it is the application. The casual paths are fully removed: no Load ROM menu, no runtime Emulator > Core picker, no live settings dialogs. Core development and debugging needs are covered headlessly by chimera-run, which learns to take a project file.
 
 ## What a project is
 
-A single JSON file (extension `.chimeraProject`) that contains literally
-everything required to reproduce the work, except the data bytes
-themselves, which are named by their SHA1:
+A single JSON file (extension `.chimeraProject`) that contains literally everything required to reproduce the work, except the data bytes themselves, which are named by their SHA1:
 
-- **Core identity**: package name, version, hash - pinned at creation, and
-  re-pinned by a save to the core that actually ran. Opening a project on
-  another build warns and starts the greenzone empty (the cached states were
-  another machine's); saving then records the build in use, so the question is
-  asked once rather than at every open. The Chimera version is rewritten by
-  every save the same way, with the one that created the project kept beside it
-  (`OriginalEmuVersion`).
-- **What the cached states are** (issue #115): `StateFormat`, the savestate
-  format number the engine was on when this project was last saved, and
-  `StateWrittenBy`, the build that wrote them. Read at the next open: when the
-  number has moved, the person is told once that those states cannot be loaded
-  and why, instead of finding out one refused branch at a time. The engine still
-  checks every state file for itself - this is the same news, said earlier and
-  about the whole cache (docs/state-manager.md, "The savestate format number").
-  A project saved before these existed says nothing, and silence is not a
-  disagreement.
-- **File manifest**: names + SHA1 + the core-defined slot id each file
-  fills (cdrom, floppy, hdd, config, ...), order within a slot = swap
-  order, cue-referenced bins auto-added as support, cue closure enforced.
-  The generic image/support/savedata role triple retires; opening
-  validates the manifest against the core's slot declaration. The
-  standalone `.chimeraMultiFile` format does not survive as a GUI-facing
-  concept; the engine's `ce_multifile_*` code evolves into this section,
-  and headless descriptors remain available during the transition.
+- **Core identity**: package name, version, hash - pinned at creation, and re-pinned by a save to the core that actually ran. Opening a project on another build warns and starts the greenzone empty (the cached states were another machine's); saving then records the build in use, so the question is asked once rather than at every open. The Chimera version is rewritten by every save the same way, with the one that created the project kept beside it (`OriginalEmuVersion`).
+- **What the cached states are** (issue #115): `StateFormat`, the savestate format number the engine was on when this project was last saved, and `StateWrittenBy`, the build that wrote them. Read at the next open: when the number has moved, the person is told once that those states cannot be loaded and why, instead of finding out one refused branch at a time. The engine still checks every state file for itself - this is the same news, said earlier and about the whole cache (docs/state-manager.md, "The savestate format number"). A project saved before these existed says nothing, and silence is not a disagreement.
+- **File manifest**: names + SHA1 + the core-defined slot id each file fills (cdrom, floppy, hdd, config, ...), order within a slot = swap order, cue-referenced bins auto-added as support, cue closure enforced. The generic image/support/savedata role triple retires; opening validates the manifest against the core's slot declaration. The standalone `.chimeraMultiFile` format does not survive as a GUI-facing concept; the engine's `ce_multifile_*` code evolves into this section, and headless descriptors remain available during the transition.
 - **Firmware**: resolved at creation, pinned by hash.
-- **Compiled code**: for a core that translates the machine's code before
-  running it, the list of objects it compiled for this game - names and
-  SHA1s, never the files, which regenerate from the game and the package
-  (docs/compile-cache.md). The wizard will not create a project until they
-  all exist.
-- **The clock's start** (user-decided, 2026-10-24, issue #366): the second
-  the machine's clock starts at, the same on every run, so a movie replays.
-  It is the sandbox's own, 2017-05-27 12:44:28 UTC, unless the creation
-  wizard was given another ("The machine's clock starts at", under the
-  settings); a game that takes its luck from the date and time then deals
-  other luck. The file says `clockStart` (`2030-01-02T03:04:05Z`) only for
-  another start, so a project at the default still opens in an older
-  Chimera, and one with another start is refused there rather than run at
-  the wrong time. It is part of the machine: the cached states of one start
-  are not used for another. A core whose clock is its own and not the
-  sandbox's (an emulated real-time clock set some other way, Ruffle's own
-  virtual date) does not follow it yet.
-- **Settings**: defined once, in the creation wizard. There is ONE kind
-  of setting: every setting shapes the machine, so all of them are part
-  of the reproduction contract. (The BizHawk lineage's "settings"
-  vs "non-settings" split does not exist here; a knob that cannot
-  desync a run is not worth declaring.)
-- **The TAS work itself**: input log, markers, branches. The project IS
-  the movie; publishing a finished TAS means handing over the project
-  file, and anyone holding files matching the SHA1s can reproduce
-  everything.
-- **TAStudio's layout** (user-decided, 2026-09-15, issue #83): which
-  piano-roll columns are shown, their order and widths, the orientation
-  and how lag frames are shown - the `tastudio` object, written by the
-  frontend and kept verbatim by the engine. It is not a sync setting; it
-  is here because it is part of the work somebody set up. It used to live
-  in the greenzone cache, which is set aside whenever the machine changes
-  (a new core, a new Chimera) and holds only what the last save wrote, so
-  people set their columns up again after every update. A project saved
-  before the move still has it in its cache, which is read once.
-  The same object keeps the value Auto-hold holds each analog axis at
-  (user-decided, 2026-10-17, issue #298), asked for when Auto-hold is
-  turned on for the axis's column.
+- **Compiled code**: for a core that translates the machine's code before running it, the list of objects it compiled for this game - names and SHA1s, never the files, which regenerate from the game and the package (docs/compile-cache.md). The wizard will not create a project until they all exist.
+- **The clock's start** (user-decided, 2026-10-24, issue #366): the second the machine's clock starts at, the same on every run, so a movie replays. It is the sandbox's own, 2017-05-27 12:44:28 UTC, unless the creation wizard was given another ("The machine's clock starts at", under the settings); a game that takes its luck from the date and time then deals other luck. The file says `clockStart` (`2030-01-02T03:04:05Z`) only for another start, so a project at the default still opens in an older Chimera, and one with another start is refused there rather than run at the wrong time. It is part of the machine: the cached states of one start are not used for another. A core whose clock is its own and not the sandbox's (an emulated real-time clock set some other way, Ruffle's own virtual date) does not follow it yet.
+- **Settings**: defined once, in the creation wizard. There is ONE kind of setting: every setting shapes the machine, so all of them are part of the reproduction contract. (The BizHawk lineage's "settings" vs "non-settings" split does not exist here; a knob that cannot desync a run is not worth declaring.)
+- **The TAS work itself**: input log, markers, branches. The project IS the movie; publishing a finished TAS means handing over the project file, and anyone holding files matching the SHA1s can reproduce everything.
+- **TAStudio's layout** (user-decided, 2026-09-15, issue #83): which piano-roll columns are shown, their order and widths, the orientation and how lag frames are shown - the `tastudio` object, written by the frontend and kept verbatim by the engine. It is not a sync setting; it is here because it is part of the work somebody set up. It used to live in the greenzone cache, which is set aside whenever the machine changes (a new core, a new Chimera) and holds only what the last save wrote, so people set their columns up again after every update. A project saved before the move still has it in its cache, which is read once. The same object keeps the value Auto-hold holds each analog axis at (user-decided, 2026-10-17, issue #298), asked for when Auto-hold is turned on for the axis's column.
 
 Not in the project:
 
-- **Paths.** Never stored. Only names and SHA1s. A game that was dumped as a
-  FOLDER therefore cannot be named at all - a directory has no SHA1 - and has
-  to become one file first, reproducibly, so that everyone who packs it gets
-  the same hash (docs/media-maker.md).
-- **Greenzone / cached states.** Kept in the per-user cache, keyed by the
-  project's id (docs/state-manager.md), not beside the project: a project
-  folder is the folder people sync, and a multi-gigabyte sibling there is
-  uploaded again on every save. If present it is loaded, otherwise the
-  session starts from a clean state-memory slate. A greenzone left beside
-  an older project is moved into the cache the first time it is opened.
-  The cache also records the path the project was last opened or saved
-  from (user-decided, 2026-10-15): a copy keeps its original's id, so a
-  project opened from any other path - copied, moved, a backup, a
-  recovered copy - has its cached greenzone and branch states discarded
-  and starts with an empty one. Losing it costs recomputation, never work. It records
-  which machine made its states (core build, settings, firmware pins, file
-  hashes) and is used only when the project still describes that machine:
-  a savestate is the memory of one exact machine, and the sandbox checks
-  only the core binary when it loads one.
-- **Per-user preferences.** Keybinds, window positions, hotkeys and
-  TAStudio's own preferences (font, autosave, scrolling) stay in user
-  config; the project holds what affects sync and reproduction, and the
-  one exception above.
+- **Paths.** Never stored. Only names and SHA1s. A game that was dumped as a FOLDER therefore cannot be named at all - a directory has no SHA1 - and has to become one file first, reproducibly, so that everyone who packs it gets the same hash (docs/media-maker.md).
+- **Greenzone / cached states.** Kept in the per-user cache, keyed by the project's id (docs/state-manager.md), not beside the project: a project folder is the folder people sync, and a multi-gigabyte sibling there is uploaded again on every save. If present it is loaded, otherwise the session starts from a clean state-memory slate. A greenzone left beside an older project is moved into the cache the first time it is opened. The cache also records the path the project was last opened or saved from (user-decided, 2026-10-15): a copy keeps its original's id, so a project opened from any other path - copied, moved, a backup, a recovered copy - has its cached greenzone and branch states discarded and starts with an empty one. Losing it costs recomputation, never work. It records which machine made its states (core build, settings, firmware pins, file hashes) and is used only when the project still describes that machine: a savestate is the memory of one exact machine, and the sandbox checks only the core binary when it loads one.
+- **Per-user preferences.** Keybinds, window positions, hotkeys and TAStudio's own preferences (font, autosave, scrolling) stay in user config; the project holds what affects sync and reproduction, and the one exception above.
 
 ## Creation
 
-One wizard, everything at once. Step one asks project title, emulation
-core, and project description. Step two asks for the files - and it is
-NOT a blind "add any files" dialog: it is a fully core-informed form.
-The core declares categories (CD-ROMs, floppy disks, hard disk,
-configuration files, save states, ...), each rendered as empty slots with
-a cardinality (exactly 1, 0-N, 1+), the accepted formats, and a small
-circled question-mark tooltip explaining what is expected there and in
-what format. The form's content is fully decided, populated and formatted
-by each core; Chimera only provides the interface and the execution. Files
-are hashed as they are added, and order within a category is the swap
-order. The form ADAPTS within the step: a slot may carry "exposedWhen"
-over the current picks, so providing a Famicom disk greys the cartridge
-slot until the disk is unloaded and vice versa - greyed, never hidden,
-so the person still sees what the machine could also take. An
-unavailable slot's minimum does not bind, which is how two mutually
-exclusive min-1 slots together say "exactly one of either". Then the settings - themselves GATED by the files just chosen: a
-declaration entry may carry "exposedWhen" (the same condition language
-as firmware), so a Game Gear cart exposes its sound chip where a
-Genesis cart exposes its own, a Famicom disk exposes the FDS BIOS
-choice where a cartridge shows nothing, and a setting may gate further
-settings (re-evaluated live as values change). Same-name variants are
-separate entries with disjoint conditions, exactly like firmware. The
-project records every EXPOSED sync setting explicitly at its effective
-value - the settings section is exactly the knobs the decisions
-offered, nothing else. A project made some other way (by an AI agent
-through the MCP server, or by hand) may leave settings out; the engine
-then checks its files against the slots with the package's default for
-each setting left out, the value the machine will start with (2026-10-18).
-Before, a slot shown only for one machine setting refused such a project
-although the machine would have started. And LAST, the firmware - last because everything
-before it has a say: the core itself may need a file regardless of
-anything else, the chosen game files may trigger a need (a Famicom disk
-needs the FDS bios where a cartridge does not; a CD image needs the CD
-bios where a cart does not), and the settings may too (a region
-choice selects between region bioses; a font-source choice turns a
-bundled freebie into a real-BIOS requirement). The core dictates that
-logic entirely, as a decision tree in its waterbox.config "firmware"
-declaration; the wizard only renders the result and collects the files.
-On create, TAStudio opens at frame 0.
+One wizard, everything at once. Step one asks project title, emulation core, and project description. Step two asks for the files - and it is NOT a blind "add any files" dialog: it is a fully core-informed form. The core declares categories (CD-ROMs, floppy disks, hard disk, configuration files, save states, ...), each rendered as empty slots with a cardinality (exactly 1, 0-N, 1+), the accepted formats, and a small circled question-mark tooltip explaining what is expected there and in what format. The form's content is fully decided, populated and formatted by each core; Chimera only provides the interface and the execution. Files are hashed as they are added, and order within a category is the swap order. The form ADAPTS within the step: a slot may carry "exposedWhen" over the current picks, so providing a Famicom disk greys the cartridge slot until the disk is unloaded and vice versa - greyed, never hidden, so the person still sees what the machine could also take. An unavailable slot's minimum does not bind, which is how two mutually exclusive min-1 slots together say "exactly one of either". Then the settings - themselves GATED by the files just chosen: a declaration entry may carry "exposedWhen" (the same condition language as firmware), so a Game Gear cart exposes its sound chip where a Genesis cart exposes its own, a Famicom disk exposes the FDS BIOS choice where a cartridge shows nothing, and a setting may gate further settings (re-evaluated live as values change). Same-name variants are separate entries with disjoint conditions, exactly like firmware. The project records every EXPOSED sync setting explicitly at its effective value - the settings section is exactly the knobs the decisions offered, nothing else. A project made some other way (by an AI agent through the MCP server, or by hand) may leave settings out; the engine then checks its files against the slots with the package's default for each setting left out, the value the machine will start with (2026-10-18). Before, a slot shown only for one machine setting refused such a project although the machine would have started. And LAST, the firmware - last because everything before it has a say: the core itself may need a file regardless of anything else, the chosen game files may trigger a need (a Famicom disk needs the FDS bios where a cartridge does not; a CD image needs the CD bios where a cart does not), and the settings may too (a region choice selects between region bioses; a font-source choice turns a bundled freebie into a real-BIOS requirement). The core dictates that logic entirely, as a decision tree in its waterbox.config "firmware" declaration; the wizard only renders the result and collects the files. On create, TAStudio opens at frame 0.
 
 ### One core, several machines
 
-A package need not be one machine. Genesis Plus GX is a Mega Drive, a Master
-System, a Game Gear and an SG-1000 - the same `core.wbx` with different
-hardware selected - so its `waterbox.config` declares a `machines` array and
-names the setting that picks between them (`machineSetting`). Each machine
-carries what makes it a different machine: the system id the movie records,
-the controller it has, the picture it draws, and the rom extensions that
-belong to it. What they share - the binary, the guest heap, and the audio
-rate unless a machine states its own - stays at the top level, and a package
-with no `machines` is one machine exactly as before.
+A package need not be one machine. Genesis Plus GX is a Mega Drive, a Master System, a Game Gear and an SG-1000 - the same `core.wbx` with different hardware selected - so its `waterbox.config` declares a `machines` array and names the setting that picks between them (`machineSetting`). Each machine carries what makes it a different machine: the system id the movie records, the controller it has, the picture it draws, and the rom extensions that belong to it. What they share - the binary, the guest heap, and the audio rate unless a machine states its own - stays at the top level, and a package with no `machines` is one machine exactly as before.
 
-A machine whose sound chip runs at another rate says so with `audioRate`, in
-Hz (issue 226). A Namco System 256 is a PlayStation 2 with every clock a
-third faster, so its chip mixes 64000 samples a second where the console's
-mixes 48000: its machine entry carries `"audioRate": 64000`. A machine that
-says nothing has the package's `audio.rate`.
+A machine whose sound chip runs at another rate says so with `audioRate`, in Hz (issue 226). A Namco System 256 is a PlayStation 2 with every clock a third faster, so its chip mixes 64000 samples a second where the console's mixes 48000: its machine entry carries `"audioRate": 64000`. A machine that says nothing has the package's `audio.rate`.
 
-The choice belongs with the core, on step one, because everything after it
-depends on it: the files it takes (a Sega CD drive is not a Master System's),
-the settings it has, the values those settings may take (a Mega Drive port
-takes a mouse, an Activator and a Team Player; a Master System port takes a
-pad or nothing - a machine may narrow a setting with `settingOverrides`), and
-the firmware it wants. Because the machine IS a setting, the project pins it
-and the movie cites it like every other structural choice, and the condition
-language already understood it: `{"setting": "systemHardware", "is": "sms"}`
-gates slots, settings and firmware alike.
+The choice belongs with the core, on step one, because everything after it depends on it: the files it takes (a Sega CD drive is not a Master System's), the settings it has, the values those settings may take (a Mega Drive port takes a mouse, an Activator and a Team Player; a Master System port takes a pad or nothing - a machine may narrow a setting with `settingOverrides`), and the firmware it wants. Because the machine IS a setting, the project pins it and the movie cites it like every other structural choice, and the condition language already understood it: `{"setting": "systemHardware", "is": "sms"}` gates slots, settings and firmware alike.
 
-A setting that only some machines have says so in its own `when` list: the
-values of the machine setting it belongs to. `exposedWhen` is not a
-substitute. It decides whether a person is shown the setting; `when` decides
-whether the setting applies to the machine at all. This matters most when two
-declarations share a name, for example a console's Boot ROM and an arcade
-board's: each must name its machines in `when`, so that every machine is left
-with exactly one declaration. Without it both stay, and the later one's
-default wins on every machine. The package tests refuse a package that
-leaves a machine with two declarations of one setting.
+A setting that only some machines have says so in its own `when` list: the values of the machine setting it belongs to. `exposedWhen` is not a substitute. It decides whether a person is shown the setting; `when` decides whether the setting applies to the machine at all. This matters most when two declarations share a name, for example a console's Boot ROM and an arcade board's: each must name its machines in `when`, so that every machine is left with exactly one declaration. Without it both stay, and the later one's default wins on every machine. The package tests refuse a package that leaves a machine with two declarations of one setting.
 
-A choice setting (`"type": "enum"`) may give its values words to be shown
-by: `"optionLabels": { "ps2-0230a-20080220": "USA v2.30 (2008-02-20)" }`.
-Only the words change. The project, the movie and the core keep the value
-itself, so a label can be reworded without changing any machine, and a
-value with no label is shown as it is (issue 293). On the wizard's settings
-page, a setting whose values call for different firmware files (a
-PlayStation 2's Boot ROM: one BIOS per value) lists first the values whose
-file is on hand, in the Firmware folder or at a path remembered for the
-core, each marked "(found)". The engine's own firmware decision tree is
-asked once per value, so this needs nothing more from a package than its
-firmware conditions.
+A choice setting (`"type": "enum"`) may give its values words to be shown by: `"optionLabels": { "ps2-0230a-20080220": "USA v2.30 (2008-02-20)" }`. Only the words change. The project, the movie and the core keep the value itself, so a label can be reworded without changing any machine, and a value with no label is shown as it is (issue 293). On the wizard's settings page, a setting whose values call for different firmware files (a PlayStation 2's Boot ROM: one BIOS per value) lists first the values whose file is on hand, in the Firmware folder or at a path remembered for the core, each marked "(found)". The engine's own firmware decision tree is asked once per value, so this needs nothing more from a package than its firmware conditions.
 
-Loading a plain rom with no project has no pin, so the extension decides: the
-package's machines claim their own extensions, and a `.sms` opened with this
-package is a Master System.
+Loading a plain rom with no project has no pin, so the extension decides: the package's machines claim their own extensions, and a `.sms` opened with this package is a Master System.
 
-The alternative - one package per machine - was tried and is worse. It ships
-copies of one binary, and since a package registers its core by name, four
-packages all called "Genesis Plus GX" meant three were silently dropped when
-all four were installed.
+The alternative - one package per machine - was tried and is worse. It ships copies of one binary, and since a package registers its core by name, four packages all called "Genesis Plus GX" meant three were silently dropped when all four were installed.
 
 ### Configuration presets
 
-A core may suggest whole machines: "1981 IBM PC/XT 5150", "Windows 98 with a
-Voodoo 2". These are declared in `waterbox.config` beside the settings, and the
-settings page offers them in a selector above the grid with an Apply button -
-absent entirely, not disabled and not empty, for a core that suggests nothing.
+A core may suggest whole machines: "1981 IBM PC/XT 5150", "Windows 98 with a Voodoo 2". These are declared in `waterbox.config` beside the settings, and the settings page offers them in a selector above the grid with an Apply button - absent entirely, not disabled and not empty, for a core that suggests nothing.
 
 ```json
 "presets": [
@@ -228,36 +59,17 @@ absent entirely, not disabled and not empty, for a core that suggests nothing.
 ]
 ```
 
-- `when` gates the preset by machine, exactly as a setting's `when` does, so a
-  PC-98 is not offered an IBM PC's machine.
-- `values` is a setting name to value map. Names are coerced through the
-  setting's own declaration, so a value written by hand cannot put a string
-  where the core declared an int; a name the chosen machine does not have is
-  ignored and NAMED on the status line, because a core that misdeclares a
-  preset should not do it quietly.
-- The machine setting and the renderer are not a preset's to move: both are
-  asked on page one, and changing the machine changes which files the project
-  takes.
+- `when` gates the preset by machine, exactly as a setting's `when` does, so a PC-98 is not offered an IBM PC's machine.
+- `values` is a setting name to value map. Names are coerced through the setting's own declaration, so a value written by hand cannot put a string where the core declared an int; a name the chosen machine does not have is ignored and NAMED on the status line, because a core that misdeclares a preset should not do it quietly.
+- The machine setting and the renderer are not a preset's to move: both are asked on page one, and changing the machine changes which files the project takes.
 
-**Apply WRITES the values into the settings, and then the preset is finished
-with.** Nothing about it is stored: the project pins the resolved values and
-the movie cites them, exactly as if each had been typed in by hand, and every
-one of them is sitting in the grid where it can be read and changed afterwards.
+**Apply WRITES the values into the settings, and then the preset is finished with.** Nothing about it is stored: the project pins the resolved values and the movie cites them, exactly as if each had been typed in by hand, and every one of them is sitting in the grid where it can be read and changed afterwards.
 
-This is the whole point, and it is a correction. DOSBox-X shipped the other
-design: a "Configuration Preset" SETTING that the core resolved for itself at
-boot by appending a `.conf` file AFTER everything the user had chosen, so the
-preset silently won. Seven settings then had to describe themselves as "Auto
-uses the configuration preset's default" - the grid no longer said what the
-machine would be - and a movie recorded a preset NAME whose meaning the next
-core build could change under it. A preset is a starting point somebody else
-has already got working, not a layer that outranks the user.
+This is the whole point, and it is a correction. DOSBox-X shipped the other design: a "Configuration Preset" SETTING that the core resolved for itself at boot by appending a `.conf` file AFTER everything the user had chosen, so the preset silently won. Seven settings then had to describe themselves as "Auto uses the configuration preset's default" - the grid no longer said what the machine would be - and a movie recorded a preset NAME whose meaning the next core build could change under it. A preset is a starting point somebody else has already got working, not a layer that outranks the user.
 
 ### The firmware decision tree
 
-A firmware entry in waterbox.config may carry "requiredWhen", a
-condition over the slot map and the EFFECTIVE (defaults-overlaid)
-settings:
+A firmware entry in waterbox.config may carry "requiredWhen", a condition over the slot map and the EFFECTIVE (defaults-overlaid) settings:
 
 ```json
 { "id": "bios_cd_us", "display": "Sega CD BIOS (US)",
@@ -267,101 +79,26 @@ settings:
   ] } }
 ```
 
-- `{"slot": id}`: the slot holds at least one file;
-  `{"slot": id, "extension": "cue"}`: ...a file with that extension.
-- `{"setting": name, "is": v}`: the setting has that value (compared by
-  its declared type); `{"setting": name, "in": [v...]}`: one of those.
+- `{"slot": id}`: the slot holds at least one file; `{"slot": id, "extension": "cue"}`: ...a file with that extension.
+- `{"setting": name, "is": v}`: the setting has that value (compared by its declared type); `{"setting": name, "in": [v...]}`: one of those.
 - `{"all": [...]}`, `{"any": [...]}`, `{"not": {...}}` combine freely.
-- A conditional entry is required when its condition holds and absent
-  otherwise; an entry without a condition keeps its legacy "required"
-  flag (false = shown as optional). A malformed condition evaluates
-  false - a core that misdeclares asks for nothing, never for
-  everything.
+- A conditional entry is required when its condition holds and absent otherwise; an entry without a condition keeps its legacy "required" flag (false = shown as optional). A malformed condition evaluates false - a core that misdeclares asks for nothing, never for everything.
 
-The engine evaluates (ce_firmware_evaluate), everywhere the question is
-asked: the wizard's last page, and the core factory at load time - a
-required file the user never provided stops the load with its name.
+The engine evaluates (ce_firmware_evaluate), everywhere the question is asked: the wizard's last page, and the core factory at load time - a required file the user never provided stops the load with its name.
 
-The decisions nail each requirement to ONE exact file, or to nothing.
-There is no optional firmware and nothing to choose between: variants
-of one file are separate declaration entries sharing an id, with
-disjoint conditions a setting selects between ("FDS BIOS to Use:
-Nintendo", "System Fonts: sony") - a choice that needs no firmware
-simply produces no requirement ("System Fonts: bundled"). An entry
-names its one dump openly: {"sha1", "name", "label"} - the SHA1 is the
-identity, the name only a hint of what the file is usually called. An
-entry may omit the hash only for a file no one can pin (a dump only
-the user can own); the chosen file's actual hash is recorded.
+The decisions nail each requirement to ONE exact file, or to nothing. There is no optional firmware and nothing to choose between: variants of one file are separate declaration entries sharing an id, with disjoint conditions a setting selects between ("FDS BIOS to Use: Nintendo", "System Fonts: sony") - a choice that needs no firmware simply produces no requirement ("System Fonts: bundled"). An entry names its one dump openly: {"sha1", "name", "label"} - the SHA1 is the identity, the name only a hint of what the file is usually called. An entry may omit the hash only for a file no one can pin (a dump only the user can own); the chosen file's actual hash is recorded.
 
-The wizard's firmware page inspects the Firmware folder (a path entry)
-FIRST, so a dump dropped there once satisfies wizards forever: every
-plausible file is hashed and matched, and a satisfied requirement
-shows its checkmark and the file in use. Config > Firmware is the same
-question asked of every installed core at once, before any project: it
-surveys the packages present, says what the folder already answers, and
-takes a file for the rest - remembered where it lives, never copied.
-Scan Folder, on both, hashes a folder the person picks. When it finds
-firmware there and the Firmware folder named in Config > Paths does not
-exist (as on a new install: nothing creates it), the scanned folder
-becomes the Firmware folder (issue 293), so the next scan opens there and
-Config > Paths says where the files are. A folder the person made and
-named is never replaced. In Config > Firmware, Scan Folder, Rescan and Set
-File keep the list where it was scrolled, so the row being looked at stays
-in view (issue 348). A per-item Select File button
-covers what the folder could not - allowed even when something was
-found - and only the exact file satisfies, except for a game core, whose
-firmware may be a file of the project's own (docs/game-cores.md): that is
-taken, said to be the project's own, and its hash is the pin. Create stays
-DISABLED until every requirement is satisfied.
+The wizard's firmware page inspects the Firmware folder (a path entry) FIRST, so a dump dropped there once satisfies wizards forever: every plausible file is hashed and matched, and a satisfied requirement shows its checkmark and the file in use. Config > Firmware is the same question asked of every installed core at once, before any project: it surveys the packages present, says what the folder already answers, and takes a file for the rest - remembered where it lives, never copied. Scan Folder, on both, hashes a folder the person picks. When it finds firmware there and the Firmware folder named in Config > Paths does not exist (as on a new install: nothing creates it), the scanned folder becomes the Firmware folder (issue 293), so the next scan opens there and Config > Paths says where the files are. A folder the person made and named is never replaced. In Config > Firmware, Scan Folder, Rescan and Set File keep the list where it was scrolled, so the row being looked at stays in view (issue 348). A per-item Select File button covers what the folder could not - allowed even when something was found - and only the exact file satisfies, except for a game core, whose firmware may be a file of the project's own (docs/game-cores.md): that is taken, said to be the project's own, and its hash is the pin. Create stays DISABLED until every requirement is satisfied.
 
-The project records the chosen files as pins ("firmware": [{"id",
-"sha1"}]), actual hashes as always; the frontend remembers paths
-per-user in its config, never in the project. REOPENING is stricter
-than creation: each pin must be matched exactly, by hash, from the
-Firmware folder or the remembered paths - whichever file matches is
-what the session mounts, even when the pin is not the declared hash and
-the declared dump is also on hand (2026-09-29: until then the declared
-dump won, and a game core's project booted on the original instead of its
-own file) - and a pin nothing satisfies takes a severe
-are-you-sure (different firmware is a different machine: expect
-desync) to get past. Without a window (chimera-run --project, the MCP
-server's open_project) nobody can be asked: the engine's project opening
-compares the firmware it is given with the pins and says which differ or
-are missing, on stderr and in the MCP answer, and opens the project anyway
-(2026-10-18). "Plausible" is by size alone, and the bar is a
-gigabyte: a PS3 system software update is 206 MB and is firmware, and
-the bar it replaced (64 MiB) let no PS3 project ever find its own,
-while a disc image is bigger still. That check is also the one that
-does the mounting: for a while it existed but nothing called it, so a
-project whose config remembered no path booted its disc with no system
-software and no word about it - a machine that ran, polled nothing and
-drew nothing (2026-09-03).
+The project records the chosen files as pins ("firmware": [{"id", "sha1"}]), actual hashes as always; the frontend remembers paths per-user in its config, never in the project. REOPENING is stricter than creation: each pin must be matched exactly, by hash, from the Firmware folder or the remembered paths - whichever file matches is what the session mounts, even when the pin is not the declared hash and the declared dump is also on hand (2026-09-29: until then the declared dump won, and a game core's project booted on the original instead of its own file) - and a pin nothing satisfies takes a severe are-you-sure (different firmware is a different machine: expect desync) to get past. Without a window (chimera-run --project, the MCP server's open_project) nobody can be asked: the engine's project opening compares the firmware it is given with the pins and says which differ or are missing, on stderr and in the MCP answer, and opens the project anyway (2026-10-18). "Plausible" is by size alone, and the bar is a gigabyte: a PS3 system software update is 206 MB and is firmware, and the bar it replaced (64 MiB) let no PS3 project ever find its own, while a disc image is bigger still. That check is also the one that does the mounting: for a while it existed but nothing called it, so a project whose config remembered no path booted its disc with no system software and no word about it - a machine that ran, polled nothing and drew nothing (2026-09-03).
 
-The declaration lives in a static file generated at core build time and
-shipped in the core package - the same pattern as `waterbox.config` for
-settings and `default_keybinds.json` for binds. The wizard reads it with
-no guest boot, and the declaration is versioned with the core.
+The declaration lives in a static file generated at core build time and shipped in the core package - the same pattern as `waterbox.config` for settings and `default_keybinds.json` for binds. The wizard reads it with no guest boot, and the declaration is versioned with the core.
 
-**Firmware that depends on the game** (user-decided, 2026-10-12, issue
-164). A package of thousands of games cannot declare each game's other
-files: an arcade game needs its board's BIOS set, its parent's set if it
-is a clone, the sets of the devices its board has. Such a package
-declares "gameFirmware": true, and its core lists what THIS game needs
-in the answer it already gives the wizard before a machine exists
-(SuggestSettings, under "firmware", in the same format, conditions
-included). The wizard adds those entries to the package's own and puts
-the whole list through the same decision tree, so the firmware page
-asks for them like any other firmware and the firmware store remembers
-them for the next game. At load the core factory asks the core the same
-question before it resolves firmware - a rom opened with no project is
-completed the same way, and a project cannot carry a list the core no
-longer agrees with. What the project pins is unchanged: the id and
-hash of each file it was made with.
+**Firmware that depends on the game** (user-decided, 2026-10-12, issue 164). A package of thousands of games cannot declare each game's other files: an arcade game needs its board's BIOS set, its parent's set if it is a clone, the sets of the devices its board has. Such a package declares "gameFirmware": true, and its core lists what THIS game needs in the answer it already gives the wizard before a machine exists (SuggestSettings, under "firmware", in the same format, conditions included). The wizard adds those entries to the package's own and puts the whole list through the same decision tree, so the firmware page asks for them like any other firmware and the firmware store remembers them for the next game. At load the core factory asks the core the same question before it resolves firmware - a rom opened with no project is completed the same way, and a project cannot carry a list the core no longer agrees with. What the project pins is unchanged: the id and hash of each file it was made with.
 
 ### The slot declaration: file_slots.json
 
-One file per core package, beside `waterbox.config`. Read by the wizard
-to build the form, and by `ce_project_*` to validate a manifest:
+One file per core package, beside `waterbox.config`. Read by the wizard to build the form, and by `ce_project_*` to validate a manifest:
 
 ```json
 {
@@ -379,315 +116,109 @@ to build the form, and by `ce_project_*` to validate a manifest:
 }
 ```
 
-- `id`: bare lowercase token, unique within the core. This is what a
-  manifest entry records as its slot, and what mount naming derives
-  from.
+- `id`: bare lowercase token, unique within the core. This is what a manifest entry records as its slot, and what mount naming derives from.
 - `title`: the category heading the form shows.
-- `min` / `max`: cardinality; `max` -1 means unbounded. Exactly one =
-  1/1, zero or more = 0/-1, one or more = 1/-1.
-- `formats`: accepted file extensions, lowercase without the dot; the
-  wizard filters file pickers by them and validation checks membership.
-  The empty string is a file with no extension, for a machine that keeps a
-  game as one file with a long name and nothing after it: without it such a
-  file is refused when the project is made. The wizard shows it as "no
-  extension".
-  An extension may legitimately appear in several slots (`.img` is a
-  floppy or a hard disk - the user's slot choice resolves what
-  sniffing had to guess).
+- `min` / `max`: cardinality; `max` -1 means unbounded. Exactly one = 1/1, zero or more = 0/-1, one or more = 1/-1.
+- `formats`: accepted file extensions, lowercase without the dot; the wizard filters file pickers by them and validation checks membership. The empty string is a file with no extension, for a machine that keeps a game as one file with a long name and nothing after it: without it such a file is refused when the project is made. The wizard shows it as "no extension". An extension may legitimately appear in several slots (`.img` is a floppy or a hard disk - the user's slot choice resolves what sniffing had to guess).
 - `help`: the circled-question-mark tooltip text.
-- `namePattern` / `nameHelp` (optional): a regular expression the FILE
-  NAME must match, for a slot whose files the core reads by name (a
-  Dreamcast's memory cards are `vmu_A1.bin`..`vmu_D1.bin` and nothing
-  else). The wizard refuses a file that does not match when it is
-  picked, saying `nameHelp` (or `help`), instead of the core refusing
-  the whole project at boot. The engine does not enforce it: the core
-  still says no at load, which is what a hand-written project meets.
-- `exposedWhen` (optional): the condition language above, evaluated over
-  the CURRENT slot map (settings do not take part - the files come
-  first in the wizard). The form re-evaluates after every add and
-  remove, greying slots the condition rules out; `ce_project_validate`
-  enforces the same rule (a file in an unexposed slot is a structural
-  error), and exposure is decided before cardinality so an unexposed
-  slot's `min` does not bind.
-- `atLeastOneOf` (optional): groups of slot ids; across each group at
-  least one file must be present, for requirements no single slot's
-  `min` can express ("some bootable medium").
-- `support` is a reserved id: files referenced by a listed cue are
-  auto-added to the manifest with slot `support`; a core never declares
-  it.
+- `namePattern` / `nameHelp` (optional): a regular expression the FILE NAME must match, for a slot whose files the core reads by name (a Dreamcast's memory cards are `vmu_A1.bin`..`vmu_D1.bin` and nothing else). The wizard refuses a file that does not match when it is picked, saying `nameHelp` (or `help`), instead of the core refusing the whole project at boot. The engine does not enforce it: the core still says no at load, which is what a hand-written project meets.
+- `exposedWhen` (optional): the condition language above, evaluated over the CURRENT slot map (settings do not take part - the files come first in the wizard). The form re-evaluates after every add and remove, greying slots the condition rules out; `ce_project_validate` enforces the same rule (a file in an unexposed slot is a structural error), and exposure is decided before cardinality so an unexposed slot's `min` does not bind.
+- `atLeastOneOf` (optional): groups of slot ids; across each group at least one file must be present, for requirements no single slot's `min` can express ("some bootable medium").
+- `support` is a reserved id: files referenced by a listed cue are auto-added to the manifest with slot `support`; a core never declares it.
 
 ### Importing a movie
 
-A core may read movies made elsewhere - a Doom demo - and say what
-project they make. It declares `movieImport` in its `waterbox.config`,
-and the frontend renders the import dialog from it, the way it renders
-settings:
+A core may read movies made elsewhere - a Doom demo - and say what project they make. It declares `movieImport` in its `waterbox.config`, and the frontend renders the import dialog from it, the way it renders settings:
 
 - `menu`: the item in the core's Game menu ("Import Demo (LMP)...");
 - `movie`: its label and extensions; it is always mounted as `movie`;
-- `files`: the other files the importer reads, each mounted under its own
-  name. `option` carries that name - a `multiple` input's names joined by
-  `separator` in the user's order, and left out when none are picked.
-  `firmware` marks a file that becomes the project's firmware, `slot` the
-  slot its files go in, and `required` one that must be given;
+- `files`: the other files the importer reads, each mounted under its own name. `option` carries that name - a `multiple` input's names joined by `separator` in the user's order, and left out when none are picked. `firmware` marks a file that becomes the project's firmware, `slot` the slot its files go in, and `required` one that must be given;
 - `options`: bool settings, sent only when ticked.
 
-The core's `ImportMovie` export answers instead of `Init`
-(`ce_import_movie`): a refusal is one sentence, shown in the dialog with
-everything still picked so a missing file can be added. An answer only
-SUGGESTS: the machine, the settings, the firmware and the files in load
-order, plus notes for the user and the movie as an input log. The New
-Project wizard then opens on those answers - with the firmware the dialog
-was given already chosen, whichever release it is (a game core's firmware
-may be a file of the project's own) - the project it creates gets the
-input log, the user chooses where it is written, and it opens. Nothing about an imported project is built outside the wizard, so
-it cannot drift from one made by hand.
+The core's `ImportMovie` export answers instead of `Init` (`ce_import_movie`): a refusal is one sentence, shown in the dialog with everything still picked so a missing file can be added. An answer only SUGGESTS: the machine, the settings, the firmware and the files in load order, plus notes for the user and the movie as an input log. The New Project wizard then opens on those answers - with the firmware the dialog was given already chosen, whichever release it is (a game core's firmware may be a file of the project's own) - the project it creates gets the input log, the user chooses where it is written, and it opens. Nothing about an imported project is built outside the wizard, so it cannot drift from one made by hand.
 
 ## Editing
 
-Anything in a project can be changed after it is opened, with one
-exception: the core. The core selection is fixed at creation - a
-different core means a new project. A **structural** change - one that
-affects sync: settings, the file manifest - first asks: "this will
-erase the greenzone and possibly desync your current inputs, are you
-sure?". On yes: the greenzone is cleared, the core restarts, and the
-frame selector returns to frame 0. The input log is kept (it may no
-longer sync; that is the user's informed call). Non-structural changes
-(title, description, markers, ...) apply freely.
+Anything in a project can be changed after it is opened, with one exception: the core. The core selection is fixed at creation - a different core means a new project. A **structural** change - one that affects sync: settings, the file manifest - first asks: "this will erase the greenzone and possibly desync your current inputs, are you sure?". On yes: the greenzone is cleared, the core restarts, and the frame selector returns to frame 0. The input log is kept (it may no longer sync; that is the user's informed call). Non-structural changes (title, description, markers, ...) apply freely.
 
-The settings are changed in File > Project Settings (issue 370,
-user-decided 2026-10-25). The window shows the settings the New Project
-wizard shows for the project's files, plus the renderer, and the start
-of the machine's clock. The machine (the System box of a core with
-several) is not there: it decides which files the project takes. After
-the question above, the new settings are the project's and the movie's,
-and the machine restarts with them; a save writes them. When the
-machine does not start with the new settings, the old ones are put back
-and it starts with those again.
+The settings are changed in File > Project Settings (issue 370, user-decided 2026-10-25). The window shows the settings the New Project wizard shows for the project's files, plus the renderer, and the start of the machine's clock. The machine (the System box of a core with several) is not there: it decides which files the project takes. After the question above, the new settings are the project's and the movie's, and the machine restarts with them; a save writes them. When the machine does not start with the new settings, the old ones are put back and it starts with those again.
 
 ## Opening
 
-Opening a project resolves its files in three steps, and only asks for
-what is left: beside the project file first, then where THIS machine last
-found them, then the file-resolution dialog. As each file is provided its
-SHA1 is checked and divergence is warned about immediately, in the dialog.
-A differing file NAME on disk is fine - the project's recorded name is the
-canonical label and mount name, the hash is the identity.
+Opening a project resolves its files in three steps, and only asks for what is left: beside the project file first, then where THIS machine last found them, then the file-resolution dialog. As each file is provided its SHA1 is checked and divergence is warned about immediately, in the dialog. A differing file NAME on disk is fine - the project's recorded name is the canonical label and mount name, the hash is the identity.
 
 ### Where this machine last found the files
 
-The project carries names and hashes and never a path, because it is meant
-to be handed to someone else and a path is true of one machine only. But
-the machine that made it knows where those files are, and asking it again
-every time you open your own work is friction for nothing.
+The project carries names and hashes and never a path, because it is meant to be handed to someone else and a path is true of one machine only. But the machine that made it knows where those files are, and asking it again every time you open your own work is friction for nothing.
 
-So the paths are remembered: `{"files": {"<name>": "<path>"}, "firmware":
-{"<id>": "<path>"}}`, written whenever the project is saved and whenever
-one is opened. They are never distributed, and never authority - HINTS.
-Every path is checked: the file must still be there and still hash to what
-the project records, and a path that now holds something else is put back
-to unresolved so the dialog asks rather than mounting the wrong bytes
-quietly. Losing them costs nothing but the asking, and a machine that has
-never seen the project behaves exactly as before.
+So the paths are remembered: `{"files": {"<name>": "<path>"}, "firmware": {"<id>": "<path>"}}`, written whenever the project is saved and whenever one is opened. They are never distributed, and never authority - HINTS. Every path is checked: the file must still be there and still hash to what the project records, and a path that now holds something else is put back to unresolved so the dialog asks rather than mounting the wrong bytes quietly. Losing them costs nothing but the asking, and a machine that has never seen the project behaves exactly as before.
 
-They live in the PER-USER CACHE, keyed by the project's id
-(docs/state-manager.md), not in a file beside the project. A
-`.chimeraProject` is the one file that exists as far as anyone else is
-concerned: it is what gets handed over, and what a cloud folder syncs, so
-nothing that can be recomputed belongs in the folder with it. The key is
-the id rather than the path because a path stops being true the moment the
-file is renamed, moved, or opened on another machine through a synced
-folder - and because two attempts at the same game must not share a cache,
-which anything derived from the contents would have got wrong. A project
-written before ids existed is given one when it opens and keeps it from
-its next save; a `<project>.chimeraLocal` left beside an older project is
-read once, moved into the cache, and taken out of the folder.
+They live in the PER-USER CACHE, keyed by the project's id (docs/state-manager.md), not in a file beside the project. A `.chimeraProject` is the one file that exists as far as anyone else is concerned: it is what gets handed over, and what a cloud folder syncs, so nothing that can be recomputed belongs in the folder with it. The key is the id rather than the path because a path stops being true the moment the file is renamed, moved, or opened on another machine through a synced folder - and because two attempts at the same game must not share a cache, which anything derived from the contents would have got wrong. A project written before ids existed is given one when it opens and keeps it from its next save; a `<project>.chimeraLocal` left beside an older project is read once, moved into the cache, and taken out of the folder.
 
-The engine keeps each file's source path in memory (`ce_project_file_source_path`)
-so a frontend can write one, and never serializes it: the distributable
-file stays free of paths by construction, not by convention.
+The engine keeps each file's source path in memory (`ce_project_file_source_path`) so a frontend can write one, and never serializes it: the distributable file stays free of paths by construction, not by convention.
 
-The pinned build runs whenever it is installed, beside any other builds of the
-same core (issue #63): several builds of one core can be loaded in a session as
-long as their packages are different bytes, and a project is never booted on
-whichever of them happened to load first.
+The pinned build runs whenever it is installed, beside any other builds of the same core (issue #63): several builds of one core can be loaded in a session as long as their packages are different bytes, and a project is never booted on whichever of them happened to load first.
 
-Core pin mismatch (the pinned build is not installed, and another build of the
-core is): refuse by default with a clear pinned-vs-installed message,
-with a knowing override - and the project then records what actually ran,
-mirroring the file-hash posture.
+Core pin mismatch (the pinned build is not installed, and another build of the core is): refuse by default with a clear pinned-vs-installed message, with a knowing override - and the project then records what actually ran, mirroring the file-hash posture.
 
-Build skew (issue #115): once the core is running, the date this Chimera was
-built on is held against the date the core package says it was built on
-(`versionDate`, issue #67). More than a fortnight apart and an on-screen message
-names both dates, both builds and what to do. It is a heuristic and nothing
-more: it never refuses, never asks, and says nothing at all when either side
-does not date itself. What actually decides whether a state can be read is the
-savestate format number, checked state by state in the engine
-(docs/state-manager.md).
+Build skew (issue #115): once the core is running, the date this Chimera was built on is held against the date the core package says it was built on (`versionDate`, issue #67). More than a fortnight apart and an on-screen message names both dates, both builds and what to do. It is a heuristic and nothing more: it never refuses, never asks, and says nothing at all when either side does not date itself. What actually decides whether a state can be read is the savestate format number, checked state by state in the engine (docs/state-manager.md).
 
-Opening boots the machine EXACTLY ONCE. The movie (which is the project)
-is queued before the rom load, so the single boot already runs with the
-project's core and its recorded settings - never a throwaway boot
-on config settings followed by a reboot, and never a re-init when
-TAStudio engages (the BizHawk lineage cost three full core inits: rom
-load, TAStudio open, tasproj load - seconds each on a machine with a
-2GB hard disk image). The witness gate's P leg counts the boots and
-checks a project-recorded setting is live in the guest. Headless runs
-skip the TAStudio landing (it opens paused, and nobody is there to
-operate it): they just play the project.
+Opening boots the machine EXACTLY ONCE. The movie (which is the project) is queued before the rom load, so the single boot already runs with the project's core and its recorded settings - never a throwaway boot on config settings followed by a reboot, and never a re-init when TAStudio engages (the BizHawk lineage cost three full core inits: rom load, TAStudio open, tasproj load - seconds each on a machine with a 2GB hard disk image). The witness gate's P leg counts the boots and checks a project-recorded setting is live in the guest. Headless runs skip the TAStudio landing (it opens paused, and nobody is there to operate it): they just play the project.
 
 ## Saving
 
-A save never writes over the project file. It writes the whole project
-beside it (`<name>.chimeraProject.writing`), waits until those bytes are on
-the disk, and then moves the new file over the old one in one step. A save
-that fails part way - a full disk, the process dying, a power cut - leaves
-the project as it was last saved, and nothing half-written behind. On
-Windows a virus scanner or the indexer may hold the old file for a moment;
-the move is tried again for up to a second. When the project file is a link,
-the file it names is the one replaced.
+A save never writes over the project file. It writes the whole project beside it (`<name>.chimeraProject.writing`), waits until those bytes are on the disk, and then moves the new file over the old one in one step. A save that fails part way - a full disk, the process dying, a power cut - leaves the project as it was last saved, and nothing half-written behind. On Windows a virus scanner or the indexer may hold the old file for a moment; the move is tried again for up to a second. When the project file is a link, the file it names is the one replaced.
 
 ## Recovery
 
-The work in a project survives any end of the process - a GPU driver that
-fast-fails, a kill, a power cut - because none of it waits for a crash to be
-saved (docs/history/design-principles.md, "A crash takes nothing that was entered").
+The work in a project survives any end of the process - a GPU driver that fast-fails, a kill, a power cut - because none of it waits for a crash to be saved (docs/history/design-principles.md, "A crash takes nothing that was entered").
 
-While a project is open, its recovery folder is `<data>/Recovery/<id>/` - its
-own root, never inside the project's cache, so removing a greenzone cannot take
-it:
+While a project is open, its recovery folder is `<data>/Recovery/<id>/` - its own root, never inside the project's cache, so removing a greenzone cannot take it:
 
-- `work.journal` - one journal for all of the work. The engine writes the
-  movie's input log into it (`ce_movie_log_journal_open_with`), and the frontend
-  writes its markers and branches in the same fresh file; then every change is
-  appended as it happens - an input by the engine, a marker or branch by the
-  frontend (`ce_movie_log_journal_note`: `M` the markers, `B` one branch whole,
-  `O` the branch order) - flushed to the OS at once and synced to the disk by
-  a thread of its own, at most once a second and never more than a second
-  after a change, the last one before a pause included (the sync used to wait
-  for the next change, on TAStudio's thread). It is rewritten only when it has
-  grown well past its last image; if another program holds it open so that it
-  cannot be replaced, the changes go on into the journal as it is. On Windows
-  the files the engine opens are not handed to the programs Chimera starts
-  (FFmpeg, the precompile sessions), which once held the journal open.
-- `snapshot.chimeraProject` - the rest of the project as it stands (settings,
-  headers; never the greenzone), rewritten every few seconds while there is
-  unsaved work, and at once when an error is caught.
-- `session.json` - the process that owns the folder and the project's title, so
-  a project open in another running Chimera is never mistaken for a crash.
+- `work.journal` - one journal for all of the work. The engine writes the movie's input log into it (`ce_movie_log_journal_open_with`), and the frontend writes its markers and branches in the same fresh file; then every change is appended as it happens - an input by the engine, a marker or branch by the frontend (`ce_movie_log_journal_note`: `M` the markers, `B` one branch whole, `O` the branch order) - flushed to the OS at once and synced to the disk by a thread of its own, at most once a second and never more than a second after a change, the last one before a pause included (the sync used to wait for the next change, on TAStudio's thread). It is rewritten only when it has grown well past its last image; if another program holds it open so that it cannot be replaced, the changes go on into the journal as it is. On Windows the files the engine opens are not handed to the programs Chimera starts (FFmpeg, the precompile sessions), which once held the journal open.
+- `snapshot.chimeraProject` - the rest of the project as it stands (settings, headers; never the greenzone), rewritten every few seconds while there is unsaved work, and at once when an error is caught.
+- `session.json` - the process that owns the folder and the project's title, so a project open in another running Chimera is never mistaken for a crash.
 
-The folder is a cache entry of its own ("Unsaved work" in the cache manager),
-locked by default: the auto-clean never takes it, it is in use while its
-session runs, and removing it by hand is a person's decision. Closing the
-project removes it.
+The folder is a cache entry of its own ("Unsaved work" in the cache manager), locked by default: the auto-clean never takes it, it is in use while its session runs, and removing it by hand is a person's decision. Closing the project removes it.
 
-Opening a project whose folder outlived its process rebuilds the work first: the
-newer of the snapshot and the saved file, with the journal's inputs, markers and
-branches, written to the backups folder as `<name>.recovered <time>.chimeraProject`.
-The person is then asked whether to open that work in place of the file's (it
-opens unsaved; saving writes it to the project) or the project as last saved
-(the copy stays). Either way the folder is removed once the copy is written,
-and the boot that follows still treats the greenzone and branch states the
-crashed session saved as not trusted: the crash is remembered until the
-project's next session begins. A recovered copy never overwrites a project. Headless runs do
-not ask; they report the copy's path. A folder left where an earlier build kept
-it (`Projects/<id>/recovery`) is moved to the new root the first time.
+Opening a project whose folder outlived its process rebuilds the work first: the newer of the snapshot and the saved file, with the journal's inputs, markers and branches, written to the backups folder as `<name>.recovered <time>.chimeraProject`. The person is then asked whether to open that work in place of the file's (it opens unsaved; saving writes it to the project) or the project as last saved (the copy stays). Either way the folder is removed once the copy is written, and the boot that follows still treats the greenzone and branch states the crashed session saved as not trusted: the crash is remembered until the project's next session begins. A recovered copy never overwrites a project. Headless runs do not ask; they report the copy's path. A folder left where an earlier build kept it (`Projects/<id>/recovery`) is moved to the new root the first time.
 
 ## Crash notes
 
-Recovery keeps the work; a crash note says why it was needed. A crash that no
-handler sees - a graphics driver that fast-fails, an access violation nothing
-catches - still leaves `<data>/Crashes/<time> pid<id>.txt` and a minidump
-(`.dmp`) beside it, on Windows.
+Recovery keeps the work; a crash note says why it was needed. A crash that no handler sees - a graphics driver that fast-fails, an access violation nothing catches - still leaves `<data>/Crashes/<time> pid<id>.txt` and a minidump (`.dmp`) beside it, on Windows.
 
-Nothing in the dying process writes them. At start Chimera registers
-`dll/chimera_crash.dll` with Windows Error Reporting
-(`WerRegisterRuntimeExceptionModule`; the per-user registry list
-`HKCU\Software\Microsoft\Windows\Windows Error Reporting\RuntimeExceptionHelperModules`
-allows it, so no administrator is needed). When the process dies, WER loads that
-module into WerFault.exe and hands it the dead process. The module reads a
-block Chimera keeps in its own memory - the folder to write to, the frame (set
-every loop), and a few lines about the session (the project, the machine and the
-movie header, set when a project boots) - and writes:
+Nothing in the dying process writes them. At start Chimera registers `dll/chimera_crash.dll` with Windows Error Reporting (`WerRegisterRuntimeExceptionModule`; the per-user registry list `HKCU\Software\Microsoft\Windows\Windows Error Reporting\RuntimeExceptionHelperModules` allows it, so no administrator is needed). When the process dies, WER loads that module into WerFault.exe and hands it the dead process. The module reads a block Chimera keeps in its own memory - the folder to write to, the frame (set every loop), and a few lines about the session (the project, the machine and the movie header, set when a project boots) - and writes:
 
-- the note: time, process id, exception code and kind (a fast fail's own code
-  too), the address and the module and offset it is in, the frame, the session
-  lines, and the faulting thread's stack, symbolized as far as the modules'
-  exports allow. Each line is flushed as it is written, so a note is never lost
-  to the dump that follows it.
-- the minidump: threads, modules and the memory the stacks reference; enough to
-  open in WinDbg.
-- in the note, when a GPU drew: the last calls that crossed the GPU bridge,
-  named, oldest first, with where frames took and gave back the context and
-  where a state was loaded (docs/gpu-bridge.md, "The flight recorder").
+- the note: time, process id, exception code and kind (a fast fail's own code too), the address and the module and offset it is in, the frame, the session lines, and the faulting thread's stack, symbolized as far as the modules' exports allow. Each line is flushed as it is written, so a note is never lost to the dump that follows it.
+- the minidump: threads, modules and the memory the stacks reference; enough to open in WinDbg.
+- in the note, when a GPU drew: the last calls that crossed the GPU bridge, named, oldest first, with where frames took and gave back the context and where a state was loaded (docs/gpu-bridge.md, "The flight recorder").
 
-The module claims nothing; Windows still records the crash as it always does.
-Registry values naming a `chimera_crash.dll` that no longer exists (a moved or
-deleted install) are removed at start, and only the newest 20 notes are kept.
+The module claims nothing; Windows still records the crash as it always does. Registry values naming a `chimera_crash.dll` that no longer exists (a moved or deleted install) are removed at start, and only the newest 20 notes are kept.
 
-Opening a project whose recovery folder outlived its process looks for the note
-that process left (the same process id, written after it started) and says what
-ended it - "a fast fail in nvoglv64.dll+0x108eb9d (the NVIDIA graphics driver)
-at frame 21" - and where the note is.
+Opening a project whose recovery folder outlived its process looks for the note that process left (the same process id, written after it started) and says what ended it - "a fast fail in nvoglv64.dll+0x108eb9d (the NVIDIA graphics driver) at frame 21" - and where the note is.
 
-Linux has no equivalent here: the journal still keeps the work, and the kernel's
-core dump settings decide what else is kept.
+Linux has no equivalent here: the journal still keeps the work, and the kernel's core dump settings decide what else is kept.
 
 ### One place starts the machine
 
-Finding the files is the caller's work, because only the caller knows where
-to look and whom to ask: the window has its dialog and its remembered paths,
-`chimera-run` has the project's folder and its `--files` folders. Everything
-after that is one engine call, `ce_session_open_project` (engine.h), used by
-both and by anything else that opens a project:
+Finding the files is the caller's work, because only the caller knows where to look and whom to ask: the window has its dialog and its remembered paths, `chimera-run` has the project's folder and its `--files` folders. Everything after that is one engine call, `ce_session_open_project` (engine.h), used by both and by anything else that opens a project:
 
-- a file that was not found is refused, and so is a file that does not match
-  its recorded hash, unless the caller says a person saw the difference and
-  went on (the window, after its dialog);
-- a package that is not the build the project names is refused, unless the
-  caller allows it (`chimera-run --allow-core-mismatch`; the window, after
-  asking);
+- a file that was not found is refused, and so is a file that does not match its recorded hash, unless the caller says a person saw the difference and went on (the window, after its dialog);
+- a package that is not the build the project names is refused, unless the caller allows it (`chimera-run --allow-core-mismatch`; the window, after asking);
 - the project's files are checked against the slots the package declares;
-- the core is given its files: the slot map as `slots`, every file under its
-  own name, and the game - the first file that is not a support file
-  (`ce_project_game_file`) - as the rom, with its name as `rom.name` and the
-  later files of its slot as `rom2`..`romN`;
+- the core is given its files: the slot map as `slots`, every file under its own name, and the game - the first file that is not a support file (`ce_project_game_file`) - as the rom, with its name as `rom.name` and the later files of its slot as `rom2`..`romN`;
 - the machine starts with the project's settings.
 
-Before 2026-10-12 these steps were written twice, in `chimera-run.cpp` and in
-the window's `RomLoader`, and the window did not check the slots when it
-opened a project. It does now, with the engine's sentence as the refusal.
+Before 2026-10-12 these steps were written twice, in `chimera-run.cpp` and in the window's `RomLoader`, and the window did not check the slots when it opened a project. It does now, with the engine's sentence as the refusal.
 
 ## Architecture decisions
 
-- **Serializer in the engine**: `ce_project_*` in libchimera reads,
-  writes and validates the project (manifest, core pin, settings, input
-  log, markers, branches), evolving `ce_multifile_*` and the
-  engine-resident input log. chimera-run and every gate consume projects
-  for free; C# only renders UI over it.
-- **Movie code is absorbed**: the engine's input-log/movie code becomes
-  the project's input-log section and the standalone movie format retires
-  from the GUI. Headless chimera-run and the gates keep old movie files
-  working during the transition, then migrate to projects.
+- **Serializer in the engine**: `ce_project_*` in libchimera reads, writes and validates the project (manifest, core pin, settings, input log, markers, branches), evolving `ce_multifile_*` and the engine-resident input log. chimera-run and every gate consume projects for free; C# only renders UI over it.
+- **Movie code is absorbed**: the engine's input-log/movie code becomes the project's input-log section and the standalone movie format retires from the GUI. Headless chimera-run and the gates keep old movie files working during the transition, then migrate to projects.
 
 ## Status
 
 - Decided: everything above.
-- DONE: file_slots.json in all four core packages; ce_project_* in the
-  engine (open/save/resolve/validate/slots map) with test_project;
-  chimera-run --project (resolution, core pin, declaration validation,
-  transitional rom mounts); cores consume the "slots" mount through the
-  guest kit's waterbox_slots.h - DOSBox-X mounts mixed media (floppies +
-  CDs + hard disk + conf, gated: the slots leg, 12/12), PPSSPP boots the
-  disc slot, both NES cores read the rom slot.
-- DONE (2026-10-26): `chimera-run --new-project`, which makes a project
-  from the command line, as New Project makes one; a game runs only in a
-  project (user-decided, 2026-10-26; docs/history/design-principles.md), so this is
-  how the gates make theirs. The game-file form of chimera-run goes once
-  every core's tests have moved to projects.
-- TODO: the frontend (start screen, creation wizard rendering
-  file_slots.json, resolution dialog, TAStudio-as-application, removal
-  of the casual paths); PPSSPP memstick-zip import and NES SRAM import
-  as future savedata-consuming slots; retiring the transitional
-  rom/rom.name/rom2..N mounts once nothing legacy needs them.
+- DONE: file_slots.json in all four core packages; ce_project_* in the engine (open/save/resolve/validate/slots map) with test_project; chimera-run --project (resolution, core pin, declaration validation, transitional rom mounts); cores consume the "slots" mount through the guest kit's waterbox_slots.h - DOSBox-X mounts mixed media (floppies + CDs + hard disk + conf, gated: the slots leg, 12/12), PPSSPP boots the disc slot, both NES cores read the rom slot.
+- DONE (2026-10-26): `chimera-run --new-project`, which makes a project from the command line, as New Project makes one; a game runs only in a project (user-decided, 2026-10-26; docs/history/design-principles.md), so this is how the gates make theirs. The game-file form of chimera-run goes once every core's tests have moved to projects.
+- TODO: the frontend (start screen, creation wizard rendering file_slots.json, resolution dialog, TAStudio-as-application, removal of the casual paths); PPSSPP memstick-zip import and NES SRAM import as future savedata-consuming slots; retiring the transitional rom/rom.name/rom2..N mounts once nothing legacy needs them.

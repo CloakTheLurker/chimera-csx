@@ -2,27 +2,13 @@
 
 # Upstream since Chimera CSX 1.0.0
 
-2026-11-14. Chimera CSX 1.0.0 is e9b74216, the last nightly before upstream
-replaced the WinForms window with Qt. Upstream main is now 1241bff3, 541
-commits later, 525 of them non-merge. This document judges every one of those
-commits and says what can come across.
+2026-11-14. Chimera CSX 1.0.0 is e9b74216, the last nightly before upstream replaced the WinForms window with Qt. Upstream main is now 1241bff3, 541 commits later, 525 of them non-merge. This document judges every one of those commits and says what can come across.
 
 ## The short answer
 
-Most of it cannot. 343 commits touch the Qt window or things that exist only
-for it. 54 add engine code and Qt code together, so only their engine half is
-a candidate, and only by hand. 23 touch the engine alone, but a probe of four
-of the safer engine fixes found three that conflict with the 1.0.0 tree: the
-engine has drifted, so those are ports, not cherry-picks. 85 touch neither the
-frontend nor the engine (docs, tools, CI, the core roster) and can be taken.
-16 bump miniBox or another submodule and are held for replay determinism. Four
-are C#-era commits that the Qt line made obsolete.
+Most of it cannot. 343 commits touch the Qt window or things that exist only for it. 54 add engine code and Qt code together, so only their engine half is a candidate, and only by hand. 23 touch the engine alone, but a probe of four of the safer engine fixes found three that conflict with the 1.0.0 tree: the engine has drifted, so those are ports, not cherry-picks. 85 touch neither the frontend nor the engine (docs, tools, CI, the core roster) and can be taken. 16 bump miniBox or another submodule and are held for replay determinism. Four are C#-era commits that the Qt line made obsolete.
 
-The engine's C ABI is still version 1, so the frozen C# client can load a
-newer libchimera at the symbol level. That is not enough: the project file
-format changed twice after the cut, and the C# client owns parts of the project
-and movie code. A batch that changes those formats needs matching C# work
-before it can be called compatible.
+The engine's C ABI is still version 1, so the frozen C# client can load a newer libchimera at the symbol level. That is not enough: the project file format changed twice after the cut, and the C# client owns parts of the project and movie code. A batch that changes those formats needs matching C# work before it can be called compatible.
 
 ## Verdicts
 
@@ -188,7 +174,6 @@ These 16 bump miniBox or another submodule. A sandbox change can change how a co
 | bcf26d87 | feat(hotkeys): Open, Close and Load Last Project replace the ROM ones |
 | 981b2343 | feat(gui): a game opens only in a project, back on the way to main |
 | 4fa77daa | Revert "revert: "feat(gui): a game opens only in a project"" |
-
 
 ## Port batches and the tags they carry
 
@@ -734,5 +719,3 @@ Newest first. The subject is upstream's own.
 | 92896bff | skip (Qt) | feat(ui): sound in the Qt window through OpenAL Soft (#142, prototype) |
 | a026f5f6 | skip (Qt) | feat(ui): gamepads in the Qt window, named as Chimera names them (#142, prototype) |
 | 4f2c7882 | skip (Qt) | feat(ui): a Qt window over view models with no Qt in them (#142, prototype) |
-
-

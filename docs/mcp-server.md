@@ -1,117 +1,58 @@
 # An MCP server for Chimera (design)
 
-Status: the design was decided by the owner on 2026-10-12 (the decisions are
-listed at the end). The work is in progress; this section says what is built.
+Status: the design was decided by the owner on 2026-10-12 (the decisions are listed at the end). The work is in progress; this section says what is built.
 
 Built so far:
 
 - One engine call opens a project (step 1 of the order of work).
-- The engine's part of the server: the local pipe, the protocol, the log, and
-  `chimera-mcp`, the program an agent starts, on Linux and Windows.
-- In the window: Tools > MCP Server... with start, stop, the state, the tick
-  box, the set-up command and the log; the title bar says "MCP server
-  started" while it is.
-- The tools that look: `status`, `controls`, `get_input`, `screenshot`,
-  `list_memory`, `read_memory`, `registers`, `list_properties`,
-  `get_property`, `list_branches`, `list_markers`.
-- RAM search, the agent's own: `search_start`, `search_filter`,
-  `search_results`, `search_undo`.
-- `watch`: values named once and told with every answer that lands on a
-  frame.
-- The tools that change things, refused until the tick box is ticked: `seek`,
-  `set_input`, `set_buttons`, `insert_frames`, `delete_frames`, `undo`,
-  `advance_until`, `save_branch`, `load_branch`, `add_marker`,
-  `write_memory`, `set_property`, `set_register`. A branch of the movie as it
-  was is saved before the first of them, and again for each project opened
-  while the server runs (2026-10-18: once per server start, a project opened
-  later had nothing kept).
-- Two command-line flags for runs nobody clicks in: `--mcp-server` and
-  `--mcp-allow-changes`.
-- For an agent's whole run with no clicking (issue 355): `pause`,
-  `resume`, `save_project` and `close_tastudio` in the window,
-  `server_info`, and `status` with the controls' names, the project's
-  files, the firmware files in use and where each was found, and the speed
-  measured. The tick box is remembered.
-- `press_buttons`, a schedule of presses written into the input as one
-  step, and `capture_series`, pictures on a schedule of the machine's own
-  frames, each saying whether it is blank; `screenshot` says so too.
-- Every Lua function, in the window: `lua_functions` lists them as the Lua
-  Console documents them, `run_lua` runs Lua there and answers what it
-  returned and printed, and `lua_script` starts or stops a script file.
-- `create_project` in the window: the New Project window, never shown,
-  given the agent's answers; missing firmware is listed instead of asked
-  for. `list_cores` (with the kinds of file each core opens) and
-  `describe_core` work in the window too.
+- The engine's part of the server: the local pipe, the protocol, the log, and `chimera-mcp`, the program an agent starts, on Linux and Windows.
+- In the window: Tools > MCP Server... with start, stop, the state, the tick box, the set-up command and the log; the title bar says "MCP server started" while it is.
+- The tools that look: `status`, `controls`, `get_input`, `screenshot`, `list_memory`, `read_memory`, `registers`, `list_properties`, `get_property`, `list_branches`, `list_markers`.
+- RAM search, the agent's own: `search_start`, `search_filter`, `search_results`, `search_undo`.
+- `watch`: values named once and told with every answer that lands on a frame.
+- The tools that change things, refused until the tick box is ticked: `seek`, `set_input`, `set_buttons`, `insert_frames`, `delete_frames`, `undo`, `advance_until`, `save_branch`, `load_branch`, `add_marker`, `write_memory`, `set_property`, `set_register`. A branch of the movie as it was is saved before the first of them, and again for each project opened while the server runs (2026-10-18: once per server start, a project opened later had nothing kept).
+- Two command-line flags for runs nobody clicks in: `--mcp-server` and `--mcp-allow-changes`.
+- For an agent's whole run with no clicking (issue 355): `pause`, `resume`, `save_project` and `close_tastudio` in the window, `server_info`, and `status` with the controls' names, the project's files, the firmware files in use and where each was found, and the speed measured. The tick box is remembered.
+- `press_buttons`, a schedule of presses written into the input as one step, and `capture_series`, pictures on a schedule of the machine's own frames, each saying whether it is blank; `screenshot` says so too.
+- Every Lua function, in the window: `lua_functions` lists them as the Lua Console documents them, `run_lua` runs Lua there and answers what it returned and printed, and `lua_script` starts or stops a script file.
+- `create_project` in the window: the New Project window, never shown, given the agent's answers; missing firmware is listed instead of asked for. `list_cores` (with the kinds of file each core opens) and `describe_core` work in the window too.
 
-- `chimera-mcp` is in the Linux and Windows release bundles, in `dll/`, where
-  the dialog's set-up command points.
+- `chimera-mcp` is in the Linux and Windows release bundles, in `dll/`, where the dialog's set-up command points.
 
-- The windowless mode: `chimera-mcp --cores <dir> --work <dir>` opens a
-  machine of its own, with `list_cores`, `describe_core`, `open_game`,
-  `open_project`, `save_project`, `export_movie` and `close`, and every tool
-  above.
+- The windowless mode: `chimera-mcp --cores <dir> --work <dir>` opens a machine of its own, with `list_cores`, `describe_core`, `open_game`, `open_project`, `save_project`, `export_movie` and `close`, and every tool above.
 
-Everything in this document is built. What the windowless mode does not do
-is said in its section below.
+Everything in this document is built. What the windowless mode does not do is said in its section below.
 
-On Windows: the same test that edits a movie in the window was run against
-the Windows build of Chimera, started with no window shown, and passed. The
-dialog itself has not been looked at on Windows; only its Linux picture has.
+On Windows: the same test that edits a movie in the window was run against the Windows build of Chimera, started with no window shown, and passed. The dialog itself has not been looked at on Windows; only its Linux picture has.
 
 ## What it is
 
-A way for an AI agent to work on the movie a person has open in Chimera: look
-at the input, the picture and the memory, search RAM, and, if the person
-allows it, edit the input. The person starts it from **Tools > MCP Server...**
-in the running window and can stop it at any time.
+A way for an AI agent to work on the movie a person has open in Chimera: look at the input, the picture and the memory, search RAM, and, if the person allows it, edit the input. The person starts it from **Tools > MCP Server...** in the running window and can stop it at any time.
 
-MCP (Model Context Protocol) is an open standard for this. A program that
-follows it (a "server") declares a list of tools, each with a name, a
-description and typed parameters. An agent's own program (Claude Code, Claude
-Desktop, Cursor and others) reads the list, and the model calls the tools and
-gets structured answers back, pictures included.
+MCP (Model Context Protocol) is an open standard for this. A program that follows it (a "server") declares a list of tools, each with a name, a description and typed parameters. An agent's own program (Claude Code, Claude Desktop, Cursor and others) reads the list, and the model calls the tools and gets structured answers back, pictures included.
 
 There are two ways to use it, built in this order:
 
-1. **In the window** (the main use). A person is working on a movie and asks
-   their agent to analyse or change it. The agent works on the project that
-   is open, and the person sees every step in TAStudio.
-2. **Without a window.** An agent opens its own machine, with no display, to
-   explore a game or check a movie. Same tools, plus opening and saving.
+1. **In the window** (the main use). A person is working on a movie and asks their agent to analyse or change it. The agent works on the project that is open, and the person sees every step in TAStudio.
+2. **Without a window.** An agent opens its own machine, with no display, to explore a game or check a movie. Same tools, plus opening and saving.
 
 ## How the agent reaches Chimera
 
-An agent's program connects to an MCP server by starting it as a child
-process and exchanging lines of JSON over that process's standard input and
-output. A running Chimera window cannot be started by the agent, so there is a
-small program in between:
+An agent's program connects to an MCP server by starting it as a child process and exchanging lines of JSON over that process's standard input and output. A running Chimera window cannot be started by the agent, so there is a small program in between:
 
 ```
 agent's program  <-- standard input/output -->  chimera-mcp  <-- local pipe -->  Chimera window
 ```
 
-- `chimera-mcp` is a small C++ program installed in `dll/` beside
-  `chimera-run`. The agent's program starts it. It passes each request to the
-  window and each answer back.
-- The local pipe is a named pipe on Windows and a pair of FIFO files in the
-  user's runtime folder on Linux, both open to the same user only. No socket
-  call is used anywhere.
-- When the server in the window is stopped, or no Chimera is running,
-  `chimera-mcp` still lists the tools, and every call answers "Chimera's MCP
-  server is not started: Tools > MCP Server... > Start". The agent's program
-  therefore does not need restarting when Chimera is.
+- `chimera-mcp` is a small C++ program installed in `dll/` beside `chimera-run`. The agent's program starts it. It passes each request to the window and each answer back.
+- The local pipe is a named pipe on Windows and a pair of FIFO files in the user's runtime folder on Linux, both open to the same user only. No socket call is used anywhere.
+- When the server in the window is stopped, or no Chimera is running, `chimera-mcp` still lists the tools, and every call answers "Chimera's MCP server is not started: Tools > MCP Server... > Start". The agent's program therefore does not need restarting when Chimera is.
 
-Nothing here opens a socket, listens on a port or resolves a name, so the rule
-that Chimera has no network code (docs/core-manager.md, "Nothing reaches the
-network") holds and `tools/check-no-network.sh` passes unchanged. MCP's other
-way to connect, over HTTP, is not offered, for the same rule.
+Nothing here opens a socket, listens on a port or resolves a name, so the rule that Chimera has no network code (docs/core-manager.md, "Nothing reaches the network") holds and `tools/check-no-network.sh` passes unchanged. MCP's other way to connect, over HTTP, is not offered, for the same rule.
 
-A second Chimera of the same user can serve beside the first under another
-name: the environment variable `CHIMERA_MCP_NAME`, set to the same word for
-that Chimera and for its `chimera-mcp`.
+A second Chimera of the same user can serve beside the first under another name: the environment variable `CHIMERA_MCP_NAME`, set to the same word for that Chimera and for its `chimera-mcp`.
 
-A user sets it up once in their agent. The dialog shows the line to copy, for
-example for Claude Code:
+A user sets it up once in their agent. The dialog shows the line to copy, for example for Claude Code:
 
 ```sh
 claude mcp add chimera -- /path/to/chimera/dll/chimera-mcp
@@ -121,63 +62,29 @@ claude mcp add chimera -- /path/to/chimera/dll/chimera-mcp
 
 One dialog, usable at any time while Chimera runs:
 
-- **Start / Stop.** The server always starts stopped when Chimera starts; its
-  state is never remembered. Stopping it ends any call in progress with an
-  error to the agent.
-- **State.** Stopped, waiting for an agent, or connected, with the name and
-  version the agent's program gives.
-- **Allow the agent to make changes.** A tick box, remembered and applied
-  every time the server is started (user-decided, 2026-10-22, issue 355; it
-  was off at every start, and an agent's run stopped at its first change
-  until someone ticked it again). Unticked, the agent can only look. Ticked,
-  it may edit input, move the playback position, write memory, and save and
-  close the project.
-- **The log.** One line per call: time, tool, arguments (shortened), result
-  or error, how long it took. It can be saved to a file.
+- **Start / Stop.** The server always starts stopped when Chimera starts; its state is never remembered. Stopping it ends any call in progress with an error to the agent.
+- **State.** Stopped, waiting for an agent, or connected, with the name and version the agent's program gives.
+- **Allow the agent to make changes.** A tick box, remembered and applied every time the server is started (user-decided, 2026-10-22, issue 355; it was off at every start, and an agent's run stopped at its first change until someone ticked it again). Unticked, the agent can only look. Ticked, it may edit input, move the playback position, write memory, and save and close the project.
+- **The log.** One line per call: time, tool, arguments (shortened), result or error, how long it took. It can be saved to a file.
 - **The set-up line** to paste into the agent, with a button to copy it.
 
-While the server is started the main window's title says "MCP server
-started" and the menu item's icon carries a green dot, so it cannot be left
-on unnoticed.
-Closing the dialog does not stop the server; closing Chimera does.
+While the server is started the main window's title says "MCP server started" and the menu item's icon carries a green dot, so it cannot be left on unnoticed. Closing the dialog does not stop the server; closing Chimera does.
 
-Chimera started with `--mcp-server` starts the server at launch, as pressing
-Start does, and `--mcp-allow-changes` beside it ticks the box for that run
-without remembering it. They exist for runs nobody clicks in (the tests use
-them). Nothing else starts the server, and only the person's own tick is
-remembered.
+Chimera started with `--mcp-server` starts the server at launch, as pressing Start does, and `--mcp-allow-changes` beside it ticks the box for that run without remembering it. They exist for runs nobody clicks in (the tests use them). Nothing else starts the server, and only the person's own tick is remembered.
 
 ## What protects the person's work
 
-- With the tick box off, every tool that changes anything is refused, and the
-  refusal says which tick box allows it.
-- Every edit the agent makes is an ordinary TAStudio edit: it appears in the
-  piano roll and in the undo history, and can be undone.
-- Before the agent's first change after the server is started, a branch of
-  the movie as it was is saved, with a note saying so and the time. If the
-  branch cannot be saved, nothing is changed: every change is refused until
-  the server is stopped and started again. The engine holds this rule, not
-  the window, so no path around the window's code skips it.
-- With changes allowed, the agent can save the project to a file it names
-  and close it (issue 355). Nothing asks: a file that is already there is
-  not replaced unless the agent says `overwrite`, and changes that are not
-  saved are lost only when it says `discard_unsaved`. No branch is saved
-  before these two, since they change no input: one would itself have been
-  an unsaved change.
-- A memory write is not input: a movie cannot reproduce it. It is reported in
-  the log and in `status` from the first write on, with the frame.
-- What the agent was told about one machine stays with that machine: when a
-  project is closed and another opened (in the window or without one), the
-  first write, the watches, the condition `advance_until` waits for and the
-  search all start again. The sandbox puts a core's memory at the same
-  address every time, so this goes by the session, not by the memory.
-- An answer finished after its agent's program has gone is not sent to the
-  next one to connect (every program numbers its calls from 1).
+- With the tick box off, every tool that changes anything is refused, and the refusal says which tick box allows it.
+- Every edit the agent makes is an ordinary TAStudio edit: it appears in the piano roll and in the undo history, and can be undone.
+- Before the agent's first change after the server is started, a branch of the movie as it was is saved, with a note saying so and the time. If the branch cannot be saved, nothing is changed: every change is refused until the server is stopped and started again. The engine holds this rule, not the window, so no path around the window's code skips it.
+- With changes allowed, the agent can save the project to a file it names and close it (issue 355). Nothing asks: a file that is already there is not replaced unless the agent says `overwrite`, and changes that are not saved are lost only when it says `discard_unsaved`. No branch is saved before these two, since they change no input: one would itself have been an unsaved change.
+- A memory write is not input: a movie cannot reproduce it. It is reported in the log and in `status` from the first write on, with the frame.
+- What the agent was told about one machine stays with that machine: when a project is closed and another opened (in the window or without one), the first write, the watches, the condition `advance_until` waits for and the search all start again. The sandbox puts a core's memory at the same address every time, so this goes by the session, not by the memory.
+- An answer finished after its agent's program has gone is not sent to the next one to connect (every program numbers its calls from 1).
 
 ## The tools
 
-Names and parameters are a sketch until built. "Changes" marks the tools the
-tick box governs.
+Names and parameters are a sketch until built. "Changes" marks the tools the tick box governs.
 
 Looking:
 
@@ -207,11 +114,7 @@ RAM search (the agent's own search, separate from the RAM Search window):
 | `search_results` | The candidates left, lowest address first, with the value now and the one remembered, up to a limit. |
 | `search_undo` | Takes the last filter back. |
 
-The way it is used: start a search, have the game change the thing looked for
-(`seek` to another frame, or the person plays), filter for "different" or
-"greater", and repeat until few addresses are left. It only reads, so it
-needs no permission. One search at a time; it ends when the project is
-closed or the server is stopped.
+The way it is used: start a search, have the game change the thing looked for (`seek` to another frame, or the person plays), filter for "different" or "greater", and repeat until few addresses are left. It only reads, so it needs no permission. One search at a time; it ends when the project is closed or the server is stopped.
 
 Changes:
 
@@ -237,12 +140,9 @@ Changes:
 | `lua_scripts` | The scripts in the Lua Console's list, the person's and the agent's: each one's file, whether it runs, is paused or is stopped, and the error it last stopped on. Window only. |
 | `close_tastudio` | Closes the project and its machine. Unsaved changes are lost only with `discard_unsaved`. Window only; without a window, `close`. |
 
-Each call that edits the input is one step in TAStudio's undo history, named
-"Agent: ...", so a person can undo an agent's edit as they undo their own.
+Each call that edits the input is one step in TAStudio's undo history, named "Agent: ...", so a person can undo an agent's edit as they undo their own.
 
-`advance_until` plays the movie's own input and never past its end, so it
-adds no frames. With `watch` it answers "on which frame does this value first
-become that" in one call instead of one call a frame.
+`advance_until` plays the movie's own input and never past its end, so it adds no frames. With `watch` it answers "on which frame does this value first become that" in one call instead of one call a frame.
 
 Without a window only:
 
@@ -255,56 +155,29 @@ Without a window only:
 
 ## Where the code lives
 
-- **In the engine (C++):** the protocol, the pipe, the list of tools, the log,
-  and every tool that only needs the machine: memory, registers, properties,
-  pictures, RAM search, conditions. This part is the same with and without a
-  window.
-- **In the interface (C#):** the dialog, and the tools that must go through
-  TAStudio so the person sees them and can undo them: input edits, seeking,
-  branches, markers. They call the same editing functions the piano roll
-  itself calls.
-- **How a call runs in the window.** A thread in the engine reads the pipe.
-  The window's main loop asks the engine once per pass whether a call is
-  waiting; the engine answers the calls it can itself and hands the others to
-  the interface. So every call runs on the thread that runs the machine,
-  between two frames, never beside it. If the window is busy (a dialog is
-  open), the call waits, and is answered "Chimera is busy" after a time limit.
-- **Nothing system-specific.** No tool names a system, a control or a core.
-  Names are whatever the opened core declares.
+- **In the engine (C++):** the protocol, the pipe, the list of tools, the log, and every tool that only needs the machine: memory, registers, properties, pictures, RAM search, conditions. This part is the same with and without a window.
+- **In the interface (C#):** the dialog, and the tools that must go through TAStudio so the person sees them and can undo them: input edits, seeking, branches, markers. They call the same editing functions the piano roll itself calls.
+- **How a call runs in the window.** A thread in the engine reads the pipe. The window's main loop asks the engine once per pass whether a call is waiting; the engine answers the calls it can itself and hands the others to the interface. So every call runs on the thread that runs the machine, between two frames, never beside it. If the window is busy (a dialog is open), the call waits, and is answered "Chimera is busy" after a time limit.
+- **Nothing system-specific.** No tool names a system, a control or a core. Names are whatever the opened core declares.
 
 ## One place that opens a project
 
-The steps from a project to a running machine (check that every file is found
-and matches its hash, check the core against the one the project names, check
-the files against the core's slots, build the list of files the core sees,
-start the machine with the project's settings) are written twice today: in
-`chimera-run.cpp` and in the C# interface (`RomLoader.LoadProjectGame`). The
-server would have been a third.
+The steps from a project to a running machine (check that every file is found and matches its hash, check the core against the one the project names, check the files against the core's slots, build the list of files the core sees, start the machine with the project's settings) are written twice today: in `chimera-run.cpp` and in the C# interface (`RomLoader.LoadProjectGame`). The server would have been a third.
 
-They are now one engine call, `ce_session_open_project` (engine.h;
-docs/project.md, "One place starts the machine"). `chimera-run` and the
-window use it, the two copies are gone, and the server will use it too.
+They are now one engine call, `ce_session_open_project` (engine.h; docs/project.md, "One place starts the machine"). `chimera-run` and the window use it, the two copies are gone, and the server will use it too.
 
-The same will be done for finding firmware in the user's Firmware folder when
-the windowless mode needs it; today only the interface knows how.
+The same will be done for finding firmware in the user's Firmware folder when the windowless mode needs it; today only the interface knows how.
 
 ## Rules of the design
 
-- **Few round trips.** Every call costs the agent time and money. That is
-  why ranges are taken in one call, why `advance_until` and `watch` exist,
-  and why a picture is sent only when asked for.
-- **Small answers.** Memory reads and search results have a size limit and
-  say when they were cut. Pictures can be scaled down.
-- **Editing the past behaves as it does by hand.** Changing input before the
-  current frame drops the saved states after it, as any TAStudio edit does.
-- **Errors are the engine's own words.** A core that stopped, a refused
-  write, a frame that does not exist are tool errors with the engine's text.
+- **Few round trips.** Every call costs the agent time and money. That is why ranges are taken in one call, why `advance_until` and `watch` exist, and why a picture is sent only when asked for.
+- **Small answers.** Memory reads and search results have a size limit and say when they were cut. Pictures can be scaled down.
+- **Editing the past behaves as it does by hand.** Changing input before the current frame drops the saved states after it, as any TAStudio edit does.
+- **Errors are the engine's own words.** A core that stopped, a refused write, a frame that does not exist are tool errors with the engine's text.
 
 ## Without a window
 
-An agent can also work with no Chimera running at all. Started with a cores
-folder, `chimera-mcp` reaches no window: it opens a machine of its own, in its
-own process.
+An agent can also work with no Chimera running at all. Started with a cores folder, `chimera-mcp` reaches no window: it opens a machine of its own, in its own process.
 
 ```sh
 claude mcp add chimera-headless -- /path/to/chimera/dll/chimera-mcp \
@@ -312,117 +185,67 @@ claude mcp add chimera-headless -- /path/to/chimera/dll/chimera-mcp \
     --files /path/to/my/games
 ```
 
-The agent then calls `list_cores` and `describe_core` to see what there is,
-`open_game` (a core, the game's files by slot, settings, firmware) or
-`open_project`, and after that every tool of the window: it writes input,
-plays, looks, searches, undoes, branches. `save_project` and `export_movie`
-keep the result, and a project saved this way opens in the window like any
-other.
+The agent then calls `list_cores` and `describe_core` to see what there is, `open_game` (a core, the game's files by slot, settings, firmware) or `open_project`, and after that every tool of the window: it writes input, plays, looks, searches, undoes, branches. `save_project` and `export_movie` keep the result, and a project saved this way opens in the window like any other.
 
 What is different from the window:
 
-- **Nothing asks for permission.** The machine is the agent's own, so the
-  tools that change things are not refused and no branch is saved first.
-- **The movie is held by the engine**, with its own undo history (the last
-  100 edits). There is no TAStudio, so nothing of TAStudio's is there: no
-  markers of the movie's own, no recording mode, no lag log.
-- **A branch keeps the input and the frame, not the machine's state.**
-  Loading one plays its input to its frame.
-- **A project is made with `open_game`, not `create_project`**: it takes
-  the files by slot and the firmware by path, and asks the core for no
-  suggestions.
-- **Firmware is given by path**, a file for each firmware id
-  (`describe_core` lists them), in `open_game` and `open_project`. It does
-  not look in Chimera's Firmware folder or its settings; only the window
-  knows those. The project `open_game` starts pins the firmware it was given
-  (its SHA-1), as the window's projects do. `open_project` given firmware
-  other than the pinned one, or none, opens the project anyway and says so
-  in `warnings` (2026-10-18): other firmware is another machine, and the
-  movie may desync.
-- **One machine at a time.** Opening another closes the one before, without
-  saving it. An open that fails gives the one before back, its unsaved input
-  as it was and its machine started again from frame 0 (2026-10-18: it was
-  lost). `export_movie` refuses a link.
-- **What the core prints goes to standard error.** The core runs in
-  `chimera-mcp`'s own process, and its standard output would be the agent's
-  protocol stream: a line of it there broke the agent's reading of every
-  answer after it (2026-10-18). `chimera-mcp` keeps standard output for the
-  protocol and sends everything else to standard error.
+- **Nothing asks for permission.** The machine is the agent's own, so the tools that change things are not refused and no branch is saved first.
+- **The movie is held by the engine**, with its own undo history (the last 100 edits). There is no TAStudio, so nothing of TAStudio's is there: no markers of the movie's own, no recording mode, no lag log.
+- **A branch keeps the input and the frame, not the machine's state.** Loading one plays its input to its frame.
+- **A project is made with `open_game`, not `create_project`**: it takes the files by slot and the firmware by path, and asks the core for no suggestions.
+- **Firmware is given by path**, a file for each firmware id (`describe_core` lists them), in `open_game` and `open_project`. It does not look in Chimera's Firmware folder or its settings; only the window knows those. The project `open_game` starts pins the firmware it was given (its SHA-1), as the window's projects do. `open_project` given firmware other than the pinned one, or none, opens the project anyway and says so in `warnings` (2026-10-18): other firmware is another machine, and the movie may desync.
+- **One machine at a time.** Opening another closes the one before, without saving it. An open that fails gives the one before back, its unsaved input as it was and its machine started again from frame 0 (2026-10-18: it was lost). `export_movie` refuses a link.
+- **What the core prints goes to standard error.** The core runs in `chimera-mcp`'s own process, and its standard output would be the agent's protocol stream: a line of it there broke the agent's reading of every answer after it (2026-10-18). `chimera-mcp` keeps standard output for the protocol and sends everything else to standard error.
 
 ### Which files it may touch
 
-An agent chooses every path it passes, so the limits are set when
-`chimera-mcp` is started and cannot be changed by a call:
+An agent chooses every path it passes, so the limits are set when `chimera-mcp` is started and cannot be changed by a call:
 
 - core packages are read only from the `--cores` folder;
-- games, projects, movies and firmware are read only from the folders named
-  with `--files <dir>` (repeatable) and from the work folder;
+- games, projects, movies and firmware are read only from the folders named with `--files <dir>` (repeatable) and from the work folder;
 - everything is written inside the work folder, `--work <dir>`;
-- any other path is refused, also one that climbs out with `..` or through a
-  link;
-- a project's files are checked against the hashes it records, and a
-  mismatch is an error, since there is no person to ask.
+- any other path is refused, also one that climbs out with `..` or through a link;
+- a project's files are checked against the hashes it records, and a mismatch is an error, since there is no person to ask.
 
 It downloads nothing. Games and firmware are the user's own files.
 
 ## How it is tested
 
-- The shared project-opening call: the existing tests must give the same
-  results as before, since `chimera-run` and the window both open every
-  project through it. That includes the test that runs the whole product
-  with the synthetic core (`tests/synth/`) and the interface tests.
-- The server in the window, in the interface tests: start it, connect as an
-  agent's program would, read input and memory and compare with what the
-  window itself shows; with the tick box off an edit is refused; with it on
-  an edit appears in the piano roll, a branch was saved first, and undo
-  removes it; stopping the server ends the connection.
-- The windowless mode: play a known movie through the tools and compare the
-  memory, byte for byte, with what `chimera-run` produces for it.
+- The shared project-opening call: the existing tests must give the same results as before, since `chimera-run` and the window both open every project through it. That includes the test that runs the whole product with the synthetic core (`tests/synth/`) and the interface tests.
+- The server in the window, in the interface tests: start it, connect as an agent's program would, read input and memory and compare with what the window itself shows; with the tick box off an edit is refused; with it on an edit appears in the piano roll, a branch was saved first, and undo removes it; stopping the server ends the connection.
+- The windowless mode: play a known movie through the tools and compare the memory, byte for byte, with what `chimera-run` produces for it.
 - Each check is broken on purpose once and seen to fail (docs/gates.md).
 - Linux and the Windows build both.
 
 ## Order of work
 
-1. One engine call that opens a project, used by `chimera-run` and the
-   window.
-2. The engine part of the server: protocol, pipe, log, and the tools that
-   only look. `chimera-mcp` as the program in between. Tools > MCP Server...
-   with start, stop, state and log.
+1. One engine call that opens a project, used by `chimera-run` and the window.
+2. The engine part of the server: protocol, pipe, log, and the tools that only look. `chimera-mcp` as the program in between. Tools > MCP Server... with start, stop, state and log.
 3. The tools that change things, the tick box, the saved branch, undo.
 4. RAM search, `watch`, `advance_until`.
 5. The windowless mode and its file limits.
 6. Release bundles, README, a note for the website.
 
-The owner changed the order on 2026-10-12, once the window mode was complete
-and tested on both systems: `chimera-mcp` ships in the release bundles now,
-and the convenience tools and the windowless mode follow.
+The owner changed the order on 2026-10-12, once the window mode was complete and tested on both systems: `chimera-mcp` ships in the release bundles now, and the convenience tools and the windowless mode follow.
 
 ## Not planned
 
 - Sound, video encoding, CPU traces.
-- More than one agent connected at once, or one agent on several Chimera
-  windows.
+- More than one agent connected at once, or one agent on several Chimera windows.
 - Any connection that is not local to the machine and the user.
 
 ## What was decided (owner, 2026-10-12)
 
-1. A program an agent starts and talks to over standard input and output is
-   inside the "no network code" rule.
+1. A program an agent starts and talks to over standard input and output is inside the "no network code" rule.
 2. `chimera-mcp` ships in the release bundles once it is tested, not before.
-3. Opening a project is one piece of C++ in the engine that `chimera-run`,
-   the window and the server all use, done now and not postponed. Avoiding
-   repeated code comes first.
+3. Opening a project is one piece of C++ in the engine that `chimera-run`, the window and the server all use, done now and not postponed. Avoiding repeated code comes first.
 4. Memory writes are offered, and reported from the first one on.
 5. Without a window, files are limited to the folders named at start.
-6. Working inside the running window is the main use: Tools > MCP Server...,
-   where the server can be started, watched, logged and stopped at any time.
+6. Working inside the running window is the main use: Tools > MCP Server..., where the server can be started, watched, logged and stopped at any time.
 7. The window comes first; the windowless mode follows.
 8. In the window, changes are behind a tick box that is off at first.
 9. The server always starts stopped; its state is not remembered.
 
 ## What was decided (owner, 2026-10-22, issue 355)
 
-The six requests of issue 355 are all built, and every Lua function is
-offered through the server too (in the window, where Lua runs; the
-windowless server has no Lua). Decision 8 changed: the tick box is
-remembered between starts. The server itself still starts stopped (9).
+The six requests of issue 355 are all built, and every Lua function is offered through the server too (in the window, where Lua runs; the windowless server has no Lua). Decision 8 changed: the tick box is remembered between starts. The server itself still starts stopped (9).

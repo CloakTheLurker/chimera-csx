@@ -1075,8 +1075,44 @@ namespace Chimera.Emulation.Common.Waterbox
 			}
 		}
 
+		/// <summary>
+		/// A package may write a setting's optionLabels as an array in the same order as its options (Mesen's
+		/// multi-machine package does), where this reader and the project keep a map from value to label. Pair
+		/// them before the typed parse; a map is left as it is.
+		/// </summary>
+		private static string OptionLabelArraysToMaps(string json)
+		{
+			Newtonsoft.Json.Linq.JObject root;
+			try
+			{
+				root = Newtonsoft.Json.Linq.JObject.Parse(json);
+			}
+			catch (JsonException)
+			{
+				return json;
+			}
+			if (root["settings"] is not Newtonsoft.Json.Linq.JArray settings) return json;
+			var changed = false;
+			foreach (var item in settings.OfType<Newtonsoft.Json.Linq.JObject>())
+			{
+				if (item["optionLabels"] is not Newtonsoft.Json.Linq.JArray labels
+					|| item["options"] is not Newtonsoft.Json.Linq.JArray options) continue;
+				var map = new Newtonsoft.Json.Linq.JObject();
+				for (var i = 0; i < labels.Count && i < options.Count; i++)
+				{
+					var value = options[i]?.ToString();
+					if (value is null) continue;
+					map[value] = labels[i]?.ToString() ?? "";
+				}
+				item["optionLabels"] = map;
+				changed = true;
+			}
+			return changed ? root.ToString(Formatting.None) : json;
+		}
+
 		public static WaterboxConfig? FromJson(string json, IReadOnlyDictionary<string, string>? texts = null)
 		{
+			json = OptionLabelArraysToMaps(json);
 			var cfg = JsonConvert.DeserializeObject<WaterboxConfig>(json);
 			if (cfg is not null)
 			{

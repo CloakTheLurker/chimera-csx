@@ -11331,3 +11331,34 @@ the person's script running with no agent script left and no error. The
 printed frame numbers there are 0, 1 and 2 for the three completed frames:
 that is the Lua Console's own reading of emu.framecount at the resume, not the
 answer's 'frame', which is 3.
+
+## Chimera CSX 1.4.0's cores (2026-11-15)
+
+The nine roster changes from upstream are in `official-cores.json` and the README:
+Mesen (with Pocket Challenge V2), bsnes v115, Cemu, 86Box, ZEsarUX, Godot 4.7
+in place of the generic Godot row, RSDKv5U, ScummVM and Supermodel. SRB2 is
+published by its author outside the organisation, so it is no longer an
+official row; the README says where to find it.
+
+Mesen's package writes a setting's `optionLabels` as an array in the order of
+its `options`, where the reader and the project keep a map from value to label.
+Chimera CSX 1.2.0 refused the package for that. The reader now pairs the array
+with the options before the typed parse; a map is unchanged. Mesen's package
+becomes a factory and is in the 1.4.0 set.
+
+Mesen calls SNES "Super NES / Super Famicom"; Snes9x and bsnes v115 call it
+"Super Nintendo". The owner chose to keep each package's own name in the
+roster rather than force one name across it. The one-name test now allows a
+split only where the installed packages themselves name the system differently;
+the package-drift test still holds every row to its package.
+
+The 1.4.0Cores set is the 1.2.0 set plus Mesen: 63 packages, 61 in the folder
+and the two above GitHub's file limit still in the 1.2.0Cores-oversize release
+(Cemu and ScummVM, the same bytes as 1.2.0). Git stores the copied files once,
+so the new folder costs only Mesen's 4.5 MB in the repository.
+
+What was measured: `CHIMERA_CORES_DIR=1.4.0Cores` and the frontend's 36
+contract tests pass (`InstalledCorePackagesTests`, `RosterNamesTests`,
+`CoreLanguageTableTests` and `MnemonicUniquenessTests`), including Mesen's
+readable package and factory. The window witness still passes. 1.4.0 is not
+tagged until the cores set is committed and published.

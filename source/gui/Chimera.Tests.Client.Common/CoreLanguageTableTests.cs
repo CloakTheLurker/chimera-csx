@@ -54,6 +54,37 @@ namespace Chimera.Tests.Client.Common
 			Assert.AreEqual("The 48K Spectrum's ROM.", cfg.Firmware[0].Description);
 		}
 
+		/// <summary>
+		/// Mesen's package writes a setting's labels as an array in the order of its options, where the reader
+		/// and the project keep a map from value to label. The two must be paired (1.4.0; the package was refused
+		/// before).
+		/// </summary>
+		[TestMethod]
+		public void OptionLabelsMayBeAnArrayInTheOrderOfTheOptions()
+		{
+			var cfg = WaterboxConfig.FromJson("""
+				{
+				  "coreName": "Mesen",
+				  "settings": [
+				    {
+				      "name": "machine",
+				      "type": "enum",
+				      "options": [ "nes", "snes" ],
+				      "optionLabels": [ "setting.machine.nes", "setting.machine.snes" ]
+				    }
+				  ]
+				}
+				""", CoreLanguageTable.Parse("""
+					{ "texts": {
+						"setting.machine.nes": "NES",
+						"setting.machine.snes": "Super NES"
+					} }
+					"""));
+			Assert.IsNotNull(cfg);
+			Assert.AreEqual("NES", cfg.Settings![0].LabelFor("nes"));
+			Assert.AreEqual("Super NES", cfg.Settings[0].LabelFor("snes"));
+		}
+
 		[TestMethod]
 		public void AnOldPackageKeepsTheWordsItHolds()
 		{

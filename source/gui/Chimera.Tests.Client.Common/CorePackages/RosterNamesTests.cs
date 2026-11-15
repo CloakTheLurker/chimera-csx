@@ -63,21 +63,37 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		}
 
 		/// <summary>
-		/// Two cores that run the same system say the same name for it. Nothing
-		/// forces them to - each core speaks for itself - but the roster is one
-		/// list read by one person, and "Nintendo Entertainment System" beside
-		/// "Famicom / NES" for the same id reads as two machines.
+		/// Two cores that run the same system normally say the same name for it,
+		/// because the roster is one list read by one person. Where the packages
+		/// themselves disagree (Mesen calls SNES "Super NES / Super Famicom",
+		/// Snes9x calls it "Super Nintendo"), the roster carries each package's
+		/// own name: a row is a copy of what its core says, and the package-drift
+		/// test below holds it there.
 		/// </summary>
 		[TestMethod]
-		public void OneSystemHasOneNameAcrossTheRoster()
+		public void OneSystemHasOneNameAcrossTheRosterUnlessItsPackagesDisagree()
 		{
 			var split = Roster()
 				.SelectMany(static core => core.Systems.Select(system => (Core: core.Id, system.Id, system.Name)))
 				.GroupBy(static x => x.Id)
 				.Where(static g => g.Select(static x => x.Name).Distinct().Count() > 1)
-				.Select(static g => $"{g.Key}: {string.Join(" / ", g.Select(static x => $"\"{x.Name}\" ({x.Core})"))}")
 				.ToList();
-			Assert.AreEqual(0, split.Count, string.Join("; ", split));
+			if (split.Count is 0) return;
+			if (InstalledPackages.Files.Count is 0) Assert.Inconclusive("no core packages in build/Cores to explain a split name");
+			List<string> unexplained = new();
+			foreach (var group in split)
+			{
+				HashSet<string> said = new(StringComparer.Ordinal);
+				foreach (var package in InstalledPackages.Files)
+				{
+					var text = InstalledPackages.ConfigOf(package);
+					var cfg = text is null ? null : WaterboxConfig.FromJson(text);
+					if (cfg?.SystemNames is not { Count: > 0 } declared || !declared.TryGetValue(group.Key, out var name)) continue;
+					said.Add(name);
+				}
+				if (said.Count < 2) unexplained.Add($"{group.Key}: {string.Join(" / ", group.Select(static x => $"\"{x.Name}\" ({x.Core})"))}");
+			}
+			Assert.AreEqual(0, unexplained.Count, string.Join("; ", unexplained));
 		}
 
 		/// <summary>

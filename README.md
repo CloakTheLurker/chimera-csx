@@ -40,9 +40,12 @@ To use a core, download its `.chimeraCore` package (hosted on [this repository](
 | --- | --- |
 | [quickerNES](https://github.com/ToolAssisted-run/chimera-core-quickernes) | Nintendo Entertainment System / Famicom |
 | [QuickerNesHawk](https://github.com/ToolAssisted-run/chimera-core-neshawk) | Nintendo Entertainment System / Famicom, Famicom Disk System |
+| [Mesen](https://github.com/ToolAssisted-run/chimera-core-mesen) | Nintendo Entertainment System / Famicom, Famicom Disk System (with the EPSM sound expansion), Super Nintendo, Super Game Boy, Game Boy / Game Boy Color, Game Boy Advance, PC Engine / TurboGrafx-16, SuperGrafx, PC Engine CD, Master System, Game Gear, SG-1000, ColecoVision, WonderSwan / WonderSwan Color, Pocket Challenge V2 |
 | [ares](https://github.com/ToolAssisted-run/chimera-core-ares) | Nintendo Entertainment System / Famicom, Super Nintendo, Satellaview, Sufami Turbo, Nintendo 64, Nintendo 64DD, Game Boy / Game Boy Color, Game Boy Advance, Mega Drive / Genesis, Mega Drive 32X, Sega CD / Mega CD, Sega CD 32X, Master System, Game Gear, SG-1000, PlayStation, Atari 2600, Atari 5200, ColecoVision, MSX / MSX2, PC Engine / TurboGrafx-16 / SuperGrafx, PC Engine CD / TurboDuo, Neo Geo AES, Neo Geo Pocket / Color, WonderSwan / WonderSwan Color |
 | [Snes9x](https://github.com/ToolAssisted-run/chimera-core-snes9x) | Super Nintendo |
+| [bsnes v115](https://github.com/ToolAssisted-run/chimera-core-bsnes115) | Super Nintendo, Super Game Boy |
 | [Dolphin](https://github.com/ToolAssisted-run/chimera-core-dolphin) | GameCube, Wii |
+| [Cemu](https://github.com/ToolAssisted-run/chimera-core-cemu) | Wii U |
 | [Azahar](https://github.com/ToolAssisted-run/chimera-core-azahar) | Nintendo 3DS / New Nintendo 3DS |
 | [melonDS](https://github.com/ToolAssisted-run/chimera-core-melonds) | Nintendo DS, Nintendo DSi |
 | [Gambatte](https://github.com/ToolAssisted-run/chimera-core-gambatte) | Game Boy / Game Boy Color, Super Game Boy, Game Boy Link (two to four Game Boys joined by cable) |
@@ -70,19 +73,23 @@ To use a core, download its `.chimeraCore` package (hosted on [this repository](
 | [PUAE](https://github.com/ToolAssisted-run/chimera-core-puae) | Commodore Amiga, Amiga CD32, Commodore CDTV |
 | [VICE](https://github.com/ToolAssisted-run/chimera-core-vice) | Commodore 64 |
 | [Fuse](https://github.com/ToolAssisted-run/chimera-core-fuse) | ZX Spectrum 16K / 48K / 128K / +2 / +3, Timex, Pentagon, Scorpion |
+| [ZEsarUX](https://github.com/ToolAssisted-run/chimera-core-zesarux) | ZX Spectrum Next |
 | [MAME X68000](https://github.com/ToolAssisted-run/chimera-core-x68k) | Sharp X68000 |
 | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x) | MS-DOS, Windows 3.1 / 95 / 98 |
 | [PCem](https://github.com/ToolAssisted-run/chimera-core-pcem) | MS-DOS, Windows 3.1 / 95 / 98, Windows XP, Linux (x86) |
+| [86Box](https://github.com/ToolAssisted-run/chimera-core-86box) | IBM PC compatibles: IBM PC, XT and AT, a 486 and a Pentium board (MS-DOS) |
 | [Ruffle](https://github.com/ToolAssisted-run/chimera-core-ruffle) | Flash |
 | [EKA2L1](https://github.com/ToolAssisted-run/chimera-core-eka2l1) | Symbian / Nokia N-Gage |
 | [touchHLE](https://github.com/ToolAssisted-run/chimera-core-touchhle) | iPhone OS 2.x-4.0 (iPhone, iPod touch and iPad apps) |
 | [FreeJ2ME-Plus](https://github.com/ToolAssisted-run/chimera-core-freej2me) | J2ME (Java games of 2000s phones) |
-| [Godot](https://github.com/ToolAssisted-run/chimera-core-godot) | Godot 4.7 (games made with the Godot Engine) |
+| [Godot 4.7](https://github.com/ToolAssisted-run/chimera-core-godot47) | Godot 4.7 (games made with the Godot Engine) |
 | [Godot 4.6](https://github.com/ToolAssisted-run/chimera-core-godot46) | Godot 4.6 |
 | [Godot 4.5](https://github.com/ToolAssisted-run/chimera-core-godot45) | Godot 4.5 |
 | [Godot 4.4](https://github.com/ToolAssisted-run/chimera-core-godot44) | Godot 4.0 to 4.4 |
 | [OpenBOR](https://github.com/ToolAssisted-run/chimera-core-openbor) | OpenBOR (2D beat 'em up games) |
 | [Ikemen GO](https://github.com/ToolAssisted-run/chimera-core-ikemen) | Ikemen GO (fighting games made with it, and M.U.G.E.N characters and stages) |
+| [ScummVM](https://github.com/ToolAssisted-run/chimera-core-scummvm) | ScummVM (adventure games of LucasArts, Sierra and others, run from their own files) |
+| [Supermodel](https://github.com/ToolAssisted-run/chimera-core-supermodel) | Sega Model 3 (arcade) |
 
 ### Game cores
 
@@ -98,11 +105,11 @@ One game each, run from the game's own files ([docs/game-cores.md](docs/game-cor
 | [RSDKv3](https://github.com/ToolAssisted-run/chimera-core-rsdkv3) | Sonic CD (the 2011 remake) |
 | [RSDKv4](https://github.com/ToolAssisted-run/chimera-core-rsdkv4) | Sonic the Hedgehog and Sonic the Hedgehog 2 (the 2013 remasters) |
 | [RSDKv5](https://github.com/ToolAssisted-run/chimera-core-rsdkv5) | Sonic Mania |
+| [RSDKv5U](https://github.com/ToolAssisted-run/chimera-core-rsdkv5u) | Sonic Origins (Sonic 1, Sonic 2, Sonic CD) |
 | [DSDA-Doom](https://github.com/ToolAssisted-run/chimera-core-dsda) | Doom, Doom II, Final Doom, Heretic, Hexen, Chex Quest, Freedoom |
 | [Open4DBoxing](https://github.com/ToolAssisted-run/chimera-core-open4dboxing) | 4D Sports Boxing (DOS) |
-| [SRB2](https://github.com/P-AS/chimera-core-srb2) | Sonic Robo Blast 2 |
 
-SRB2 is published by its author, P-AS, from their own repository.
+SRB2 (Sonic Robo Blast 2) is published by its author, P-AS, from [their own repository](https://github.com/P-AS/chimera-core-srb2), so it is not in the official roster.
 
 ## Getting a build
 

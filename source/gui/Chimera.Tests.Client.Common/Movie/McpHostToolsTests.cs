@@ -113,6 +113,10 @@ namespace Chimera.Tests.Client.Common.Movie
 
 			public void PlayUntil(int frame) => PlayingTo = frame;
 
+			public int PlayedFrames = -1;
+
+			public void PlayFrames(int frames) => PlayedFrames = frames;
+
 			public System.Collections.Generic.IReadOnlyList<int>? Pictures;
 
 			public void TakePictures(System.Collections.Generic.IReadOnlyList<int> frames) => Pictures = frames;

@@ -38,6 +38,12 @@ namespace Chimera.Client.GUI
 		private (LuaConsole Console, int Start)? _mcpLuaFrames;
 
 		/// <summary>
+		/// run_lua with frames: the call, the frame it began on and the frame it is to stop on, while the machine
+		/// plays. A playback, not a seek: every frame runs the tools, so the agent's script is resumed on each.
+		/// </summary>
+		private (ulong Id, int Start, int Target)? _mcpPlay;
+
+		/// <summary>
 		/// The frames a capture_series still has to take pictures of, the next first; null when none is
 		/// running. Each is reached by a seek of its own (<see cref="_mcpSeek"/>), and the picture is taken
 		/// when the seek has stopped there, with the frame drawn.
@@ -70,6 +76,8 @@ namespace Chimera.Client.GUI
 				_main._mcpAsked = (Frame, frame, true);
 				_main.Tools.TAStudio.GoToFrame(frame);
 			}
+
+			public void PlayFrames(int frames) => _main.McpPlayFrames(frames);
 
 			public void TakePictures(IReadOnlyList<int> frames)
 			{
@@ -292,6 +300,39 @@ namespace Chimera.Client.GUI
 			var session = McpSession;
 			var movie = MovieSession.Movie;
 			var active = movie.IsActive();
+			if (_mcpPlay is { Id: not 0 } play)
+			{
+				// run_lua with frames: the machine is playing, and its tools run on every frame. It is stopped
+				// on the frame it was told to, or at the movie's end, and the script's answer goes back then.
+				if (window is null || !active || movie is not ITasMovie playMovie)
+				{
+					EngineMcp.Answer(session, play.Id, "The project was closed while the frames were playing.", isError: true);
+					_mcpPlay = null;
+				}
+				else if (!EmulatorPaused && Emulator.Frame < play.Target && Emulator.Frame < playMovie.InputLogLength - 1)
+				{
+					return;
+				}
+				else
+				{
+					PauseEmulator();
+					try
+					{
+						McpChimera luaChimera = new(this);
+						var (ended, results, error, output) = luaChimera.FinishLuaFrames();
+						var played = Math.Max(0, Emulator.Frame - play.Start);
+						EngineMcp.Answer(session, play.Id,
+							McpHostTools.LuaFramesAnswer(window, played, ended, ended ? results : Array.Empty<object>(), error, output),
+							isError: error is not null);
+					}
+					catch (Exception ex)
+					{
+						// the console was closed while the code ran: the agent is told, not left waiting
+						EngineMcp.Answer(session, play.Id, $"The Lua Console was closed while the code ran: {ex.Message}", isError: true);
+					}
+					_mcpPlay = null;
+				}
+			}
 			if (_mcpSeek is { } seek)
 			{
 				// A seek runs over many passes of this loop, one frame a pass. Its call is answered when
@@ -307,24 +348,6 @@ namespace Chimera.Client.GUI
 				if (window is null || !active || movie is not ITasMovie tasMovie)
 				{
 					EngineMcp.Answer(session, seek.Id, "The project was closed while the playback position was moving.", isError: true);
-				}
-				else if (_mcpLuaFrames is { } luaFrames)
-				{
-					// run_lua with frames: the script has had them; what it ended on goes back with what it printed
-					try
-					{
-						McpChimera luaChimera = new(this);
-						var (ended, results, error, output) = luaChimera.FinishLuaFrames();
-						var played = Math.Max(0, window.Frame - luaFrames.Start);
-						EngineMcp.Answer(session, seek.Id,
-							McpHostTools.LuaFramesAnswer(window, played, ended, ended ? results : Array.Empty<object>(), error, output),
-							isError: error is not null);
-					}
-					catch (Exception ex)
-					{
-						// the console was closed while the code ran: the agent is told, not left waiting
-						EngineMcp.Answer(session, seek.Id, $"The Lua Console was closed while the code ran: {ex.Message}", isError: true);
-					}
 				}
 				else if (_mcpPictures is { } pictures)
 				{
@@ -396,8 +419,16 @@ namespace Chimera.Client.GUI
 				}
 				if (text is null)
 				{
-					// a seek or an advance_until has begun: answered above, on the pass where it stops
-					_mcpSeek = (id, _mcpAsked.Start, _mcpAsked.Frame, _mcpAsked.Until);
+					if (_mcpPlay is { } playing)
+					{
+						// run_lua with frames has begun playing: answered above, where it stops
+						_mcpPlay = (id, playing.Start, playing.Target);
+					}
+					else
+					{
+						// a seek or an advance_until has begun: answered above, on the pass where it stops
+						_mcpSeek = (id, _mcpAsked.Start, _mcpAsked.Frame, _mcpAsked.Until);
+					}
 					return;
 				}
 				// the machine as it is now: a closed project's session is gone
@@ -405,6 +436,19 @@ namespace Chimera.Client.GUI
 				// what the agent changed is shown at once, as a change made by hand is
 				if (!Emulator.IsNull() && Tools.Has<TAStudio>() && !isError && !tool.StartsWith("list_", StringComparison.Ordinal)) Tools.TAStudio.RefreshDialog();
 			}
+		}
+
+		/// <summary>
+		/// run_lua with frames (issue 571): lets the machine play, rather than seek, up to the frame asked for -
+		/// never past the movie's end - so the Lua Console's scripts run on every frame. The call is answered in
+		/// <see cref="ServiceMcp"/> once it stops.
+		/// </summary>
+		private void McpPlayFrames(int frames)
+		{
+			var start = Emulator.Frame;
+			var length = MovieSession.Movie is ITasMovie movie ? movie.InputLogLength : start;
+			_mcpPlay = (0, start, Math.Min(length, start + frames));
+			UnpauseEmulator();
 		}
 
 		/// <summary>

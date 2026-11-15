@@ -11303,3 +11303,31 @@ a filesystem difference this change does not touch. The with_lua picture and
 the window's deferred frames were not seen in a running window on this machine:
 they are covered by the code and the host tests, not by a picture or an agent
 session.
+
+## MCP: run_lua's frames are played, not sought (2026-11-15)
+
+The first version of run_lua with 'frames' reached the frames through a seek
+(the same call advance_until uses). A seek is not a playback: the run loop
+serves the host only sixty times a second while it runs, and the frames in
+between are "quiet" - the tools do not update, so the Lua Console does not
+resume a script waiting for a frame. A live run in a shown window showed it:
+code that waits three frames printed frames 2 and 3 only and was answered
+still waiting, though the machine had reached frame 3.
+
+The frames are now played, not sought: the machine is unpaused, the call is
+answered when it reaches the frame asked for (or the movie's end, or stops
+early), and the tools run on every frame, so the agent's script is resumed on
+each. This is the only way the frames can be the script's.
+
+What was measured, in a shown window under WSLg with the synthetic core and
+its movie: a Lua overlay with four pixels of padding and a red box at the
+game's (0,0) came back in screenshot with layers "with_lua" at the game's size
+plus the padding, with the padding said on each side and the red box in it
+(the game-only picture did not have it); run_lua with frames 3 played three
+frames, ended, returned 3 and left the machine on frame 3, printing once a
+frame; run_lua with seconds 1 stopped "while true do end" with its error;
+lua_console numbered the lines and said where to ask next; lua_scripts showed
+the person's script running with no agent script left and no error. The
+printed frame numbers there are 0, 1 and 2 for the three completed frames:
+that is the Lua Console's own reading of emu.framecount at the resume, not the
+answer's 'frame', which is 3.

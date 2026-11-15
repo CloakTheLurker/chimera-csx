@@ -43,6 +43,14 @@ namespace Chimera.Client.Common
 		void PlayUntil(int frame);
 
 		/// <summary>
+		/// run_lua with frames: lets the machine play up to this many frames from where it is - never past the
+		/// movie's end - and stops it. Unlike <see cref="PlayUntil"/>, this is a playback, not a seek: the Lua
+		/// Console and the other tools run on every frame, so a script waiting for a frame is resumed on each.
+		/// The call is answered once it stops.
+		/// </summary>
+		void PlayFrames(int frames);
+
+		/// <summary>
 		/// capture_series: plays the movie to each of these frames in turn, and on each has the engine take its
 		/// picture. The call is answered after the last (<see cref="McpHostTools.PicturesAnswer"/>).
 		/// </summary>
@@ -556,7 +564,8 @@ namespace Chimera.Client.Common
 					var (ended, left, why, tail) = chimera.FinishLuaFrames();
 					return LuaFramesAnswer(window, 0, ended, ended ? left : Array.Empty<object>(), why, tail);
 				}
-				window.PlayUntil(target);
+				// a playback, not a seek: the script must be resumed on every frame
+				window.PlayFrames(frames);
 				// answered when the frames are played: McpHostTools.LuaFramesAnswer
 				return null;
 			}

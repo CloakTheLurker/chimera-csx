@@ -138,6 +138,10 @@ namespace Chimera.Tests.Client.Common.Movie
 
 			public void PlayUntil(int frame) => PlayingTo = frame;
 
+			public int PlayedFrames = -1;
+
+			public void PlayFrames(int frames) => PlayedFrames = frames;
+
 			public void TakePictures(IReadOnlyList<int> frames)
 			{
 			}
@@ -561,7 +565,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.IsFalse(isError);
 			Assert.IsNotNull(chimera.StartedFrames);
 			Assert.AreEqual(("emu.frameadvance() return 7", 14.0), chimera.StartedFrames!.Value, "ten seconds and one a frame");
-			Assert.AreEqual(7, window.PlayingTo, "four frames from where the machine is");
+			Assert.AreEqual(4, window.PlayedFrames, "four frames from where the machine is");
 
 			// the frames are played: answered then
 			var done = JObject.Parse(McpHostTools.LuaFramesAnswer(window, 4, true, [7L], null, "printed\n"));

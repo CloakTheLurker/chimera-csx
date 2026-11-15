@@ -1,8 +1,8 @@
 # Porting a core
 
 What one person learned building sixteen of them. This is the practical
-companion to [design-principles.md](design-principles.md) (why Chimera is the
-way it is) and [waterbox-analysis.md](waterbox-analysis.md) (what the sandbox
+companion to [design-principles.md](history/design-principles.md) (why Chimera is the
+way it is) and [waterbox-analysis.md](history/waterbox-analysis.md) (what the sandbox
 is): the order the work actually goes in, and the traps that cost days.
 
 Per-core reasoning lives in each core's own `docs/PLAN.md`. Read the closest

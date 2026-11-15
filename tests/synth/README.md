@@ -1,7 +1,7 @@
 # The synthetic witness
 
 Chimera's own, core-agnostic correctness apparatus (see "The synthetic
-witness" in [design-principles.md](../../docs/design-principles.md)). Three
+witness" in [design-principles.md](../../docs/history/design-principles.md)). Three
 core flavors - native, pure C#, waterboxed - will implement the same tiny
 console, and for every test movie ALL of the memory space, video output, and
 audio output must match bit-exactly across the three.

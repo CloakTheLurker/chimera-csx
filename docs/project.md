@@ -552,7 +552,7 @@ the file it names is the one replaced.
 
 The work in a project survives any end of the process - a GPU driver that
 fast-fails, a kill, a power cut - because none of it waits for a crash to be
-saved (docs/design-principles.md, "A crash takes nothing that was entered").
+saved (docs/history/design-principles.md, "A crash takes nothing that was entered").
 
 While a project is open, its recovery folder is `<data>/Recovery/<id>/` - its
 own root, never inside the project's cache, so removing a greenzone cannot take
@@ -683,7 +683,7 @@ opened a project. It does now, with the engine's sentence as the refusal.
   disc slot, both NES cores read the rom slot.
 - DONE (2026-10-26): `chimera-run --new-project`, which makes a project
   from the command line, as New Project makes one; a game runs only in a
-  project (user-decided, 2026-10-26; docs/design-principles.md), so this is
+  project (user-decided, 2026-10-26; docs/history/design-principles.md), so this is
   how the gates make theirs. The game-file form of chimera-run goes once
   every core's tests have moved to projects.
 - TODO: the frontend (start screen, creation wizard rendering

@@ -1,7 +1,7 @@
 # Save data: the core keeps it, the user takes it out
 
 Status: SPEC + first tenant (PPSSPP memstick). User-decided 2026-08-25.
-This is the third design for "what a machine keeps" (see design-principles.md,
+This is the third design for "what a machine keeps" (see history/design-principles.md,
 "Storing progress: cleared to the ground" for the two removed ones).
 
 ## The design, in one paragraph
@@ -183,3 +183,4 @@ taken off a stick and goes under `PSP/SAVEDATA` (save data) or `PSP/GAME`
   `ce_session_savedata_read` is ranged.
 - **NES cores**: not tenants. SRAM is machine state; savestates already
   carry it.
+

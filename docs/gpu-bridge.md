@@ -757,9 +757,9 @@ included, and says so when it opens. What changed it: a Ruffle greenzone saved
 by one process and restored twenty-one frames deep in the next crashed inside
 the NVIDIA driver (0xc0000409), reproducibly - a path the old
 drop-everything-ahead capture had kept anyone from reaching (see
-docs/design-principles.md, "A GPU core's word that its states survive is not
+docs/history/design-principles.md, "A GPU core's word that its states survive is not
 taken"). The in-process reopen below still works; it is the cross-process
-restore that is unproven. It was honored again on 2026-09-14 and withdrawn the same day, when a history written by a session that was already corrupting its guest crashed the driver on every open of the project (docs/design-principles.md, "A GPU core's word is withdrawn again, after it bricked a project"). Rewind and branches within a session keep their states
+restore that is unproven. It was honored again on 2026-09-14 and withdrawn the same day, when a history written by a session that was already corrupting its guest crashed the driver on every open of the project (docs/history/design-principles.md, "A GPU core's word is withdrawn again, after it bricked a project"). Rewind and branches within a session keep their states
 either way - a load there moves the id and the core rebuilds (see "Per load,
 too" above) - and a project that loses its cache replays,
 which is what an empty greenzone has always meant.
@@ -767,7 +767,7 @@ which is what an empty greenzone has always meant.
 What stands now: the greenzone of a GPU-drawn machine is kept across a clean
 close for the cores whose states have been SHOWN to reload in another process,
 and since 2026-10-06 a branch's state is kept under exactly the same rule
-(docs/design-principles.md, "A branch's state follows the greenzone's rule").
+(docs/history/design-principles.md, "A branch's state follows the greenzone's rule").
 
 ### Keeping the greenzone across sessions (user-decided, 2026-10-18)
 
@@ -1005,7 +1005,7 @@ rebuilds, it rebuilds as the game touches it (above), and for the frames in
 between the picture read back can be wrong on a real card. The session keeps
 the picture of every frame it shows and, for a while after a load, shows the
 kept one for a frame that has it (engine.h, `ce_session_greenzone_pictures`;
-docs/design-principles.md, chimera#190). It is on by itself for a session a
+docs/history/design-principles.md, chimera#190). It is on by itself for a session a
 GPU draws for, and it helps frames already seen, not frames drawn for the
 first time after an edit.
 
@@ -1013,14 +1013,14 @@ How long a renderer is wrong is measured, not presumed: `chimera-run
 --settle-probe <frame>,<count>` on the card in question, with
 `--greenzone-period 1 --greenzone-max-stride 1` so the load lands on the
 frame before. On a GTX 1060 xemu was one frame behind after a load in one
-game and wrong for five frames in another (docs/design-principles.md, "What
+game and wrong for five frames in another (docs/history/design-principles.md, "What
 a real card shows").
 
 That was not the renderer being slow. What it had drawn was not in the state:
 a core whose GPU surfaces reach the machine's memory only when the machine
 reads them is told before a state is taken, through the optional
 `StateSaving()` export, and writes them out then (docs/porting-a-core.md;
-docs/design-principles.md, "A core is told before a state is taken of it").
+docs/history/design-principles.md, "A core is told before a state is taken of it").
 xemu does, and its first frame after a load is the frame's own picture.
 
 ## A state taken by another process (user-decided, 2026-10-24)

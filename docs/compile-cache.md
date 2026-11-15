@@ -134,7 +134,7 @@ the Windows status values both, and an unrecognised code by number. That is wort
 more than the sentence it replaces - "3 of 8 sessions failed without saying why"
 was holding an 0xC0000005, which is what turned a supposed memory shortage into
 the real fault, a JIT region in the rpcs3 core that wrapped onto its own code
-(docs/design-principles.md, 2026-09-12). Where memory is what ran out, the run halves the sessions and goes again -
+(docs/history/design-principles.md, 2026-09-12). Where memory is what ran out, the run halves the sessions and goes again -
 too much at once is a reason to want less, not a reason to stop. Memory ran
 out when the system's code says so, when a session said the sandbox "failed
 to create memory block", or when the machine had less than 4 GB to spare at

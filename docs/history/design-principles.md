@@ -1,3 +1,5 @@
+> **This is the historical design log, kept as a record.** Chimera CSX is the C# WinForms fork of Chimera at nightly-2026-10-27. Where this log describes the upstream Qt window or the C# window's removal, that is upstream history, not this fork. The current documents are indexed in [docs/README.md](../README.md).
+
 # Chimera - Project Charter
 
 A minimal, core-agnostic TAS frontend derived from BizHawk. Emulation cores are removed
@@ -303,7 +305,7 @@ phase of unverified change.
   (previously they could exit 0 after an invisible dialog). Both witness drivers
   pass --headless, and both gained --quick/-Quick: a six-test smoke subset (~1 min)
   for CI and dev loops - explicitly NOT a substitute for the full commit gate.
-  Layout/docs in the same round: CHIMERA.md moved to docs/design-principles.md
+  Layout/docs in the same round: CHIMERA.md moved to docs/history/design-principles.md
   (references updated); LICENSE separates copyright (BizHawk team = inherited
   code, Sergio Martin 2026 = Chimera modifications and new work); accidentally
   committed build output purged (root libchd_capi.so and 490 files under
@@ -475,7 +477,7 @@ phase of unverified change.
 
 ## THE WATERBOX-ONLY REDESIGN (user-decided, 2026-08-11)
 
-After full analysis of BizHawk's waterbox (docs/waterbox-analysis.md), a
+After full analysis of BizHawk's waterbox (docs/history/waterbox-analysis.md), a
 fundamental design change: Chimera allows ONLY waterboxed cores, making
 every core reproducible and portable BY FORCE rather than by discipline.
 Decisions, all user-confirmed:
@@ -4002,7 +4004,7 @@ did: false, nil, or nothing done.
 
 Seven distinct instances of a gate passing while the thing it vouched for was
 broken were found in one day, across three repositories. Written up as
-[gates.md](gates.md), because seven in a day is a class of mistake and not
+[gates.md](../gates.md), because seven in a day is a class of mistake and not
 seven accidents.
 
 The worst of them, by how long it lasted and how much it covered: the PCSX2
@@ -8650,7 +8652,7 @@ GL's rows are copied back. Before a buffer upload or a readback, the engine
 asks miniBox whether the core's range is allocated with the access needed (a
 new export, wbx_guest_range_ok); a pointer into memory the core gave back is a
 refused call. Other GL calls that take a pointer are not checked yet; the
-detail is in [gpu-bridge.md](gpu-bridge.md).
+detail is in [gpu-bridge.md](../gpu-bridge.md).
 
 **Tested.** Four new GL tests (on Mesa's software GL): overlapping rows with
 nothing written past the buffer, gaps between rows keeping the core's bytes,
@@ -11289,7 +11291,7 @@ trace_memory, trace_cpu, try_input, snapshot and restore, diff_memory, the
 freeze tools, the wider RAM search (8-byte values, misaligned starts, ranges,
 several rounds in one call), registers' names and roles, and the warning when
 chimera-mcp and the window are different builds. They stay engine candidates
-in docs/upstream-since-1.0.0.md.
+in docs/outdated/upstream-since-1.0.0.md.
 
 What was measured: the engine builds for Linux and Windows and its tests are 28
 of 30 (media and sha1 fail on this checkout for filesystem reasons, as before).

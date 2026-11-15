@@ -62,7 +62,7 @@ versions before 2026-10-07 downloaded into it go along, though Chimera no
 longer looks for cores there - docs/core-manager.md), which is what `CHIMERA_DATA_HOME` always did for anyone who knew
 to set it. The variable still wins where it is set. The window only records the
 change; the next start carries it out before anything in the directory is open
-(`DataDirectory`, and docs/design-principles.md for why).
+(`DataDirectory`, and docs/history/design-principles.md for why).
 
 **Nothing cached goes in the install directory.** A Chimera bundle is a zip
 somebody unpacks, and updating it means unpacking a newer one - anything that

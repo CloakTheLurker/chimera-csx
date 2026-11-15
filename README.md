@@ -115,7 +115,7 @@ SRB2 (Sonic Robo Blast 2) is published by its author, P-AS, from [their own repo
 
 The frontend is built for Linux and Windows and published here:
 
-- [**Nightly builds**](https://github.com/CloakTheLurker/chimera-csx/releases) - dated, immutable, and kept forever. A run is only reproducible while the build that recorded it still exists, and this is what a TAS submitted to toolAssisted.run should be made on.
+- [**Releases**](https://github.com/CloakTheLurker/chimera-csx/releases) - versioned, immutable, and kept forever. A run is only reproducible while the build that recorded it still exists, and this is what a TAS submitted to toolAssisted.run should be made on.
 
 A bundle carries no cores, and Chimera never reaches the network - it downloads nothing, not a core and not a list of them. To set one up:
 
@@ -158,7 +158,7 @@ To run: `build\Chimera.exe` on Windows, `build/ChimeraMono.sh` on Linux, then
 `File > New Project...` and pick a core. To play a rom with no project, pass
 `--core=<package> <rom>` on the command line.
 
-The witness gate runs with `tests/synth/run-witness.sh`. The engineering log (objectives, procedure, and the sharp edges found along the way) is in [docs/design-principles.md](docs/design-principles.md); the engine migration is chronicled in [docs/engine-migration.md](docs/engine-migration.md). Building a new core, and joining it to this bundle, is [docs/porting-a-core.md](docs/porting-a-core.md).
+The witness gate runs with `tests/synth/run-witness.sh`. The engineering log (objectives, procedure, and the sharp edges found along the way) is in [docs/history/design-principles.md](docs/history/design-principles.md); the engine migration is chronicled in [docs/history/engine-migration.md](docs/history/engine-migration.md). Building a new core, and joining it to this bundle, is [docs/porting-a-core.md](docs/porting-a-core.md).
 
 ## Reporting a problem
 

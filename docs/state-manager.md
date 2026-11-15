@@ -6,7 +6,7 @@ states, and what survives closing a project.
 Status: phase 1 BUILT (miniBox 0c972de, with its measurements below); the rest
 is design, decided with the user 2026-09-08.
 It replaces the surviving implementations with one, and it is the remaining half of
-step 5 of the engine migration (docs/engine-migration.md), which always said
+step 5 of the engine migration (docs/history/engine-migration.md), which always said
 TAStudio's state history would move onto the session's.
 
 ## Why this is being redone
@@ -445,7 +445,7 @@ is ahead is still there to jump back to. What changes the timeline - an edit,
 recording over an entry, input that is not the movie's, a different log - calls
 `invalidateAfter` itself before the frame is played. Until 2026-09-13 every
 capture dropped everything after it, and on a Ruffle project returning 3000
-frames to the end after a look back was 99 s of emulation (docs/design-principles.md,
+frames to the end after a look back was 99 s of emulation (docs/history/design-principles.md,
 "A replay changes nothing").
 
 ### A delta continues only the machine that was stored (issue #68, 2026-09-15)
@@ -521,7 +521,7 @@ project's cache, under a second, disk budget of ten gigabytes (user-asked,
 2026-09-10). That extended a greenzone past what the machine could hold, and did
 it by writing gigabytes to the drive continuously while somebody worked - a cost
 paid by the SSD, in wear, for a convenience. Chimera no longer turns spilling on,
-and the disk budget is gone (user-decided, 2026-09-15; docs/design-principles.md,
+and the disk budget is gone (user-decided, 2026-09-15; docs/history/design-principles.md,
 "A greenzone lives in memory, and the disk is for saving"). The history file is
 still written when a project is saved, which is the one moment somebody asked for
 the disk. Spill files an earlier build left in a project's cache are deleted when
@@ -1771,7 +1771,7 @@ big as the history, and anything on the machine's thread that waits for the
 writer waits for the save. A spill over the write queue's cap does exactly
 that - a 42.4 s frame on a Ruffle project whose history saved as 4.35 GB. So
 while a save is pending the history neither spills nor compacts, and keeps its
-memory budget by thinning (docs/design-principles.md, "A save in the background
+memory budget by thinning (docs/history/design-principles.md, "A save in the background
 still stopped the run").
 
 This is worth doing FIRST, before anything in the capture path: the mechanism

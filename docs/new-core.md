@@ -12,13 +12,13 @@ code, what to copy, what "done" means, and what is the owner's to decide.
 |---|---|
 | [porting-a-core.md](porting-a-core.md) | The order of work and the traps that cost days |
 | [gates.md](gates.md) | The eight ways a gate goes green on a broken thing |
-| [waterbox-analysis.md](waterbox-analysis.md) | What the sandbox is, and why it makes a run reproducible |
+| [waterbox-analysis.md](history/waterbox-analysis.md) | What the sandbox is, and why it makes a run reproducible |
 | miniBox `docs/MACHINE-SPEC.md` (`extern/chimera-common-minibox`) | The machine a guest runs on: memory kinds, stacks, syscalls |
 | [gpu-bridge.md](gpu-bridge.md) | A renderer on a real GPU: what it costs a savestate, and what a load loses |
 | [game-cores.md](game-cores.md) | A core that is a game and not a machine: properties, the kind |
 | [multi-file.md](multi-file.md), [save-data.md](save-data.md) | Projects of several files; what a machine remembers |
 | [core-manager.md](core-manager.md) | What a core release is, and how a user gets one |
-| [issue-intake.md](issue-intake.md) | How issues are labelled, answered and closed |
+| [issue-intake.md](history/issue-intake.md) | How issues are labelled, answered and closed |
 | The closest core's `docs/PLAN.md`, `docs/BUILDING.md`, `AGENTS.md` | Everything this page says, done once already |
 
 ## 1. Before any code: what a request has to answer
@@ -149,7 +149,7 @@ optional exports - and porting-a-core.md lists them all.
 
 If a core seems to need a line of its own in the frontend, the answer is a
 declaration every core could use, which is a change to Chimera's design: put
-it to the owner, and write it in [design-principles.md](design-principles.md)
+it to the owner, and write it in [design-principles.md](history/design-principles.md)
 when it is decided. It is never a special case.
 
 ## 6. Where determinism has leaked before

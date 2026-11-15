@@ -7,7 +7,7 @@ emulator core runs in. It ships no cores. Each core is its own repository,
 `<id>.chimeraCore`, that a user puts in the `Cores` folder.
 
 This file is the operating guide for an agent working here. The reasoning
-behind every rule in it is in [docs/design-principles.md](docs/design-principles.md),
+behind every rule in it is in [docs/history/design-principles.md](docs/history/design-principles.md),
 the design log.
 
 ## If you are here to build a new core
@@ -20,12 +20,12 @@ step, the gates, and the publishing checklist. It sends you to the rest:
   toolchain's refusals, the picture, savestates, what a package declares,
   the optional exports, what breaks on a CI runner.
 - [docs/gates.md](docs/gates.md) - how a gate goes green on a broken thing.
-- [docs/waterbox-analysis.md](docs/waterbox-analysis.md) and
+- [docs/history/waterbox-analysis.md](docs/history/waterbox-analysis.md) and
   `extern/chimera-common-minibox/docs/MACHINE-SPEC.md` - the sandbox.
 - [docs/gpu-bridge.md](docs/gpu-bridge.md) - a renderer on a real GPU.
 - [docs/game-cores.md](docs/game-cores.md) - a core that is a game.
 - [docs/multi-file.md](docs/multi-file.md), [docs/save-data.md](docs/save-data.md),
-  [docs/core-manager.md](docs/core-manager.md), [docs/issue-intake.md](docs/issue-intake.md).
+  [docs/core-manager.md](docs/core-manager.md), [docs/history/issue-intake.md](docs/history/issue-intake.md).
 - The closest core's own `AGENTS.md`, `docs/BUILDING.md` and `docs/PLAN.md`.
 
 The requests are the issues labelled `core-request`:
@@ -49,7 +49,7 @@ nothing under `source/`.
 - `tools/` - bundles, publishing (`publish-core.sh`, `write-core-index.sh`),
   `fetch-cores.sh`.
 - `official-cores.json` - the roster CI goes by. The frontend does not read it.
-- `docs/` - one document per subject; `design-principles.md` is the log.
+- `docs/` - one document per subject; the index is `docs/README.md`, and the design log is `docs/history/design-principles.md`.
 - `build/` - every output. Ignored by git. `build/Cores` is where a core's
   `build-package.sh -r <this checkout>` installs its package.
 
@@ -108,7 +108,7 @@ env -u DISPLAY bash tests/ui/run-ui-tests.sh     # the interface tests
 - **No network code.** Nothing downloads, nothing phones anywhere;
   `tools/check-no-network.sh` holds it.
 - **Decisions go in the design log** in the same commit as the code: a dated
-  section in `docs/design-principles.md` with what was decided, why, and what
+  section in `docs/history/design-principles.md` with what was decided, why, and what
   was measured, marked "(user-decided, YYYY-MM-DD)" when the owner decided it.
   The document for the subject is updated in that commit too.
 - **Write in plain language** (user-decided, 2026-10-10, issue 239). Commit

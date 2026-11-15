@@ -2,14 +2,17 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # This fork's integration branch. Upstream's was main, which this fork does
+    # not push to; while the filter said main, a push ran nothing and only the
+    # daily schedule kept CI alive.
+    branches: [chimera-csx]
   pull_request:
   workflow_dispatch:
   schedule:
     # daily, to catch environment drift even when nothing is committed
     - cron: '0 4 * * *'
 
-# Keyed by the EVENT as well as the ref. A push to main and the nightly
+# Keyed by the EVENT as well as the ref. A push and the nightly
 # schedule are different runs of the same workflow on the same ref, so without
 # the event in the key whichever starts second cancels the first. That happened
 # on 2026-09-12: the nightly (cron says 04:00, GitHub actually started it at
@@ -60,6 +63,10 @@ jobs:
         run: |
           meson setup extern/chimera-common-minibox/build/meson-linux extern/chimera-common-minibox
           meson compile -C extern/chimera-common-minibox/build/meson-linux
+          # The guest toolchain is not in the default target set: the frontend
+          # never needs it, a core author does. build-box.sh does need it, so
+          # name both targets rather than assume the plain compile made them.
+          meson compile -C extern/chimera-common-minibox/build/meson-linux musl-gcc emulibc.c.o
 
       - name: Build the waterboxed synth core (core.wbx) and its tester
         run: sh tests/synth/package-box/build-box.sh
@@ -176,7 +183,7 @@ jobs:
     # No rom, no firmware, no emulation and no core build - that a package can be
     # read, understood and turned into a working factory. Whether the emulation
     # is still right is each core repository's own gate, which runs against this
-    # repository's main and is the same check from the other side.
+    # repository's chimera-csx branch and is the same check from the other side.
     #
     # A core that has published nothing is skipped, not a failure: the cores gain
     # their release pipeline one at a time. Note what that means when NOTHING is
@@ -196,9 +203,9 @@ jobs:
         run: git submodule update --init --recursive extern
 
       - name: Install build dependencies
-        # mono because the tests are net48 and vstest needs a host for them on
-        # Linux; the rest because reading a package is the ENGINE's job now
-        # (ce_package_open), so this job has to build libchimera like any other.
+        # mono because the tests are net48 and run as a Mono program; the rest
+        # because reading a package is the ENGINE's job now (ce_package_open),
+        # so this job has to build libchimera like any other.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -236,7 +243,19 @@ jobs:
           [ "$count" -gt 0 ] || { echo "::error::no core packages were fetched; there is nothing to check" >&2; exit 1; }
 
       - name: The frontend against real packages
+        # The test project is net48 and its output is a self-running MSTest
+        # executable (EnableMSTestRunner), so Mono runs it directly. `dotnet
+        # test` did until the SDK dropped its Mono host for .NET Framework on
+        # Linux: it now aborts with "Running .NET Framework tests is supported
+        # on Windows only" before a single test runs. LD_LIBRARY_PATH finds the
+        # engine this job built; the runner's own exit code is the verdict.
         run: |
-          dotnet test source/gui/Chimera.Tests.Client.Common/Chimera.Tests.Client.Common.csproj \
-            -c Release --no-build --nologo \
-            --filter "FullyQualifiedName~InstalledCorePackagesTests|FullyQualifiedName~MnemonicUniquenessTests"
+          export LD_LIBRARY_PATH="$PWD/build/dll:$PWD/build:${LD_LIBRARY_PATH:-}"
+          status=0
+          out="$(mono build/tests/Chimera.Tests.Client.Common.exe \
+            --filter "FullyQualifiedName~InstalledCorePackagesTests|FullyQualifiedName~MnemonicUniquenessTests" 2>&1)" || status=$?
+          printf '%s\n' "$out"
+          # The runner's exit code is the verdict, and the count has to be
+          # non-zero too, so a filter that matches nothing cannot pass the job.
+          total="$(printf '%s\n' "$out" | sed -n 's/^  total: \([0-9][0-9]*\).*/\1/p' | tail -1)"
+          [ "$status" -eq 0 ] && [ "${total:-0}" -gt 0 ]

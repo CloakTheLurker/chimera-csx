@@ -10,18 +10,18 @@ name: Release
 # archive; the `cores` release here is the OLD one, kept because movies recorded
 # before the split cite packages in it, and it no longer grows.
 #
-#   dev      a ROLLING prerelease, replaced on every green push to main. One
-#            link that is always the newest; the assets carry the short commit
-#            in their names, so a downloaded file still says what it is.
-#   nightly  an IMMUTABLE release, once a day and only when main moved, tagged
-#            with the next patch version (0.1.1, 1.0.1, ...); the newest is the
+#   dev      a ROLLING prerelease, replaced on every green push to the branch.
+#            One link that is always the newest; the assets carry the short
+#            commit in their names, so a downloaded file still says what it is.
+#   release  an IMMUTABLE release, once a day and only when the branch moved,
+#            tagged with the next patch version (1.4.1, ...); the newest is the
 #            one GitHub shows as Latest.
 #            The point is not freshness (dev has that) but PERMANENCE. A movie
 #            cites the build that recorded it, and someone replaying that run in
 #            five years needs THAT build - not a rebuild, because a package's
 #            identity is a function of its toolchain, so the same sources
 #            through a later gcc are different bytes and a different hash.
-#            Nightlies are therefore NEVER deleted. They are the archive.
+#            Releases are therefore NEVER deleted. They are the archive.
 #
 # Nothing is published that did not pass CI. The release job is triggered by the
 # CI workflow FINISHING SUCCESSFULLY, and builds that same commit.
@@ -30,18 +30,19 @@ on:
   workflow_run:
     workflows: [ CI ]
     types: [ completed ]
-    branches: [ main ]
+    # This fork's integration branch (upstream's was main)
+    branches: [ chimera-csx ]
   schedule:
-    # 05:00 UTC, an hour after CI's own nightly, so it releases a gated commit
+    # 05:00 UTC, an hour after CI's own daily run, so it releases a gated commit
     - cron: '0 5 * * *'
   workflow_dispatch:
     inputs:
       kind:
-        description: 'dev (rolling) or nightly (immutable)'
+        description: 'release (versioned, immutable) or dev (rolling)'
         required: true
-        default: dev
+        default: release
         type: choice
-        options: [ dev, nightly ]
+        options: [ dev, release ]
 
 concurrency:
   group: release
@@ -68,12 +69,11 @@ jobs:
             kind=dev
           else
             sha="${{ github.sha }}"
-            kind="${{ github.event.inputs.kind || 'nightly' }}"
+            kind="${{ github.event.inputs.kind || 'release' }}"
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "kind=$kind" >> "$GITHUB_OUTPUT"
           echo "short=$(echo "$sha" | cut -c1-8)" >> "$GITHUB_OUTPUT"
-          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
         with:
@@ -86,7 +86,7 @@ jobs:
       - name: Check out what the frontend is built from
         run: git submodule update --init --recursive extern
 
-      - name: Has main moved since the last nightly?
+      - name: Has the branch moved since the last release?
         id: moved
         if: github.event_name == 'schedule'
         env:
@@ -100,7 +100,7 @@ jobs:
           if [ -n "$last" ] && [ "$(git rev-list -n1 "$last")" = "$(git rev-parse HEAD)" ] \
              && gh release view "$last" --json assets --jq '.assets[].name' 2>/dev/null | grep -q '^chimera-.*\.zip$'; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "main has not moved since $last; nothing to release"
+            echo "the branch has not moved since $last; nothing to release"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -111,7 +111,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # the scheduled build publishes only a commit CI has passed
-          conclusion=$(gh run list --workflow CI --branch main --limit 20 \
+          conclusion=$(gh run list --workflow CI --branch chimera-csx --limit 20 \
             --json headSha,conclusion --jq \
             "[.[] | select(.headSha == \"$(git rev-parse HEAD)\")] | first | .conclusion")
           if [ "$conclusion" != "success" ]; then
@@ -172,7 +172,7 @@ jobs:
           name=$(tools/bundle-name.sh "${{ steps.what.outputs.kind }}" "$short")
           # Everything that landed since the previous build of this kind, not
           # just the top commit (issue #76): the newest release tag for a
-          # nightly, the dev release's commit for dev. With nothing to measure
+          # release, the dev release's commit for dev. With nothing to measure
           # from (the first build, a shallow clone) the top commit alone.
           if [ "${{ steps.what.outputs.kind }}" = "dev" ]; then
             since=$(gh release view dev --json targetCommitish --jq .targetCommitish 2>/dev/null || true)
@@ -218,8 +218,8 @@ jobs:
               echo "> change, so it may stop being downloadable - which means a movie made"
               echo "> on it can stop being replayable. Do **not** use a dev build to"
               echo "> produce a TAS for submission to toolAssisted.run; use a"
-              echo "> [nightly](https://github.com/ToolAssisted-run/chimera/releases),"
-              echo "> which is dated and kept forever."
+              echo "> [release](https://github.com/CloakTheLurker/chimera-csx/releases),"
+              echo "> which is versioned and kept forever."
               echo
             fi
           } > build/release/NOTES.md
@@ -234,7 +234,7 @@ jobs:
           # a commit whose .github/workflows differ from the default branch's
           # counts as exactly that: the first release of this pipeline died on
           # "refusing to allow a GitHub App to create or update workflow" while
-          # publishing a commit main had already moved past. Deleting the
+          # publishing a commit the branch had already moved past. Deleting the
           # release with its tag and recreating it at the built commit goes
           # through the releases API, which has no such restriction, and keeps
           # the tag honest about which build the assets came from.
@@ -256,14 +256,14 @@ jobs:
           retry gh release upload dev build/release/chimera-*.zip build/release/chimera-*.tar.gz \
             build/release/LICENSES.md build/release/BUILD.txt --clobber
 
-      - name: Publish the nightly
-        if: steps.moved.outputs.skip != 'true' && steps.what.outputs.kind == 'nightly'
+      - name: Publish the release
+        if: steps.moved.outputs.skip != 'true' && steps.what.outputs.kind == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           source tools/release-retry.sh
           tag=$(tools/release-version.sh next)
-          # A nightly that holds its bundles is never republished; one that
+          # A release that holds its bundles is never republished; one that
           # exists EMPTY is a publish that died between create and upload, and
           # finishing it is the only way it becomes what its name says.
           if gh release view "$tag" --json assets --jq '.assets[].name' 2>/dev/null | grep -q '^chimera-.*\.zip$'; then
@@ -271,6 +271,6 @@ jobs:
           fi
           made="$(python3 tools/european-time.py "$(git log -1 --format=%ct "${{ steps.what.outputs.sha }}")")"
           ensure_release "$tag" "${{ steps.what.outputs.sha }}" \
-            "Nightly ${{ steps.what.outputs.date }} (${{ steps.what.outputs.short }}, made $made)" build/release/NOTES.md
+            "Release $tag (${{ steps.what.outputs.short }}, made $made)" build/release/NOTES.md
           retry gh release upload "$tag" build/release/chimera-*.zip build/release/chimera-*.tar.gz \
             build/release/LICENSES.md build/release/BUILD.txt --clobber

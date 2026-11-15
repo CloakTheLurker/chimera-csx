@@ -49,6 +49,8 @@ A core repository also needs miniBox's host library and guest toolchain:
 ```sh
 mb="$PWD/extern/chimera-common-minibox"
 meson setup "$mb/build/meson-linux" "$mb" && meson compile -C "$mb/build/meson-linux"
+# the guest toolchain is not in the default target set; a core build needs it
+meson compile -C "$mb/build/meson-linux" musl-gcc emulibc.c.o
 meson setup "$mb/build/meson-cpp" "$mb" -Dguest_cpp=true && meson compile -C "$mb/build/meson-cpp"
 ```
 

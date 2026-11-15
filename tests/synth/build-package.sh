@@ -33,12 +33,14 @@ for src in "$here"/roms/*.sasm; do
 	python3 "$here/asm.py" "$src" "${src%.sasm}.testrom"
 done
 
-# build the miniBox host + guest toolchain (musl builds in the meson graph), then
-# the guest core.wbx.
+# build the miniBox host + guest toolchain, then the guest core.wbx. The host is
+# in the default target set; musl-gcc and emulibc.c.o are not, because the
+# frontend never needs them - so name them, or build-box.sh finds no toolchain.
 mb="$chimera_root/extern/chimera-common-minibox"
 mbuild="$mb/build/meson-linux"
 [ -f "$mbuild/build.ninja" ] || meson setup "$mbuild" "$mb"
 ninja -C "$mbuild"
+meson compile -C "$mbuild" musl-gcc emulibc.c.o
 sh "$here/package-box/build-box.sh"
 
 # package = core.wbx (fixed name) + waterbox.config, and the file form a

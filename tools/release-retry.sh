@@ -13,13 +13,15 @@ retry() {
 	return 1
 }
 
-# release_kind_flags <tag>: a dated nightly is a full release and the one
-# GitHub shows as Latest; anything else (the rolling dev build) is a
-# pre-release and never Latest (user-decided, 2026-09-25)
+# release_kind_flags <tag>: a versioned release is a full release and the one
+# GitHub shows as Latest; the rolling dev build is a pre-release and never
+# Latest (user-decided, 2026-09-25). The tags became semantic versions when the
+# fork cut 1.0.0, and this case still looked for nightly-*: every scheduled
+# release would have been marked a pre-release and never been Latest.
 release_kind_flags() {
 	case "$1" in
-		nightly-*) echo "--latest" ;;
-		*) echo "--prerelease --latest=false" ;;
+		dev) echo "--prerelease --latest=false" ;;
+		*) echo "--latest" ;;
 	esac
 }
 

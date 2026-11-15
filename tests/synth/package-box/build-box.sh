@@ -2,20 +2,25 @@
 # Builds synth.wbx (the waterboxed flavor (c) Synth core) and synth-run-box (its
 # Level A tester) using the miniBox toolchain + host from extern/chimera-common-minibox.
 #
-# Prereq: build miniBox once. musl (the guest toolchain) and the host both build
-# in the meson graph, so a single setup+compile is enough:
+# Prereq: set up miniBox and build its host and guest toolchain. The host is a
+# default target; musl-gcc and emulibc.c.o are not (the frontend never needs
+# them), so they are named:
 #   meson setup extern/chimera-common-minibox/build/meson-linux
-#   ninja -C extern/chimera-common-minibox/build/meson-linux
+#   meson compile -C extern/chimera-common-minibox/build/meson-linux
+#   meson compile -C extern/chimera-common-minibox/build/meson-linux musl-gcc emulibc.c.o
 set -eu
 here="$(cd "$(dirname "$0")" && pwd)"
 mb="$(cd "$here/../../../extern/chimera-common-minibox" && pwd)"
 mbuild="$mb/build/meson-linux"
 
-# musl-gcc is installed to the build root; emulibc.o and the host are meson outputs.
+# musl-gcc is installed to the build root; emulibc.c.o and the host are meson outputs.
 musl_gcc="$mbuild/musl-gcc"
-[ -x "$musl_gcc" ] || { echo "miniBox not built; run: meson setup $mbuild && ninja -C $mbuild" >&2; exit 1; }
+[ -x "$musl_gcc" ] || {
+	echo "miniBox guest toolchain not built; run: meson setup $mbuild && meson compile -C $mbuild musl-gcc emulibc.c.o" >&2
+	exit 1
+}
 emulibc_o="$mbuild/source/guest/emulibc.c.o"
-[ -f "$emulibc_o" ] || { echo "emulibc.c.o missing; run: ninja -C $mbuild" >&2; exit 1; }
+[ -f "$emulibc_o" ] || { echo "emulibc.c.o missing; run: meson compile -C $mbuild emulibc.c.o" >&2; exit 1; }
 
 cflags="-fvisibility=hidden -I$mb/extern/emulibc -I$mb/source/guest/include -I$mb/extern/jsmn \
 	-Wall -mcmodel=large -mstack-protector-guard=global -fno-pic -fno-pie -fcf-protection=none -O2 -DNDEBUG -std=c11"

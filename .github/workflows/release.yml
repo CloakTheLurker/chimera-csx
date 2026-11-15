@@ -2,47 +2,27 @@ name: Release
 
 # What users download, built only from what the gates passed.
 #
-# Two kinds of build, deliberately:
-#
 # The bundle is the FRONTEND. It carries no cores and downloads none: those
 # are other repositories that publish themselves, and a user puts the packages
-# they want in the Cores folder (docs/core-manager.md). Each core's own releases are its
-# archive; the `cores` release here is the OLD one, kept because movies recorded
-# before the split cite packages in it, and it no longer grows.
+# they want in the Cores folder (docs/core-manager.md). Each core's own releases
+# are its archive; the `cores` release here is the OLD one, kept because movies
+# recorded before the split cite packages in it, and it no longer grows.
 #
-#   dev      a ROLLING prerelease, replaced on every green push to the branch.
-#            One link that is always the newest; the assets carry the short
-#            commit in their names, so a downloaded file still says what it is.
-#   release  an IMMUTABLE release, once a day and only when the branch moved,
-#            tagged with the next patch version (1.4.1, ...); the newest is the
-#            one GitHub shows as Latest.
-#            The point is not freshness (dev has that) but PERMANENCE. A movie
-#            cites the build that recorded it, and someone replaying that run in
-#            five years needs THAT build - not a rebuild, because a package's
-#            identity is a function of its toolchain, so the same sources
-#            through a later gcc are different bytes and a different hash.
-#            Releases are therefore NEVER deleted. They are the archive.
+# A release is IMMUTABLE and NEVER deleted. A movie cites the build that
+# recorded it, and someone replaying that run in five years needs THAT build -
+# not a rebuild, because a package's identity is a function of its toolchain, so
+# the same sources through a later gcc are different bytes and a different hash.
 #
-# Nothing is published that did not pass CI. The release job is triggered by the
-# CI workflow FINISHING SUCCESSFULLY, and builds that same commit.
+# It is cut BY HAND, when the batch it marks is in (user-decided, 2026-11-15):
+# Actions > Release > Run workflow. There is no rolling dev build and no daily
+# version cut. The version is the next patch, or a minor version tagged by hand
+# at the commit first; the newest release is the one GitHub shows as Latest.
+#
+# Nothing is published that did not pass CI: the run refuses unless a CI run for
+# the same commit succeeded.
 
 on:
-  workflow_run:
-    workflows: [ CI ]
-    types: [ completed ]
-    # This fork's integration branch (upstream's was main)
-    branches: [ chimera-csx ]
-  schedule:
-    # 05:00 UTC, an hour after CI's own daily run, so it releases a gated commit
-    - cron: '0 5 * * *'
   workflow_dispatch:
-    inputs:
-      kind:
-        description: 'release (versioned, immutable) or dev (rolling)'
-        required: true
-        default: release
-        type: choice
-        options: [ dev, release ]
 
 concurrency:
   group: release
@@ -53,10 +33,6 @@ permissions:
 
 jobs:
   bundle:
-    # A push-triggered run only publishes when CI was green. A scheduled or
-    # manual run has no CI run attached and is gated by the commit's own status
-    # check below.
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     name: bundle (windows + linux)
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -64,16 +40,8 @@ jobs:
       - name: What is being released
         id: what
         run: |
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            sha="${{ github.event.workflow_run.head_sha }}"
-            kind=dev
-          else
-            sha="${{ github.sha }}"
-            kind="${{ github.event.inputs.kind || 'release' }}"
-          fi
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "kind=$kind" >> "$GITHUB_OUTPUT"
-          echo "short=$(echo "$sha" | cut -c1-8)" >> "$GITHUB_OUTPUT"
+          echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "short=$(echo "${{ github.sha }}" | cut -c1-8)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
         with:
@@ -86,35 +54,14 @@ jobs:
       - name: Check out what the frontend is built from
         run: git submodule update --init --recursive extern
 
-      - name: Has the branch moved since the last release?
-        id: moved
-        if: github.event_name == 'schedule'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # a scheduled build of an unchanged commit is a second copy of the
-          # last one - but only one that HOLDS its bundles counts: a publish
-          # that died between create and upload leaves a tag at this very
-          # commit, and counting it would make every later run skip the repair
-          last=$(tools/release-version.sh last)
-          if [ -n "$last" ] && [ "$(git rev-list -n1 "$last")" = "$(git rev-parse HEAD)" ] \
-             && gh release view "$last" --json assets --jq '.assets[].name' 2>/dev/null | grep -q '^chimera-.*\.zip$'; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "the branch has not moved since $last; nothing to release"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Was this commit gated?
-        if: github.event_name == 'schedule' && steps.moved.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # the scheduled build publishes only a commit CI has passed. Any
-          # successful run of this commit counts: the daily run and a push's
-          # run are the same gate, and taking the newest alone fails when the
-          # daily run is still going at 05:00 - GitHub starts these crons hours
-          # late (2026-11-15: CI asked for 04:00 and started at 11:45).
+          # Any successful CI run of this commit counts: a push's run and the
+          # daily run are the same gate. The daily run starts hours late
+          # (2026-11-15: asked for 04:00, started at 11:45), so the newest run
+          # alone is not the question.
           conclusion=$(gh run list --workflow CI --branch chimera-csx --limit 20 \
             --json headSha,conclusion --jq \
             "[.[] | select(.headSha == \"$(git rev-parse HEAD)\" and .conclusion == \"success\")] | first | .conclusion")
@@ -124,7 +71,6 @@ jobs:
           fi
 
       - name: Install build dependencies
-        if: steps.moved.outputs.skip != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -133,26 +79,21 @@ jobs:
             libgl1-mesa-dev libegl-dev libx11-dev libxext-dev libasound2-dev
 
       - name: Set up .NET
-        if: steps.moved.outputs.skip != 'true'
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0'
 
       - name: Build the Linux bundle
-        if: steps.moved.outputs.skip != 'true'
         run: ./tools/build-bundle.sh --platform linux --out build/bundle-linux
 
       - name: Build the Windows bundle
-        if: steps.moved.outputs.skip != 'true'
         # only the natives differ between the two: the managed assemblies are IL
         run: ./tools/build-bundle.sh --platform windows --out build/bundle-windows
 
       - name: Pack
         id: pack
-        if: steps.moved.outputs.skip != 'true'
         run: |
-          short="${{ steps.what.outputs.short }}"
-          name=$(tools/bundle-name.sh "${{ steps.what.outputs.kind }}" "$short")
+          name=$(tools/bundle-name.sh)
           mkdir -p build/release
           # one top-level folder, named like the archive, so both unpack into a
           # directory instead of the one they were unpacked in
@@ -168,21 +109,23 @@ jobs:
 
       - name: Release notes
         id: notes
-        if: steps.moved.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           short="${{ steps.what.outputs.short }}"
-          name=$(tools/bundle-name.sh "${{ steps.what.outputs.kind }}" "$short")
-          # Everything that landed since the previous build of this kind, not
-          # just the top commit (issue #76): the newest release tag for a
-          # release, the dev release's commit for dev. With nothing to measure
-          # from (the first build, a shallow clone) the top commit alone.
-          if [ "${{ steps.what.outputs.kind }}" = "dev" ]; then
-            since=$(gh release view dev --json targetCommitish --jq .targetCommitish 2>/dev/null || true)
-          else
-            since=$(tools/release-version.sh last)
-          fi
+          name=$(tools/bundle-name.sh)
+          # The PREVIOUS release, not the tag being published: a minor version
+          # is tagged at this commit by hand, and "since 1.5.0" would list
+          # nothing. Everything that landed since then, not just the top commit
+          # (issue #76). With nothing to measure from (the first build, a
+          # shallow clone) the top commit alone.
+          since=""
+          for candidate in $(git tag -l '[0-9]*' --sort=-v:refname); do
+            if [ "$(git rev-list -n1 "$candidate")" != "$(git rev-parse HEAD)" ]; then
+              since="$candidate"
+              break
+            fi
+          done
           if [ -n "$since" ] && git rev-parse -q --verify "$since^{commit}" >/dev/null 2>&1 \
              && [ "$(git rev-parse "$since^{commit}")" != "$(git rev-parse HEAD)" ]; then
             changes=$(git log --no-merges --format='- %s (`%h`)' "$since..HEAD")
@@ -217,51 +160,9 @@ jobs:
             echo "publisher; it is not signed, and there is no way around that warning"
             echo "short of buying a certificate."
             echo
-            if [ "${{ steps.what.outputs.kind }}" = "dev" ]; then
-              echo "> **Not for submissions.** A development build is replaced on every"
-              echo "> change, so it may stop being downloadable - which means a movie made"
-              echo "> on it can stop being replayable. Do **not** use a dev build to"
-              echo "> produce a TAS for submission to toolAssisted.run; use a"
-              echo "> [release](https://github.com/CloakTheLurker/chimera-csx/releases),"
-              echo "> which is versioned and kept forever."
-              echo
-            fi
           } > build/release/NOTES.md
 
-      - name: Publish the rolling dev release
-        if: steps.moved.outputs.skip != 'true' && steps.what.outputs.kind == 'dev'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # ONE TAG, MOVED - through the API, never `git push`. A workflow's
-          # token may not create or update workflow FILES, and pushing a tag at
-          # a commit whose .github/workflows differ from the default branch's
-          # counts as exactly that: the first release of this pipeline died on
-          # "refusing to allow a GitHub App to create or update workflow" while
-          # publishing a commit the branch had already moved past. Deleting the
-          # release with its tag and recreating it at the built commit goes
-          # through the releases API, which has no such restriction, and keeps
-          # the tag honest about which build the assets came from.
-          #
-          # Every call is retried and the release is ENSURED, not created: the
-          # API answers 5xx now and then, and on 2026-09-13 a 500 on this create
-          # cost the day's dev build. A create whose answer was lost may still
-          # have happened, so it looks before it tries again.
-          source tools/release-retry.sh
-          # when the commit was made, on the clock Chimera's build line shows
-          # it in (issue 331), so the two can be matched by eye
-          made="$(python3 tools/european-time.py "$(git log -1 --format=%ct "${{ steps.what.outputs.sha }}")")"
-          gh release delete dev --yes --cleanup-tag 2>/dev/null || true
-          ensure_release dev "${{ steps.what.outputs.sha }}" \
-            "Development build ${{ steps.what.outputs.short }} (made $made)" build/release/NOTES.md
-
-          # straight away, so the window in which /releases/tag/dev has nothing
-          # to download is as short as an upload
-          retry gh release upload dev build/release/chimera-*.zip build/release/chimera-*.tar.gz \
-            build/release/LICENSES.md build/release/BUILD.txt --clobber
-
       - name: Publish the release
-        if: steps.moved.outputs.skip != 'true' && steps.what.outputs.kind == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -1,15 +1,15 @@
 #!/bin/bash
 # The frontend's release tags are semantic versions: 0.1.0 is the first,
-# 1.0.0 is the fork cut, and a minor version marks a major feature. The rolling
-# `dev` release has a tag of its own and is not one of them.
+# 1.0.0 is the fork cut, and a minor version marks a major feature. A release
+# is dispatched by hand when its batch is in (user-decided, 2026-11-15).
 #
 #   release-version.sh last   the newest release tag, or nothing
 #   release-version.sh next   the tag this build publishes: the newest tag when
-#                             it already names HEAD (a rerun finishing a release
-#                             that exists empty), the next patch otherwise
+#                             it already names HEAD (a minor tagged by hand, or
+#                             a rerun finishing a release that exists empty),
+#                             the next patch otherwise
 #
-# A scheduled build takes the next patch. A major feature bumps the minor by
-# hand, which is what makes the numbers mean something.
+# A major feature bumps the minor by hand: tag the commit, then dispatch.
 set -eu
 
 last=$(git tag -l '[0-9]*' --sort=-v:refname | head -1)

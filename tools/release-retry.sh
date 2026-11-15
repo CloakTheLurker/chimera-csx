@@ -1,7 +1,6 @@
 # Sourced by the release workflow. GitHub's API answers 5xx now and then, and a
 # publish is two calls, so a bad answer between them used to leave a release
-# with nothing in it (2026-09-13). tools/publish-core.sh carries the same two
-# helpers for the cores, which check this repository out to publish.
+# with nothing in it (2026-09-13).
 
 # retry <command...>: up to four attempts, 15/30/45s apart
 retry() {
@@ -13,26 +12,15 @@ retry() {
 	return 1
 }
 
-# release_kind_flags <tag>: a versioned release is a full release and the one
-# GitHub shows as Latest; the rolling dev build is a pre-release and never
-# Latest (user-decided, 2026-09-25). The tags became semantic versions when the
-# fork cut 1.0.0, and this case still looked for nightly-*: every scheduled
-# release would have been marked a pre-release and never been Latest.
-release_kind_flags() {
-	case "$1" in
-		dev) echo "--prerelease --latest=false" ;;
-		*) echo "--latest" ;;
-	esac
-}
-
 # ensure_release <tag> <sha> <title> <notes file>: a create whose answer was
-# lost may still have happened, so look before trying again
+# lost may still have happened, so look before trying again. Every release the
+# frontend publishes is a versioned release, which is the one GitHub shows as
+# Latest.
 ensure_release() {
 	local n
 	for n in 1 2 3 4; do
 		gh release view "$1" >/dev/null 2>&1 && return 0
-		# shellcheck disable=SC2046
-		gh release create "$1" --target "$2" $(release_kind_flags "$1") --title "$3" --notes-file "$4" && return 0
+		gh release create "$1" --target "$2" --latest --title "$3" --notes-file "$4" && return 0
 		[ "$n" -lt 4 ] && { echo "retrying in $((n * 15))s: release $1" >&2; sleep $((n * 15)); }
 	done
 	return 1

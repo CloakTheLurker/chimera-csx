@@ -6,7 +6,7 @@
 
 The 17 commits add nine cores and a gamepad model.
 
-- **Portable: five commits, nine cores.** Gearboy, Gearsystem, Gearcoleco, Geargrafx, Gearlynx, Pokket, Geartowns, blueMSX and Sonic 3 A.I.R. join the upstream roster in five commits. They change `official-cores.json`, the README table, `docs/platforms.md` and the design log. The nine packages are published and pass this fork's package contract (below). A 1.5.0 batch is those nine roster rows, nine README rows and the cores set; no engine or window change.
+- **Portable: five commits, nine cores.** Gearboy, Gearsystem, Gearcoleco, Geargrafx, Gearlynx, Pokket, Geartowns, blueMSX and Sonic 3 A.I.R. join the upstream roster in five commits. They change `official-cores.json`, the README table, `docs/platforms.md` and the design log. The nine packages are published and pass this fork's package contract (below). The 1.4.1 batch is those nine roster rows, nine README rows and the cores set; no engine or window change.
 - **Engine candidate: one commit.** The TAS Studio long seek adds `ce_session_measured_fps`, an export that says how fast a replay is running so the window can estimate a seek. The rest of that feature is Qt. A C# window would need a progress dialog and a cancel, and the export is a new declaration, so this is a separate decision rather than part of the cores batch.
 - **Held: one commit.** Gamepads move from SDL 2 to SDL 3. That replaces an extern and the Qt window's gamepad model; in the C# window it would be an input rewrite, not a port.
 - **Skip: ten commits.** The Qt window's own: four gamepad features and their settings document, two menus, a project-scripts fix, a greenzone status line, and the long seek's threshold setting. `source/ui` does not exist here.
@@ -78,18 +78,18 @@ The systems the nine declare have no name conflicts. The systems already in the 
 
 Not run: a game in each core, a project made through the C# wizard, and the window with these packages. The packages' own repositories measured gameplay; this fork has not.
 
-## The proposed 1.5.0 batch
+## The 1.4.1 batch (user-decided, 2026-11-16)
 
-If the owner takes it, the batch is:
+The owner took the batch as 1.4.1: nine cores are a patch, not a minor, so 1.5.0 was not used. The batch is:
 
 - The nine rows in `official-cores.json`, in upstream's order.
 - The nine README rows, with Sonic 3 A.I.R. under Game cores and the other eight in their systems' places.
 - The nine x86_64 packages in the cores set, which becomes 72 cores; Cemu and ScummVM stay in the oversize release.
 - The design log section for the batch, adapted from upstream's five entries with this fork's measurements added.
 
-No engine, C# or miniBox change is needed. The release is 1.5.0: a cores batch is a minor feature, as 1.4.0 was, and it is cut by hand when the batch is in.
+No engine, C# or miniBox change is needed. The release is 1.4.1, cut by hand when the batch is in.
 
-The README's licence note should name the new non-commercial terms too: Gearsystem's FM sound chip, Sonic 3 A.I.R.'s sound chips and its declared package, beside Genesis Plus GX and the others already there.
+The README's licence note now names the new non-commercial terms too: Gearsystem's FM sound chip, Sonic 3 A.I.R.'s sound chips and its declared package, beside Genesis Plus GX and the others already there.
 
 ## Asked for, not built
 

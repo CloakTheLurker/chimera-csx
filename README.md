@@ -49,13 +49,18 @@ To use a core, download its `.chimeraCore` package (hosted on [this repository](
 | [Azahar](https://github.com/ToolAssisted-run/chimera-core-azahar) | Nintendo 3DS / New Nintendo 3DS |
 | [melonDS](https://github.com/ToolAssisted-run/chimera-core-melonds) | Nintendo DS, Nintendo DSi |
 | [Gambatte](https://github.com/ToolAssisted-run/chimera-core-gambatte) | Game Boy / Game Boy Color, Super Game Boy, Game Boy Link (two to four Game Boys joined by cable) |
+| [Gearboy](https://github.com/ToolAssisted-run/chimera-core-gearboy) | Game Boy / Game Boy Color, Super Game Boy, Game Boy Link (two Game Boys joined by cable) |
 | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx) | Mega Drive / Genesis, Sega CD / Mega CD, Master System, Game Gear, SG-1000, Sega Pico |
+| [Gearsystem](https://github.com/ToolAssisted-run/chimera-core-gearsystem) | Master System, Game Gear, SG-1000, Gear-to-Gear and Mark III links (two consoles joined by cable) |
 | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) | Dreamcast, Sega NAOMI / NAOMI 2 (arcade), Sammy Atomiswave (arcade) |
 | [Mednafen](https://github.com/ToolAssisted-run/chimera-core-mednafen) | Sega Saturn, Sega ST-V (arcade), Virtual Boy, PC-FX, Atari Lynx |
+| [Geargrafx](https://github.com/ToolAssisted-run/chimera-core-geargrafx) | PC Engine / TurboGrafx-16, SuperGrafx, PC Engine CD |
+| [Gearlynx](https://github.com/ToolAssisted-run/chimera-core-gearlynx) | Atari Lynx, ComLynx (two to four Lynxes joined by cable) |
 | [FBNeo](https://github.com/ToolAssisted-run/chimera-core-fbneo) | Capcom CPS-1 / CPS-2 / CPS-3 (arcade), Neo Geo MVS (arcade), Neo Geo CD, Sega System 16 (arcade) |
 | [MAME](https://github.com/ToolAssisted-run/chimera-core-mame) | Arcade machines |
 | [MAME Home Systems](https://github.com/ToolAssisted-run/chimera-core-mamehome) | Atari 7800, Intellivision, Vectrex, Odyssey 2 / Videopac, Channel F, Amstrad CPC / CPC+ / GX4000, TI-83, BBC Micro |
 | [DuckStation](https://github.com/ToolAssisted-run/chimera-core-duckstation) | PlayStation, Namco System 11 (arcade), Konami GQ (arcade) |
+| [Pokket](https://github.com/ToolAssisted-run/chimera-core-pokket) | Sony PocketStation |
 | [PCSX2](https://github.com/ToolAssisted-run/chimera-core-pcsx2) | PlayStation 2 |
 | [PPSSPP](https://github.com/ToolAssisted-run/chimera-core-ppsspp) | PlayStation Portable |
 | [Vita3K](https://github.com/ToolAssisted-run/chimera-core-vita3k) | PlayStation Vita |
@@ -65,6 +70,7 @@ To use a core, download its `.chimeraCore` package (hosted on [this repository](
 | [Opera](https://github.com/ToolAssisted-run/chimera-core-opera) | 3DO Interactive Multiplayer |
 | [Zeebx](https://github.com/ToolAssisted-run/chimera-core-zeebx) | Zeebo |
 | [Stella](https://github.com/ToolAssisted-run/chimera-core-stella) | Atari 2600 |
+| [Gearcoleco](https://github.com/ToolAssisted-run/chimera-core-gearcoleco) | ColecoVision, Coleco ADAM |
 | [Virtual Jaguar](https://github.com/ToolAssisted-run/chimera-core-virtualjaguar) | Atari Jaguar, Atari Jaguar CD |
 | [Cadmium](https://github.com/ToolAssisted-run/chimera-core-cadmium) | CHIP-8, SUPER-CHIP, XO-CHIP and their relatives |
 | [TIC-80](https://github.com/ToolAssisted-run/chimera-core-tic80) | TIC-80 (fantasy computer) |
@@ -74,7 +80,9 @@ To use a core, download its `.chimeraCore` package (hosted on [this repository](
 | [VICE](https://github.com/ToolAssisted-run/chimera-core-vice) | Commodore 64 |
 | [Fuse](https://github.com/ToolAssisted-run/chimera-core-fuse) | ZX Spectrum 16K / 48K / 128K / +2 / +3, Timex, Pentagon, Scorpion |
 | [ZEsarUX](https://github.com/ToolAssisted-run/chimera-core-zesarux) | ZX Spectrum Next |
+| [blueMSX](https://github.com/ToolAssisted-run/chimera-core-bluemsx) | MSX, MSX2, MSX2+, MSX turbo R |
 | [MAME X68000](https://github.com/ToolAssisted-run/chimera-core-x68k) | Sharp X68000 |
+| [Geartowns](https://github.com/ToolAssisted-run/chimera-core-geartowns) | Fujitsu FM Towns, FM Towns II and FM Towns Marty |
 | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x) | MS-DOS, Windows 3.1 / 95 / 98 |
 | [PCem](https://github.com/ToolAssisted-run/chimera-core-pcem) | MS-DOS, Windows 3.1 / 95 / 98, Windows XP, Linux (x86) |
 | [86Box](https://github.com/ToolAssisted-run/chimera-core-86box) | IBM PC compatibles: IBM PC, XT and AT, a 486 and a Pentium board (MS-DOS) |
@@ -106,6 +114,7 @@ One game each, run from the game's own files ([docs/game-cores.md](docs/game-cor
 | [RSDKv4](https://github.com/ToolAssisted-run/chimera-core-rsdkv4) | Sonic the Hedgehog and Sonic the Hedgehog 2 (the 2013 remasters) |
 | [RSDKv5](https://github.com/ToolAssisted-run/chimera-core-rsdkv5) | Sonic Mania |
 | [RSDKv5U](https://github.com/ToolAssisted-run/chimera-core-rsdkv5u) | Sonic Origins (Sonic 1, Sonic 2, Sonic CD) |
+| [Sonic 3 A.I.R.](https://github.com/ToolAssisted-run/chimera-core-sonic3air) | Sonic 3 & Knuckles (the A.I.R. remaster, from your own Sonic & Knuckles + Sonic 3 ROM) |
 | [DSDA-Doom](https://github.com/ToolAssisted-run/chimera-core-dsda) | Doom, Doom II, Final Doom, Heretic, Hexen, Chex Quest, Freedoom |
 | [Open4DBoxing](https://github.com/ToolAssisted-run/chimera-core-open4dboxing) | 4D Sports Boxing (DOS) |
 
@@ -125,7 +134,7 @@ A bundle carries no cores, and Chimera never reaches the network - it downloads 
 
 Each core publishes a nightly release the same way, and its nightlies are never deleted - which is what lets a movie name the exact package that recorded it and still be replayable years later.
 
-Every bundle carries `BUILD.txt`, naming the exact commit it was built from, and `LICENSES.md`, stating its terms. **Adding a core adds that core's terms**, and some of them (Genesis Plus GX, Opera, Snes9x) forbid commercial use, which binds whatever they are installed into; Chimera shows a core's licence once it is in the folder.
+Every bundle carries `BUILD.txt`, naming the exact commit it was built from, and `LICENSES.md`, stating its terms. **Adding a core adds that core's terms**, and some of them (Genesis Plus GX, Gearsystem, Opera, Snes9x, Sonic 3 A.I.R.) forbid commercial use, which binds whatever they are installed into; Chimera shows a core's licence once it is in the folder.
 
 ## Working with an AI agent
 

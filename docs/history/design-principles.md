@@ -3617,3 +3617,13 @@ The release workflow published a rolling `dev` prerelease on every green push an
 The schedule, the `workflow_run` trigger and the dev kind are gone. The release notes now measure from the previous release rather than the newest tag, because a minor version is tagged at HEAD before the dispatch, and "since 1.5.0" at that commit would list nothing. The published-core job keeps all four contract classes: 36 tests.
 
 What was measured: the push path had published one dev release at a756585b before this change; it and its tag have been deleted. The versioned path builds and publishes as before; its first run with the hand-cut trigger has not happened yet.
+
+## Chimera CSX 1.4.1's cores (2026-11-16, user-decided)
+
+The nine cores upstream added after the 1.4.0 batch are in the roster: Gearboy (Game Boy, Game Boy Color, Super Game Boy, Game Boy Link), Gearsystem (Master System, Game Gear, SG-1000, Gear-to-Gear and Mark III links), Gearcoleco (ColecoVision, Coleco ADAM), Geargrafx (PC Engine, SuperGrafx, PC Engine CD), Gearlynx (Atari Lynx, ComLynx), Pokket (Sony PocketStation), Geartowns (FM Towns, FM Towns II, Marty), blueMSX (MSX, MSX2, MSX2+, turbo R) and Sonic 3 A.I.R. (a game core). The owner took them as 1.4.1 - nine cores are a patch, not a minor - and the release is cut by hand. The README's licence note names Gearsystem's FM sound chip and Sonic 3 A.I.R. among the non-commercial terms.
+
+Upstream measured each core in its own repository: its test script, the frontend test script and the package checks, games natively, in the sandbox and with a savestate saved and loaded every frame. The exceptions are said plainly: the FM Towns Marty was not booted, and the Coleco ADAM ran on stand-in ROMs until the owner's EOS and SmartWriter ROMs arrived. The firmware each core needs is its package's own declaration: boot ROMs, a System Card, an MSX BIOS, the PocketStation BIOS, FM Towns ROMs or the free TOWNSROM set, and the Sonic & Knuckles + Sonic 3 ROM.
+
+What was measured here: the 1.2.0 and 1.4.0 sets with the nine x86_64 packages (70 packages; the two oversize, Cemu and ScummVM, were not downloaded) against the 72-row roster. The four contract classes ran 36 tests, 0 failed: the nine packages read, their factories build, their settings, file slots, nested firmware conditions, language tables and controller names hold, and every roster row with a package says what the package says. The array optionLabels Gearlynx writes is the form Mesen needed in 1.4.0. The new systems are new rows only; the shared systems keep one name.
+
+Not proved: a game in each core, a project made through the C# wizard, and the C# window with these packages. The cores' own repositories measured gameplay; this fork has not.

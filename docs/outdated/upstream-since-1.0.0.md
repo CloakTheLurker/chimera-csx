@@ -1,4 +1,4 @@
-> **This assessment is kept for the record.** It judged upstream's commits since the 1.0.0 cut and planned the batches built on them. The batches through 1.4.0 are done, and it describes upstream's Qt line rather than this fork's current code. The current documents are indexed in [docs/README.md](../README.md).
+> **This assessment is kept for the record.** It judged upstream's commits since the 1.0.0 cut and planned the batches built on them. The batches through 1.4.0 are done, and it describes upstream's Qt line rather than this fork's current code. The current documents are indexed in [docs/README.md](../README.md). A later assessment, [upstream-since-1.4.0.md](../upstream-since-1.4.0.md), covers the 17 commits and nine cores after the 1.4.0 batch; upstream rebased main on 2026-11-16, so the last ten SHAs here were replaced and the new document lists them.
 
 # Upstream since Chimera CSX 1.0.0
 

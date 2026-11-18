@@ -821,7 +821,8 @@ namespace Chimera.Client.GUI
 			try
 			{
 				using var pkg = EnginePackage.Open(core.Path);
-				_cfg = WaterboxConfig.FromJson(pkg?.EntryText(WaterboxCoreFactory.ConfigFileName) ?? "");
+				_cfg = LoadConfig(pkg?.EntryText(WaterboxCoreFactory.ConfigFileName),
+					pkg?.EntryText(CoreLanguageTable.EnglishPath));
 			}
 			catch (InvalidOperationException)
 			{
@@ -844,6 +845,15 @@ namespace Chimera.Client.GUI
 			PinMachine();
 			RefreshRendererChoices();
 		}
+
+		/// <summary>
+		/// The chosen package's declaration with its own words. A package built after
+		/// nightly-2026-10-27 names settings, slots and firmware by key and carries the
+		/// words in its languages/en.json; a package from before the cut holds the words
+		/// itself and has no table, so it is read as it is.
+		/// </summary>
+		internal static WaterboxConfig? LoadConfig(string? configJson, string? languageJson)
+			=> WaterboxConfig.FromJson(configJson ?? "", CoreLanguageTable.Parse(languageJson));
 
 		/// <summary>
 		/// Opens the wizard already filled in from a project: its core, its machine,

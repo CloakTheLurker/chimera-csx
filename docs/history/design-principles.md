@@ -3627,3 +3627,7 @@ Upstream measured each core in its own repository: its test script, the frontend
 What was measured here: the 1.2.0 and 1.4.0 sets with the nine x86_64 packages (70 packages; the two oversize, Cemu and ScummVM, were not downloaded) against the 72-row roster. The four contract classes ran 36 tests, 0 failed: the nine packages read, their factories build, their settings, file slots, nested firmware conditions, language tables and controller names hold, and every roster row with a package says what the package says. The array optionLabels Gearlynx writes is the form Mesen needed in 1.4.0. The new systems are new rows only; the shared systems keep one name.
 
 Not proved: a game in each core, a project made through the C# wizard, and the C# window with these packages. The cores' own repositories measured gameplay; this fork has not.
+
+## The New Project wizard reads a package's words (2026-11-18)
+
+1.2.0 taught the window to read a package's `languages/en.json` and resolve the settings, file slots and firmware it names by key, but the wizard's own read of `waterbox.config` did not pass the table. The machine list and the settings page showed keys such as `setting.machine`, while the rest of the window showed the words. It now reads the declaration through the same table. A test holds a keyed declaration and its table to the words, and a package from before the cut still keeps the words it carries.

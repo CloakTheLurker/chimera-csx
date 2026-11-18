@@ -388,7 +388,7 @@ namespace Chimera.Client.GUI
 		private void ScrollBack(FirmwareSurveyRow? row, int index, int y)
 		{
 			var at = row is null ? -1 : _rowOf.FindIndex(r => r is not null && SameRow(r, row));
-			if (at < 0) at = Math.Min(index, _list.Items.Count - 1);
+			if (at < 0 || at >= _list.Items.Count) at = Math.Min(index, _list.Items.Count - 1);
 			if (at < 0) return;
 			var rowHeight = Math.Max(1, _list.Items[at].Bounds.Height);
 			if (Math.Abs(y - _list.Items[at].Bounds.Top) < rowHeight / 2) return; // the list was not scrolled
@@ -399,7 +399,12 @@ namespace Chimera.Client.GUI
 				_list.EnsureVisible(top);
 				var off = y - _list.Items[at].Bounds.Top;
 				if (Math.Abs(off) < rowHeight / 2) return;
-				var next = Math.Max(0, top - (int) Math.Round((double) off / rowHeight));
+				// The row put at the top is corrected the way it is drawn: further up
+				// when the anchor is too low, further down when it is too high. Never
+				// past either end of the list: a row that is not listed cannot be shown,
+				// and its index is not a valid one to ask a list view about.
+				var next = Math.Min(_list.Items.Count - 1,
+					Math.Max(0, top - (int) Math.Round((double) off / rowHeight)));
 				if (next == top) return;
 				top = next;
 			}

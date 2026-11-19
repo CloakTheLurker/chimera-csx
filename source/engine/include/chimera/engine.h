@@ -1708,6 +1708,12 @@ CE_API int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const i
 /* Enables with a byte budget (captures the current frame immediately as the
  * anchor), or disables and drops everything with budget 0. */
 CE_API void ce_session_greenzone_enable(ce_session *s, uint64_t budget_bytes);
+/* The byte budget the history works to now: the one set, or less once the
+ * computer has run out of memory and the history halved it to go on (each
+ * halving is written to the core log). A clear of the greenzone gives back
+ * the one set (upstream issue 577). set_bytes, when not null, receives the one
+ * set, read together with it. 0 (and 0 set) while the history is off. */
+CE_API uint64_t ce_session_greenzone_budget_now(const ce_session *s, uint64_t *set_bytes);
 CE_API int64_t ce_session_greenzone_count(const ce_session *s);
 
 /* Anchor spacing, and the density of what is SPILLED to disk, all in FRAMES

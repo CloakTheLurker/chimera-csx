@@ -27,7 +27,7 @@ These describe the C# fork as it is.
 | [theming.md](theming.md) | Themes: the colours Chimera paints with, and how to choose or write one. |
 | [folder-picker.md](folder-picker.md) | The file and folder pickers, including the desktop portal on Linux. |
 | [mcp-server.md](mcp-server.md) | The MCP server: an AI agent's tools for the project, the machine, and the Lua Console. |
-| [upstream-since-1.4.0.md](upstream-since-1.4.0.md) | The 1.4.0 assessment and the second batch after 1.4.2: 34 commits, eleven cores, and the input-header port that fixes the RPCS3 package contract. |
+| [upstream-since-1.4.0.md](upstream-since-1.4.0.md) | The 1.4.0 assessment and the second batch after 1.4.2: 34 commits, eleven cores, and the ports taken afterwards - input headers, large files, the greenzone fixes, the long seek. |
 
 ## History
 

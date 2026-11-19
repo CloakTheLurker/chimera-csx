@@ -160,7 +160,7 @@ void StateHistory::configure(const HostApi *host, void *obj, uint64_t budgetByte
 	finishPlan();
 	m_host = host;
 	m_obj = obj;
-	m_budget = budgetBytes;
+	m_budget = m_budgetSet = budgetBytes;
 	/* Everything stored goes, the spill file with it: a history configured
 	 * over one that had spilled kept the file open and its live count, and
 	 * then held the disk budget against stretches that no longer existed. The
@@ -201,6 +201,18 @@ void StateHistory::clear()
 	m_lastCaptureEnded = 0;
 	m_capturesSinceTuned = 0;
 	dropSpillFile();
+	/* A budget halved when the machine ran out of memory stayed halved until
+	 * the project was opened again, so the greenzone went on thinning after a
+	 * clear that had given the memory back (upstream issue 577). The clear
+	 * gives back the budget that was set; if memory runs out again, it is
+	 * halved again. */
+	if (m_budgetSet > m_budget)
+	{
+		fprintf(stderr, "[history] cleared: the budget goes back from %llu to the %llu set\n",
+			(unsigned long long)m_budget, (unsigned long long)m_budgetSet);
+		fflush(stderr);
+		m_budget = m_budgetSet;
+	}
 }
 
 /* CHIMERA_NO_DELTAS=1 keeps whole states, as the greenzone did before epochs.
@@ -634,7 +646,15 @@ void StateHistory::finishPacking()
 			fflush(stderr);
 		}
 	}
+	/* The raw copies the packed ones replaced are let go on the packer's
+	 * thread, not here: the jobs hold their last references, and a stretch
+	 * is about 200 buffers and 68 MB of a Mesen game. Windows' heap took 9
+	 * to 12 ms to free them, on the machine's thread once every anchor
+	 * (upstream issue 548); Linux took 0.4. The next finishPacking drains
+	 * the packer, so they are gone long before the memory is wanted again. */
+	auto done = std::make_shared<std::vector<std::unique_ptr<PackJob>>>(std::move(m_packJobs));
 	m_packJobs.clear();
+	m_packer.post([done]() { done->clear(); });
 }
 
 bool StateHistory::writeSegmentBodyPacked(std::FILE *f, const Segment &seg, bool &packed)
@@ -2278,6 +2298,17 @@ void StateHistory::pin(int64_t frame, bool isPinned)
 {
 	if (isPinned) m_pinned.insert(frame);
 	else m_pinned.erase(frame);
+	/* A marker set on the frame the machine stands on had no state until the
+	 * machine played that frame again, with a period ("every N frames")
+	 * between its multiples (upstream issue 578): the machine is there now, so
+	 * the frame is stored now, as a capture with no frame run stores one (a
+	 * branch made). Off, nothing is stored, pins included. m_storeNext is what
+	 * carries it past the sparse history's period gate. */
+	if (isPinned && enabled() && m_capturePeriod != 0 && frame == m_machineFrame && nearest(frame) != frame)
+	{
+		m_storeNext = true;
+		capture(frame);
+	}
 }
 
 bool StateHistory::pinned(int64_t frame) const

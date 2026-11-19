@@ -691,6 +691,33 @@ int main(void)
 		std::filesystem::remove_all("work-history-capped");
 	}
 
+	{ // A marker on the frame the machine stands on keeps its state at once.
+	  //
+	  // With a capture period ("every 60 frames") only the multiples are
+	  // stored, so a marker set between them had no state until the machine
+	  // played that frame again (upstream issue 578). The machine is there
+	  // now, so the frame is stored now, as making a branch stores its own.
+		const chimera::HostApi api = fakeHost();
+		g_machine = Machine{};
+
+		chimera::StateHistory h;
+		h.configure(&api, nullptr, 64ull << 20);
+		h.bands(2, 6, 3, 12, 8);
+		h.capturePeriod(60);
+		h.capture(0);
+		h.beforeAdvance();
+		advance(30);
+		h.capture(30);
+		assert(h.nearest(30) == 0);   /* 30 is not a multiple of 60: nothing stored */
+		h.pin(30, true);
+		assert(h.pinned(30));
+		assert(h.nearest(30) == 30);  /* the machine stands there: stored at once */
+		/* a marker on another frame is no frame to store: it waits for its own */
+		h.pin(31, true);
+		assert(h.pinned(31));
+		assert(h.nearest(31) == 30);
+	}
+
 	{ // Running out of memory halves the budget instead of ending the session.
 	  //
 	  // The history is the biggest thing Chimera holds that it does not need, so
@@ -728,6 +755,17 @@ int main(void)
 		assert(h.budget() >= 1);
 		assert(g_outOfMemoryFor > 0);         /* it gave up rather than spin */
 		g_outOfMemoryFor = 0;
+
+		/* Clear Greenzone gives memory back, and with it the budget that was
+		 * set: a halved budget used to stay halved until the project was
+		 * opened again, so the greenzone kept thinning after a clear
+		 * (upstream issue 577). */
+		assert(h.budget() < before);
+		h.clear();
+		assert(h.budget() == before);
+		assert(h.budgetSet() == before);
+		h.capture(0);                          /* and it stores again, at that budget */
+		assert(h.nearest(0) == 0);
 	}
 
 	{ // The spill file has a budget of its own, and the oldest goes first.

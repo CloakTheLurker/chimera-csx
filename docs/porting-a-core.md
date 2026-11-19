@@ -96,6 +96,25 @@ What that comparison found in two cores (2026-10-13), each a thing to look for i
 - **The host's random numbers.** In the sandbox `getrandom` is a fixed sequence, but C++'s `std::random_device` does not ask it: built for x86 it uses the processor's own instruction (RDRAND), which nothing can stand in front of. Two runs of one movie then differ. Give the emulator a sequence of its own, kept in guest memory, and check that no object of the guest build refers to `std::random_device`.
 - **Turns handed out by the renderer's rebuild.** After a load the renderer is made again; if that waits through the emulator's own scheduler, the machine's threads run beside it and the rewound run is no longer the straight one.
 
+**A guest that reads its dead stack runs differently on Windows unless the
+package says so** (upstream issue 555). On Windows the sandbox learns that the
+guest wrote a page by letting the write fault, and Windows puts the fault's
+record, about 2 KB of it, in the guest's stack just below where it is running.
+Linux puts nothing there. Code reads that memory when it reads a local it
+never set, a frame's padding, or, above all, when a conservative garbage
+collector scans its stack for pointers: a saved register left there can keep
+an object alive in one run and not in another. Where the faults fall depends
+on the greenzone's settings, so the same movie plays differently on Windows
+with different settings. A core whose guest does this declares
+`"readsDeadStack": true` at the top of `waterbox.config`. On Windows its
+writes are then found by comparing pages instead, so nothing is written into
+its stack. That costs speed while the greenzone captures frames: Mesen marked
+this way fell from 644 to 140 frames a second capturing every frame on a GTX
+1060 PC. Declare it only for a guest that needs it. To find out: play one
+movie on Windows with the greenzone off and with it capturing every frame
+(`chimera-run ... --greenzone-period 1`), and compare the domains or the final
+states (`--final-state`).
+
 ## The gate
 
 One command, and every leg says what it compared.

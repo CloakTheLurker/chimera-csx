@@ -1340,6 +1340,60 @@ DYNAMIC
 		else
 			report "E:made-project:slots" FAIL "slot rc=$mslotrc, wrong slot rc=$mwrongrc, whole rc=$mrc (see work/made-project/*.make.log)"
 		fi
+		# the machine: a package of two machines, each with its own kind of file,
+		# and the game's kind picks one, as Chimera picked it for a game opened
+		# alone - unless the settings given name it
+		mmach="$mdir/machines-package"
+		mkdir -p "$mmach" && ( cd "$mmach" && unzip -q -o "$epkg" )
+		python3 - "$mmach/waterbox.config" "$mmach/file_slots.json" <<'MACHPY'
+import json, sys
+slots = json.load(open(sys.argv[2]))
+for slot in slots["slots"]:
+    slot["formats"] = slot.get("formats", []) + ["runner"]
+json.dump(slots, open(sys.argv[2], "w"))
+p = sys.argv[1]
+cfg = json.load(open(p))
+cfg["machineSetting"] = "model"
+cfg.setdefault("settings", []).append({"name": "model", "type": "choice", "options": ["walker", "runner"], "default": "walker"})
+cfg["machines"] = [{"id": "Synth", "when": ["walker"], "extensions": {".testrom": "Synth"}},
+                   {"id": "SynthRunner", "when": ["runner"], "extensions": {".runner": "SynthRunner"}}]
+json.dump(cfg, open(p, "w"))
+MACHPY
+		cp "$mdir/gridWalker.testrom" "$mdir/gridWalker.runner"
+		mmake machine-own "$mmach" "$mdir/gridWalker.testrom"
+		mown="$(mfield machine-own settings)|$(mfield machine-own headers)"
+		mmake machine-other "$mmach" "$mdir/gridWalker.runner"
+		mother="$(mfield machine-other settings)|$(mfield machine-other headers)"
+		mmake machine-named "$mmach" "$mdir/gridWalker.runner" --settings '{"model":"walker"}'
+		mnamed="$(mfield machine-named settings)|$(mfield machine-named headers)"
+		if [ "$mown" = '{"initFillByte": 0, "model": "walker"}|{"Platform": "Synth"}' ] \
+			&& [ "$mother" = '{"initFillByte": 0, "model": "runner"}|{"Platform": "SynthRunner"}' ] \
+			&& [ "$mnamed" = '{"initFillByte": 0, "model": "walker"}|{"Platform": "Synth"}' ]; then
+			report "E:made-project:machine" PASS "the game's kind of file picks the machine, and settings that name one are kept"
+		else
+			report "E:made-project:machine" FAIL "own: $mown; other: $mother; named: $mnamed (see work/made-project/machine-*.make.log)"
+		fi
+		# a slot the settings open or close: the files are checked against the
+		# slots the recorded settings leave, not against none
+		mgated="$mdir/gated-package"
+		mkdir -p "$mgated" && ( cd "$mgated" && unzip -q -o "$epkg" )
+		printf '{"slots":[{"id":"rom","title":"Game","min":1,"max":1,"formats":["testrom"],"exposedWhen":{"setting":"initFillByte","is":0}}]}\n' > "$mgated/file_slots.json"
+		mmake gated-open "$mgated" "$mdir/gridWalker.testrom"
+		mopenrc=$mrc
+		mmake gated-shut "$mgated" "$mdir/gridWalker.testrom" --settings '{"initFillByte":7}'
+		if [ "$mopenrc" -eq 0 ] && [ "$mrc" -ne 0 ] && [ "$mrc" -lt 128 ] && grep -q "which these files make unavailable" "$mdir/gated-shut.make.log"; then
+			report "E:made-project:gated-slot" PASS "a slot the recorded settings open takes the game; one they close refuses it"
+		else
+			report "E:made-project:gated-slot" FAIL "open rc=$mopenrc, shut rc=$mrc (see work/made-project/gated-*.make.log)"
+		fi
+		# the movie named with --movie, which a project of no game file needs:
+		# the same input as the movie after the game
+		mmake movie-option "$epkg" "$mdir/gridWalker.testrom" --movie "$here/movies/gridWalker.win.txt"
+		if [ "$mrc" -eq 0 ] && [ -n "$(mfield gridWalker.win input)" ] && [ "$(mfield movie-option input)" = "$(mfield gridWalker.win input)" ]; then
+			report "E:made-project:movie-option" PASS "a movie named with --movie is the project's input, as one after the game"
+		else
+			report "E:made-project:movie-option" FAIL "rc=$mrc, or the input differs (see work/made-project/movie-option.make.log)"
+		fi
 	fi
 fi
 

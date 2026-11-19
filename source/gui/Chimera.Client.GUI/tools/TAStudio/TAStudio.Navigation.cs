@@ -1,4 +1,6 @@
-﻿using Chimera.Client.Common;
+using System.Windows.Forms;
+
+using Chimera.Client.Common;
 
 namespace Chimera.Client.GUI
 {
@@ -43,6 +45,26 @@ namespace Chimera.Client.GUI
 				MainForm.AddOnScreenMessage($"Nothing stored at or before frame {frame}");
 				return;
 			}
+			/* A seek that would replay for a long time asks first, with the frames
+			 * and the time the last seek's speed makes of them (upstream issue
+			 * 595). Before anything is loaded, so a declined seek has moved
+			 * nothing. No measurement yet - the first seek of a session - means
+			 * no estimate, and no question. */
+			var replayFrom = closestState >= 0 ? closestState : Emulator.Frame;
+			var replayFrames = frame - replayFrom;
+			if (replayFrames > 0 && _seekFramesPerSecond > 0 && !HeadlessMode.Enabled
+				&& replayFrames / _seekFramesPerSecond > 10)
+			{
+				var answer = MessageBox.Show(this,
+					$"Seek to frame {frame}?\r\n\r\nThat replays {replayFrames:n0} frames, about {Duration(replayFrames / _seekFramesPerSecond)} "
+						+ $"at the speed the last seek ran ({_seekFramesPerSecond:F0} frames a second).",
+					"Long seek", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
+				if (answer != System.Windows.Forms.DialogResult.OK)
+				{
+					StopSeeking();
+					return;
+				}
+			}
 			if (closestState >= 0 && (frame < Emulator.Frame || (closestState > Emulator.Frame && !skipLoadState)))
 			{
 				LoadStateAt(closestState);
@@ -52,6 +74,8 @@ namespace Chimera.Client.GUI
 			{
 				_seekStartFrame = Emulator.Frame;
 				_seekingByEdit = false;
+				_seekFramesWatched = 0;
+				_seekClock.Restart();
 
 				MainForm.UnpauseEmulator();
 

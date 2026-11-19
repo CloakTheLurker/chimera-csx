@@ -212,8 +212,11 @@ public:
 	Costs costs() const { return m_costs; }
 
 	/* What it may hold now, which is not what it was configured with if the
-	 * machine has run out of memory since. */
+	 * machine has run out of memory since. clear() gives back the budget that
+	 * was set. */
 	uint64_t budget() const { return m_budget; }
+	/* the budget as it was set: configure's, never halved */
+	uint64_t budgetSet() const { return m_budgetSet; }
 	uint64_t bytes() const { return m_bytes; }
 	/* bytes() and the bookkeeping of every stored frame: what the budget holds */
 	uint64_t heldAgainstBudget() const;
@@ -730,6 +733,9 @@ private:
 	const HostApi *m_host = nullptr;
 	void *m_obj = nullptr;
 	uint64_t m_budget = 0;
+	/* The budget as it was set. m_budget is halved below it when the machine
+	 * runs out of memory, and a clear gives it back (upstream issue 577). */
+	uint64_t m_budgetSet = 0;
 	uint64_t m_bytes = 0;
 	std::vector<Segment> m_segments;   /* ordered by anchorFrame, never overlapping */
 	bool m_epochOpen = false;          /* an epoch is marked and a delta is wanted */

@@ -265,6 +265,14 @@ namespace Chimera.Client.GUI
 		public TAStudio()
 		{
 			InitializeComponent();
+
+			// the Cancel beside a seek's bar: the same thing as Stop Seeking in the
+			// menu, where the wait is (upstream issue 595)
+			_seekCancel.Text = "Cancel";
+			_seekCancel.Visible = false;
+			_seekCancel.ToolTipText = "Stop the seek where it is";
+			_seekCancel.Click += (_, _) => StopSeeking();
+			TasStatusStrip.Items.Add(_seekCancel);
 			if (OSTailoredCode.IsUnixHost)
 			{
 				// workaround for https://github.com/mono/mono/issues/12644

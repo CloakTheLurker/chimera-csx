@@ -194,6 +194,17 @@ custom_target(
   install: true,
   install_dir: 'dll',
 )
+# Windows: its own backends (WASAPI, DirectSound, WinMM) and nothing else. A
+# Windows build made on Linux would otherwise find the Linux machine's
+# PipeWire, PulseAudio or JACK headers and fail to compile them with mingw
+# (upstream e778d80d).
+openal_platform_args = host_windows ? [
+  '-DALSOFT_RTKIT=OFF',
+  '-DALSOFT_BACKEND_PORTAUDIO=OFF', '-DALSOFT_BACKEND_PULSEAUDIO=OFF',
+  '-DALSOFT_BACKEND_PIPEWIRE=OFF', '-DALSOFT_BACKEND_JACK=OFF',
+  '-DALSOFT_BACKEND_ALSA=OFF', '-DALSOFT_BACKEND_OSS=OFF',
+  '-DALSOFT_BACKEND_SDL2=OFF', '-DALSOFT_BACKEND_SDL3=OFF',
+] : []
 custom_target(
   'openal',
   output: host_windows ? 'OpenAL32.dll' : 'libopenal.so',
@@ -206,6 +217,7 @@ custom_target(
     cmake_toolchain,
     '-DALSOFT_UTILS=OFF', '-DALSOFT_EXAMPLES=OFF', '-DALSOFT_TESTS=OFF',
     '-DLIBTYPE=SHARED',
+    openal_platform_args,
   ],
   console: true,
   install: true,

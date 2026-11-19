@@ -475,6 +475,12 @@ Measured with `chimera-run --record --frames 11000` on snes9x (The Last Super), 
 
 `--seek 1500 --greenzone-check` lands exactly at periods 32 and 1000, and `--seek 1501` at 2 and 999, the ends of the spin box. The switch in chimera-run is `--greenzone-period <n>`, set at the frame `--greenzone-period-at` names. The engine test counts every capturing call the fake sandbox receives and asserts none while off, and that a sparse period stores only its multiples, as deltas, with one epoch per stored frame; removing either guard fails it.
 
+## What a marker stores, and what a clear gives back (2026-11-19, upstream #578 and #577)
+
+With a period, a marker set on the frame the machine stands on had no state until the machine played that frame again - the multiples alone are stored, and a marker between them waited for its own. Pinning now stores that frame at once, as making a branch stores its own: `StateHistory::pin` sees the machine's frame, asks `nearest`, and captures, carried past the period's gate by the same "store the next one" flag a period change uses. A marker on another frame is still only a wish, and takes effect if that frame is ever stored. The engine test sets a period of 60, stands on 30, pins it, and finds frame 30 reachable where nothing was before.
+
+The history halves its budget when the machine runs out of memory (see "What the history is allowed to cost"), and the halving used to outlive a Clear Greenzone: the clear gave the memory back but not the budget, so the greenzone went on thinning. `configure` now remembers the budget as it was set, and `clear` gives it back; running out again halves it again. `ce_session_greenzone_budget_now` says both numbers, for a frontend that wants to show them. The engine test halves a budget four times, clears, and finds the budget that was set; the clear also stores again at that budget.
+
 ## Phasing
 
 Each phase is separately gated and separately landable.

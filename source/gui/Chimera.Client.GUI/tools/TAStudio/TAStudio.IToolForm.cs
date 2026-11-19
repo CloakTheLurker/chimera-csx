@@ -22,6 +22,15 @@ namespace Chimera.Client.GUI
 		private bool _doPause;
 		private int _lastRecordAction = -1;
 
+		// A seek that replays for a long time says how long, asks first, and can be
+		// stopped from its own bar (upstream issue 595). The speed is the one the
+		// last seek ran at, in frames a second: the window's own measurement, as
+		// this engine has no measured-fps export.
+		private readonly System.Diagnostics.Stopwatch _seekClock = new();
+		private int _seekFramesWatched;
+		private double _seekFramesPerSecond;
+		private readonly System.Windows.Forms.ToolStripButton _seekCancel = new();
+
 		private void UpdateProgressBar()
 		{
 			if (SeekingTo != -1)
@@ -45,12 +54,36 @@ namespace Chimera.Client.GUI
 				}
 
 				ProgressBar.Value = (int)progress;
+
+				/* how fast this replay is going - the frames played over the
+				 * seconds they took - and what is left of it, kept for the next
+				 * seek's estimate (upstream issue 595) */
+				_seekFramesWatched++;
+				if (_seekClock.Elapsed.TotalSeconds >= 0.5)
+				{
+					_seekFramesPerSecond = _seekFramesWatched / _seekClock.Elapsed.TotalSeconds;
+				}
+				var left = SeekingTo - Emulator.Frame;
+				var about = _seekFramesPerSecond > 0
+					? $", about {Duration(Math.Max(0, left) / _seekFramesPerSecond)} left"
+					: "";
+				MessageStatusLabel.Text = $"Seeking... {diff:n0} of {unit:n0} frames{about}";
+				_seekCancel.Visible = true;
 			}
 			else
 			{
 				ProgressBar.Visible = false;
 				MessageStatusLabel.Text = "";
+				_seekCancel.Visible = false;
 			}
+		}
+
+		/// <summary>"40 s", "2 min 5 s" - a seek's estimate (upstream issue 595).</summary>
+		private static string Duration(double seconds)
+		{
+			if (seconds < 60) return $"{Math.Max(0, seconds):F0} s";
+			var whole = (int)Math.Round(seconds);
+			return $"{whole / 60} min {whole % 60} s";
 		}
 
 		protected override void UpdateBefore()

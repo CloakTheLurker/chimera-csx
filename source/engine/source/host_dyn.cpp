@@ -95,6 +95,7 @@ void loadOnce()
 	/* the core log, which an older host cannot keep */
 	if (!g_ok || !bind(g_api.wbx_set_output_file, "wbx_set_output_file")) g_api.wbx_set_output_file = nullptr;
 	if (!g_ok || !bind(g_api.wbx_set_clock_start, "wbx_set_clock_start")) g_api.wbx_set_clock_start = nullptr;
+	if (!g_ok || !bind(g_api.wbx_set_compare_writes, "wbx_set_compare_writes")) g_api.wbx_set_compare_writes = nullptr;
 	/* and the in-memory form of it, which an older host does not have */
 	if (!g_ok || !bind(g_api.wbx_compose_delta_mem, "wbx_compose_delta_mem")) g_api.wbx_compose_delta_mem = nullptr;
 

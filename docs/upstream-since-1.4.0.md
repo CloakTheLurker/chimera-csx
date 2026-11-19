@@ -28,7 +28,7 @@ The 17 commits add nine cores and a gamepad model.
 | 443f3597 | feat(qt): menus are windows of their own and reach past the window (#593) | skip (Qt) |
 | c3e2716a | test(qt): the menus test checks a menu the way Qt shows it (#593) | skip (Qt) |
 | 63bd69b0 | feat(cores): blueMSX joins the official cores (#591) | portable (roster) |
-| ca01fe69 | feat(tastudio): a long seek asks first, shows its progress and can be cancelled (#595) | engine half only |
+| ca01fe69 | feat(tastudio): a long seek asks first, shows its progress and can be cancelled (#595) | ported (this window's own seek; the export is not) |
 | f6598133 | feat(tastudio): a long seek's threshold is a setting | skip (Qt) |
 | 9cd20fb4 | feat(cores): Sonic 3 A.I.R. joins the official cores, a game core (#594) | portable (roster) |
 | c98a3565 | fix(greenzone): a greenzone thrown away at close is said in the status line | skip (Qt) |
@@ -140,6 +140,7 @@ The roster row for Dolphin gains Triforce, the arcade board its package already 
 - **1.4.3, a patch**: port #607's engine rule and update the C# test that mirrors it. No roster change. Done and published on 2026-11-19 from `798543b0`; the published-cores job is green again, and the RPCS3 package was not pinned or skipped.
 - **The cores batch**: fheroes2, TheXTech and Dolphin's Triforce row were taken on 2026-11-19. The roster is 74 cores and the README's game-core table has the two new rows. The 74-package set is published in [chimera-csx-cores](https://github.com/CloakTheLurker/chimera-csx-cores) now, ahead of the release it is named for, as `1.4.4Cores` with `cores-1.4.4.json` (commit c768c8a). No engine or C# change is needed for these packages; the `windows/` QML is ignored and the C# window's tools remain.
 - **#611, the large-file wizard**: taken on 2026-11-19, on the owner's word. The two engine exports and the C# wizard's bar and Cancel are in; a stopped read leaves its file in the slot, marked "(not read)", and Compile reads it again. Why it was first held: the C# window's progress dialog had no Cancel, and the two exports are declarations that are the owner's to add; both are here now. The engine exports change what a frontend may ask of the engine, so the next release carries them.
+- **The rest of the ports, taken on 2026-11-19**: the Windows OpenAL backends (e778d80d), the greenzone's raw copies freed on the packer's thread (1d1cc953), the budget a clear gives back (08c40487) and a marker storing the machine's frame at once (a4ecc4e5), chimera-run's `--movie` with its two fixes (8e888145, 6afea84e, 530b5591), and the long seek in this window's own shape (ca01fe69's behaviour, without its engine export, which this window has nothing to measure with). `readsDeadStack` (4629dcfd) needed miniBox's compare-writes, so the submodule moved to `ba7cbc54`; the witness then passed 117 legs with RAM and VRAM byte-identical. The design log has what each changes and what was not proved.
 - **Not taken**: the core windows architecture. It is the Qt window's: the host would have to be written in WinForms and the miniBox kit is an extern bump.
 
 Measured here on 2026-11-19 against the 74-row roster: the 1.2.0, 1.4.0 and 1.4.1 set files with the two new x86_64 packages (72 files; the two oversize, Cemu and ScummVM, were not downloaded) passed 39 tests with 0 failed and 0 skipped, where the same two packages alone had left two tests inconclusive for the roster rows they lacked.
@@ -164,7 +165,7 @@ The current CI: witness level A and the full frontend pass; published cores fail
 | c9b68913 | docs(readme): Dolphin lists Triforce among its systems (#606) | portable (roster and README) |
 | ad7c30ac | fix(cores): a core's window reaches a file only through Chimera's dialog (#610) | skip (Qt) |
 | e7ebf0c9 | feat(cores): Chimera has no tools of its own for a core (#610) | skip (Qt) |
-| e778d80d | fix(build): the Windows build's OpenAL takes only Windows's own sound backends | portable (build) |
+| e778d80d | fix(build): the Windows build's OpenAL takes only Windows's own sound backends | ported (the CMake backend flags) |
 | faa98d77 | fix(cores): a core's save exported in windows reaches the zip whole (#610) | hold (miniBox kit) |
 | 4a2afeb2 | fix(cores): a core's window writes the file Chimera gave it (#610) | hold (miniBox kit) |
 | 07463056 | fix(cores): every core's windows link, whatever its code model (#610) | hold (miniBox kit) |

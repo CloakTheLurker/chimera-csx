@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
 using Chimera.Client.Common;
 using Chimera.Emulation.Common;
+using Chimera.Emulation.Common.Engine;
 
 namespace Chimera.Tests.Client.Common.CorePackages
 {
@@ -142,6 +144,44 @@ namespace Chimera.Tests.Client.Common.CorePackages
 			{
 				Directory.Delete(first, recursive: true);
 				Directory.Delete(second, recursive: true);
+			}
+		}
+
+		/// <summary>
+		/// A firmware file of 16 MB or more whose hash is not known is not read
+		/// while an index is built, when the caller can show a bar and take a
+		/// Cancel (issue 611): it is named instead, and indexed once it is known.
+		/// </summary>
+		[TestMethod]
+		public void ALargeFileIsLeftToTheCallerThatCanShowACancel()
+		{
+			var dir = MakeFolder();
+			try
+			{
+				var path = Path.Combine(dir, "big_firmware.bin");
+				using (var stream = new FileStream(path, FileMode.Create, FileAccess.Write))
+				{
+					stream.SetLength(FirmwareLocator.LargeFileBytes + (1L << 20));
+					stream.Position = 0;
+					stream.WriteByte(0x5A);
+				}
+
+				var unread = new List<string>();
+				var index = FirmwareLocator.BuildIndex([ ], [ path ], unread);
+				Assert.AreEqual(1, unread.Count, "a file of 16 MB or more is not read while an index is built");
+				Assert.AreEqual(path, unread[0]);
+				Assert.AreEqual(0, index.Count);
+
+				Assert.AreEqual(ChimeraEngine.FileHashOutcome.Hashed,
+					ChimeraEngine.HashFile(path, null, out var sha1, out _));
+				var after = FirmwareLocator.BuildIndex([ ], [ path ], new List<string>());
+				Assert.AreEqual(1, after.Count, "a file whose hash is known is indexed");
+				Assert.AreEqual(sha1, after[0].Sha1);
+				Assert.AreEqual(FirmwareLocator.LargeFileBytes + (1L << 20), after[0].Length);
+			}
+			finally
+			{
+				Directory.Delete(dir, recursive: true);
 			}
 		}
 	}

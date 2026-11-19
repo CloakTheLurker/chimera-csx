@@ -97,15 +97,30 @@ namespace Chimera.Client.Common
 		public const long MaxBytes = int.MaxValue;
 
 		/// <summary>
+		/// Files this large or larger are not read on the window's thread while
+		/// an index is built: a caller that can show a bar and take a Cancel
+		/// passes <c>unread</c> and reads them itself (issue 611). The same 16 MB
+		/// line the New Project wizard reads a game at.
+		/// </summary>
+		public const long LargeFileBytes = 16L * 1024 * 1024;
+
+		/// <summary>
 		/// Hashes every plausible file in the given directories and their
 		/// sub-folders (and any extra paths), once - the same index then answers
 		/// for every requirement. A folder is walked as Scan Folder walks one,
 		/// to the same number of files at most: a Firmware folder sorted into
 		/// a folder a company or a system was searched only at its top (issue
 		/// 359). Unreadable files and directories are simply not in the index.
+		///
+		/// When <paramref name="unread"/> is given, a file of
+		/// <see cref="LargeFileBytes"/> or more whose hash the engine does not
+		/// already know is added to it and left out of the index instead of
+		/// being read here: the caller reads it with a bar and a Cancel, then
+		/// asks again.
 		/// </summary>
 		public static IReadOnlyList<IndexedFile> BuildIndex(
-			IEnumerable<string> searchDirs, IEnumerable<string>? extraPaths = null)
+			IEnumerable<string> searchDirs, IEnumerable<string>? extraPaths = null,
+			ICollection<string>? unread = null)
 		{
 			List<IndexedFile> index = new();
 			HashSet<string> seen = new();
@@ -133,6 +148,14 @@ namespace Chimera.Client.Common
 				{
 					var info = new FileInfo(full);
 					if (!info.Exists || info.Length is 0 or >= MaxBytes) continue;
+					// a large file is not read on this thread when the caller can
+					// show a bar and take a Cancel: it is named and left out
+					if (unread is not null && info.Length >= LargeFileBytes
+						&& !ChimeraEngine.KnownFileHash(full, out _, out _))
+					{
+						unread.Add(full);
+						continue;
+					}
 					// read through rather than held: a disk image is firmware too,
 					// and the engine answers a repeat with the hash it already took
 					if (ChimeraEngine.Sha1OfFile(full) is not { } hashed) continue;

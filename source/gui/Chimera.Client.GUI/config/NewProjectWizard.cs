@@ -1411,6 +1411,21 @@ namespace Chimera.Client.GUI
 		private string? _romSha1Path, _romSha1;
 
 		/// <summary>
+		/// Files whose read the person stopped: each stays in the slot it was
+		/// picked for, shown as (not read), and is read again with the same bar
+		/// when it is picked again or when Compile needs it (issue 611).
+		/// </summary>
+		private readonly HashSet<string> _hashDeclined = new(StringComparer.OrdinalIgnoreCase);
+
+		/// <summary>
+		/// A file this large or larger is read with the bar and a Cancel, never
+		/// silently: a 12 GB game hashed on the window's own thread froze New
+		/// Project until it was done (issue 611). The same line the firmware
+		/// index is built with.
+		/// </summary>
+		private const long HashAtOnce = FirmwareLocator.LargeFileBytes;
+
+		/// <summary>
 		/// Hashes the game when the file form is LEFT (Next), so that the compile
 		/// step opens on an answer instead of on a stall.
 		///
@@ -1432,14 +1447,104 @@ namespace Chimera.Client.GUI
 			if (_romSha1Path == path && _romSha1 is not null) return;
 			try
 			{
-				using var progress = ProgressDialog.Begin(this, "Adding game");
-				progress.Step($"hashing {Path.GetFileName(path)}");
-				PrecompileRomSha1();
+				TryReadFileHash(path, "Adding game", out _);
 			}
 			catch (Exception)
 			{
 				// left for the compile step: this was an optimisation, not a duty
 			}
+		}
+
+		/// <summary>
+		/// A file's identity, read with a bar the person can stop when the file is
+		/// large and the engine does not already know its hash (issue 611).
+		///
+		/// False when it could not be read or the read was stopped. A stopped file
+		/// is remembered, stays in the slot it was picked for and is shown as (not
+		/// read); picking it again or pressing Compile reads it again with the same
+		/// bar. The engine answers a file it has already hashed without reading it,
+		/// so asking twice costs nothing - and a stopped read is not kept.
+		/// </summary>
+		private bool TryReadFileHash(string path, string title, out string sha1)
+		{
+			sha1 = "";
+			if (ChimeraEngine.KnownFileHash(path, out sha1, out _)) return true;
+			if (_hashDeclined.Contains(path)) return false;
+			long size;
+			try
+			{
+				size = new FileInfo(path).Length;
+			}
+			catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+			{
+				return false;
+			}
+			if (size < HashAtOnce)
+			{
+				if (ChimeraEngine.HashFile(path, null, out sha1, out _) == ChimeraEngine.FileHashOutcome.Hashed) return true;
+				sha1 = "";
+				return false;
+			}
+			using var progress = ProgressDialog.Begin(this, title, cancellable: true);
+			progress.Report($"hashing {Path.GetFileName(path)}", 0, size);
+			var outcome = ChimeraEngine.HashFile(path, (_, _) => !progress.CancelRequested, out sha1, out _);
+			if (outcome == ChimeraEngine.FileHashOutcome.Hashed) return true;
+			if (outcome == ChimeraEngine.FileHashOutcome.Stopped)
+			{
+				_hashDeclined.Add(path);
+				MarkUnread(path);
+				_status.Text = $"stopped reading {Path.GetFileName(path)}";
+			}
+			sha1 = "";
+			return false;
+		}
+
+		/// <summary>Shows a file as (not read) in the slot that holds it, redrawing the row.</summary>
+		private void MarkUnread(string path)
+		{
+			foreach (var list in _slotLists.Values)
+			{
+				for (var i = 0; i < list.Items.Count; i++)
+				{
+					if (list.Items[i] is not PickedFile file
+						|| !file.Path.Equals(path, StringComparison.OrdinalIgnoreCase)) continue;
+					file.Unread = true;
+					list.Items[i] = file; // re-set, so the row is drawn again
+				}
+			}
+		}
+
+		/// <summary>A file is picked again: whatever was decided about it before is no decision now.</summary>
+		private void ForgetUnread(string path)
+		{
+			_hashDeclined.Remove(path);
+			foreach (var list in _slotLists.Values)
+			{
+				for (var i = 0; i < list.Items.Count; i++)
+				{
+					if (list.Items[i] is not PickedFile file
+						|| !file.Path.Equals(path, StringComparison.OrdinalIgnoreCase)) continue;
+					file.Unread = false;
+					list.Items[i] = file; // re-set, so the row is drawn again
+				}
+			}
+		}
+
+		/// <summary>
+		/// Reads the files too large to have been hashed while a firmware index
+		/// was being built, with the same bar and Cancel (issue 611), and says
+		/// whether any was read - the index is then built again, and the files
+		/// that were stopped stay out of it until something reads them.
+		/// </summary>
+		private bool ReadFirmwareFiles(IReadOnlyList<string> unread)
+		{
+			var read = false;
+			foreach (var path in unread)
+			{
+				if (_hashDeclined.Contains(path)) continue;
+				if (TryReadFileHash(path, "Looking for firmware", out _)) read = true;
+			}
+			return read;
 		}
 
 		/// <summary>
@@ -1451,14 +1556,34 @@ namespace Chimera.Client.GUI
 		/// hashes the very same file again when it adds it to the project. Two
 		/// independent hashings of a 5 GB disc image is one read too many, and
 		/// two notions of what a file's identity is, is one too many as well.
+		///
+		/// Never reads a large file here: this is asked while pages are drawn, and
+		/// a game of gigabytes read at that moment is what froze New Project
+		/// (issue 611). A large file is read where the person asked for it - Next,
+		/// Compile - and this answers null until then.
 		/// </summary>
 		private string? PrecompileRomSha1()
 		{
 			var path = PrecompileRomPath();
 			if (path is null || !File.Exists(path)) return null;
 			if (_romSha1Path == path && _romSha1 is not null) return _romSha1;
-			if (ChimeraEngine.Sha1OfFile(path) is not { } hashed) return null;
-			_romSha1 = hashed.Sha1;
+			if (_hashDeclined.Contains(path)) return null;
+			string sha1;
+			if (!ChimeraEngine.KnownFileHash(path, out sha1, out _))
+			{
+				long size;
+				try
+				{
+					size = new FileInfo(path).Length;
+				}
+				catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+				{
+					return null;
+				}
+				if (size >= HashAtOnce) return null;
+				if (ChimeraEngine.HashFile(path, null, out sha1, out _) != ChimeraEngine.FileHashOutcome.Hashed) return null;
+			}
+			_romSha1 = sha1;
 			_romSha1Path = path;
 			return _romSha1;
 		}
@@ -1505,6 +1630,14 @@ namespace Chimera.Client.GUI
 			}
 			_precompileList.EndUpdate();
 			UpdatePrecompileStatus();
+			// a game not read yet has no folder to list: say why, and that Compile
+			// reads it (issue 611)
+			if (PrecompileRomPath() is { } game && PrecompileRomSha1() is null)
+			{
+				_precompileStatus.Text = _hashDeclined.Contains(game)
+					? $"{Path.GetFileName(game)} was not read. Compile reads it again."
+					: $"{Path.GetFileName(game)} is a large file: Compile reads it first.";
+			}
 		}
 
 		/// <summary>
@@ -1584,6 +1717,19 @@ namespace Chimera.Client.GUI
 		{
 			var romPath = PrecompileRomPath();
 			if (romPath is null || ChosenCore is null) return;
+
+			// a game whose read was stopped, or one too large to have been read while
+			// the page was drawn, is read now with the same bar, and Compile goes on
+			// when its hash is known (issue 611)
+			if (PrecompileRomSha1() is null)
+			{
+				ForgetUnread(romPath);
+				if (!TryReadFileHash(romPath, "Compiling", out _))
+				{
+					UpdatePrecompileStatus();
+					return;
+				}
+			}
 
 			_precompiling = true;
 			_precompileCancelled = false;
@@ -2151,8 +2297,12 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private sealed record PickedFile(string Name, string Path, int TrackCount = 0)
 		{
+			/// <summary>The person stopped the read that would have hashed it (issue 611): it stays, and says so.</summary>
+			public bool Unread { get; set; }
+
 			public override string ToString()
-				=> TrackCount is 0 ? Name : $"{Name}  (+ {TrackCount} track file{(TrackCount is 1 ? "" : "s")})";
+				=> (TrackCount is 0 ? Name : $"{Name}  (+ {TrackCount} track file{(TrackCount is 1 ? "" : "s")})")
+					+ (Unread ? "  (not read)" : "");
 		}
 
 		/// <summary>
@@ -2239,19 +2389,20 @@ namespace Chimera.Client.GUI
 			}
 
 			list.Items.Add(new PickedFile(name, path, tracks));
+			// picked again: a read that was stopped before is not a decision now
+			ForgetUnread(path);
 
 			// A core that compiles its game's code files that code under the
 			// game's own hash, so the hash has to exist BEFORE the compile step
 			// opens - that step looks the game up to say what is already
 			// compiled, and looking it up is the first thing it does.
 			//
-			// Hashing here rather than there is what keeps that lookup instant.
-			// A disc image is gigabytes and the compile step used to hash one on
-			// the UI thread while building its page: a silent freeze, no
-			// progress, no cancel, at the exact moment the person arrived. Here
-			// the wait is where a wait is expected - they just chose a file -
-			// and it is said out loud. The engine memoizes by path, size and
-			// mtime, so Create's own hashing of the same file costs nothing.
+			// The hash is taken when the file form is LEFT (HashGameForPrecompileNow),
+			// not here: which file is "the game" is the first of its slot, and
+			// adding, removing and reordering all change that. It is taken with the
+			// bar and a Cancel, because a disc image is gigabytes (issue 611). The
+			// engine memoizes by path, size and mtime, so Create's own hashing of
+			// the same file costs nothing.
 
 			// A slot that names its formats has still not been given a rule: the
 			// picker offers "All files" too, and a person who renamed something
@@ -2931,7 +3082,15 @@ namespace Chimera.Client.GUI
 				.Where(static path => path is not null)
 				.Select(static path => path!)
 				.Concat(_rememberedFirmwarePaths(ChosenCoreName ?? ""));
-			_firmwareIndex = FirmwareLocator.BuildIndex(_firmwareSearchDirs, remembered);
+			// a firmware file of 16 MB or more whose hash is not known is read with
+			// the bar and a Cancel, not while this page is drawn (issue 611)
+			List<string> unread = new();
+			_firmwareIndex = FirmwareLocator.BuildIndex(_firmwareSearchDirs, remembered, unread);
+			if (unread.Count is not 0 && ReadFirmwareFiles(unread))
+			{
+				unread.Clear();
+				_firmwareIndex = FirmwareLocator.BuildIndex(_firmwareSearchDirs, remembered, unread);
+			}
 			BuildFirmwareNeeds(needed);
 			ApplySeededFirmware();
 			RenderFirmwareRows();
@@ -3117,17 +3276,14 @@ namespace Chimera.Client.GUI
 		{
 			var need = _firmwareNeeds.FirstOrDefault(n => n.Id == id);
 			if (need is null) return;
-			byte[] bytes;
-			try
+			// the hash through the engine, which answers a known file without
+			// reading it and takes a large one with the bar and a Cancel (issue
+			// 611): never the whole file as an array - a disc image is gigabytes
+			if (!TryReadFileHash(path, "Firmware", out var sha1))
 			{
-				bytes = System.IO.File.ReadAllBytes(path);
-			}
-			catch (System.IO.IOException ex)
-			{
-				_status.Text = ex.Message;
+				if (!_hashDeclined.Contains(path)) _status.Text = $"cannot read {System.IO.Path.GetFileName(path)}";
 				return;
 			}
-			var sha1 = Chimera.Emulation.Common.Engine.ChimeraEngine.Sha1Hex(bytes);
 			// a pinned entry names ONE exact file; an unpinned one (no declared
 			// hash - a file only the user can own, like a console's own font
 			// region nothing ships) takes what is chosen and records its hash
@@ -3173,8 +3329,17 @@ namespace Chimera.Client.GUI
 					.Enumerate(folder, recurse: recurse)
 					.Take(Chimera.Client.Common.ProjectFolderScan.MaxFiles)
 					.ToList();
-				// one hashed index answers every pinned requirement
-				var index = FirmwareLocator.BuildIndex([ ], found);
+				// one hashed index answers every pinned requirement; a file too
+				// large to read while the person waits is read with the bar, and
+				// the index asked again once it is known (issue 611)
+				List<string> unread = new();
+				var index = FirmwareLocator.BuildIndex([ ], found, unread);
+				if (unread.Count is not 0 && ReadFirmwareFiles(unread))
+				{
+					unread.Clear();
+					index = FirmwareLocator.BuildIndex([ ], found, unread);
+				}
+				var stoppedAt = unread.FirstOrDefault(_hashDeclined.Contains);
 				_firmwareIndex = _firmwareIndex.Concat(index).ToList();
 				var filled = 0;
 				// a file this page asks for is in that folder, chosen already or not
@@ -3206,9 +3371,10 @@ namespace Chimera.Client.GUI
 					ProvideFirmware(need.Id, named);
 					if (need.ChosenPath is not null) filled++;
 				}
-				_status.Text = filled is 0
+				var said = filled is 0
 					? $"scanned {found.Count} files; nothing new matched"
 					: $"scanned {found.Count} files; {filled} requirement{(filled is 1 ? "" : "s")} resolved";
+				_status.Text = stoppedAt is null ? said : $"stopped reading {Path.GetFileName(stoppedAt)}; {said}";
 			}
 			finally
 			{

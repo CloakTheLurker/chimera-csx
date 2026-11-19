@@ -219,6 +219,12 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract int ce_sha1_file(string utf8Path, byte[] out41, ref ulong lenOut);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_sha1_file_known(string utf8Path, byte[] out41, ref ulong lenOut);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_sha1_file_progress(string utf8Path, byte[] out41, ref ulong lenOut, IntPtr fn, IntPtr user);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_sha1_keep_in([MarshalAs(UnmanagedType.LPUTF8Str)] string? utf8Path);
 
 
@@ -1341,6 +1347,71 @@ namespace Chimera.Emulation.Common.Engine
 			ulong len = 0;
 			if (Instance.ce_sha1_file(path, buf, ref len) is 0) return null;
 			return (Encoding.ASCII.GetString(buf, 0, 40), (long)len);
+		}
+
+		/// <summary>What a file's hash is when its identity is already known: the engine's cache alone, which never reads.</summary>
+		public static bool KnownFileHash(string path, out string sha1, out long length)
+		{
+			var buf = new byte[41];
+			ulong len = 0;
+			if (Instance.ce_sha1_file_known(path, buf, ref len) is 0)
+			{
+				sha1 = "";
+				length = 0;
+				return false;
+			}
+			sha1 = Encoding.ASCII.GetString(buf, 0, 40);
+			length = (long)len;
+			return true;
+		}
+
+		/// <summary>How reading a file for its hash ended (issue 611).</summary>
+		public enum FileHashOutcome
+		{
+			/// <summary>The hash was taken, or the file was already known.</summary>
+			Hashed,
+			/// <summary>The file could not be read.</summary>
+			Unreadable,
+			/// <summary>The caller's tick asked it to stop, which caches nothing.</summary>
+			Stopped,
+		}
+
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+		private delegate int HashTickFn(ulong done, ulong total, IntPtr user);
+
+		/// <summary>
+		/// The same hash of a file, with a bar that can be stopped (issue 611).
+		/// <paramref name="tick"/> is asked after every megabyte with the bytes
+		/// read so far and the file's length, on this thread, and returning false
+		/// stops the read: a stopped read is not cached and nothing is written to
+		/// <paramref name="sha1"/>. A file whose hash is already known answers
+		/// without calling it.
+		/// </summary>
+		public static FileHashOutcome HashFile(string path, Func<ulong, ulong, bool>? tick, out string sha1, out long length)
+		{
+			HashTickFn? shim = null;
+			var handle = IntPtr.Zero;
+			if (tick is not null)
+			{
+				// the C callback answers non-zero to STOP; tick answers false to stop
+				shim = (done, total, _) => tick(done, total) ? 0 : 1;
+				handle = Marshal.GetFunctionPointerForDelegate(shim);
+			}
+
+			var buf = new byte[41];
+			ulong len = 0;
+			var result = Instance.ce_sha1_file_progress(path, buf, ref len, handle, IntPtr.Zero);
+			// the delegate must outlive the call it was handed to
+			GC.KeepAlive(shim);
+
+			sha1 = result is 1 ? Encoding.ASCII.GetString(buf, 0, 40) : "";
+			length = result is 1 ? (long)len : 0;
+			return result switch
+			{
+				1 => FileHashOutcome.Hashed,
+				-1 => FileHashOutcome.Stopped,
+				_ => FileHashOutcome.Unreadable,
+			};
 		}
 
 		/// <summary>

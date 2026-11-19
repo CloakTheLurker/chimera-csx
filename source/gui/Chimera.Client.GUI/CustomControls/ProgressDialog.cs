@@ -57,6 +57,14 @@ namespace Chimera.Client.GUI
 		private bool _determinate;
 		private double _fraction;
 
+		// a read that can be stopped (issue 611): the button is on the window's
+		// thread, the flag is read by the caller's tick, so it is volatile
+		private readonly bool _cancellable;
+		private volatile bool _cancelRequested;
+
+		/// <summary>Whether the person pressed Cancel. A caller that is reading a file asks after every megabyte and stops when it is true.</summary>
+		public bool CancelRequested => _cancelRequested;
+
 		public string StageText { get { lock (_lock) return _stage; } }
 		public string DetailText { get { lock (_lock) return _detail; } }
 		public bool Determinate { get { lock (_lock) return _determinate; } }
@@ -71,6 +79,15 @@ namespace Chimera.Client.GUI
 		public static ProgressDialog Begin(Form? owner, string title) => Begin(owner, title, showAfterMs: 0);
 
 		/// <summary>
+		/// A window with a Cancel button, for work the person may decide to stop
+		/// part way - reading a large file for its hash (issue 611). The flag it
+		/// raises is <see cref="CancelRequested"/>; the caller stops, and a read
+		/// this window was up for that stopped caches nothing.
+		/// </summary>
+		public static ProgressDialog Begin(Form? owner, string title, bool cancellable)
+			=> Begin(owner, title, showAfterMs: 0, cancellable: cancellable);
+
+		/// <summary>
 		/// The same, for work that is usually over before anybody could read a window: nothing is
 		/// shown until it has lasted <paramref name="showAfterMs"/>, and if it finishes sooner
 		/// nothing is shown at all. Saving a branch is a few milliseconds on an NES and half a
@@ -78,8 +95,12 @@ namespace Chimera.Client.GUI
 		/// worse than none, and none at all left the long case looking like a hang.
 		/// </summary>
 		public static ProgressDialog Begin(Form? owner, string title, int showAfterMs)
+			=> Begin(owner, title, showAfterMs, cancellable: false);
+
+		/// <summary>The same, with or without a Cancel button.</summary>
+		public static ProgressDialog Begin(Form? owner, string title, int showAfterMs, bool cancellable)
 		{
-			ProgressDialog dialog = new(owner, title) { _showAfterMs = showAfterMs };
+			ProgressDialog dialog = new(owner, title, cancellable) { _showAfterMs = showAfterMs };
 			EngineProgress.Reported += dialog.OnReport;
 			if (!HeadlessMode.Enabled) dialog.StartWindow(title, owner);
 			return dialog;
@@ -93,10 +114,11 @@ namespace Chimera.Client.GUI
 		/// <summary>Whether a window was ever put up. For tests.</summary>
 		public bool WindowWasShown => _window is not null;
 
-		private ProgressDialog(Form? owner, string title)
+		private ProgressDialog(Form? owner, string title, bool cancellable)
 		{
 			_owner = owner;
 			_ownerWasEnabled = owner?.Enabled ?? false;
+			_cancellable = cancellable;
 			_stage = Capitalise(title);
 			if (owner is not null) owner.Enabled = false;
 		}
@@ -134,7 +156,7 @@ namespace Chimera.Client.GUI
 				ControlBox = false,
 				ShowInTaskbar = false,
 				StartPosition = FormStartPosition.CenterScreen,
-				ClientSize = new(UIHelper.ScaleX(420), UIHelper.ScaleY(96)),
+				ClientSize = new(UIHelper.ScaleX(420), UIHelper.ScaleY(_cancellable ? 132 : 96)),
 			};
 			_stageLabel = new Label
 			{
@@ -158,6 +180,24 @@ namespace Chimera.Client.GUI
 			};
 			_detailLabel.SetForeRole(ThemeColorRole.DisabledText);
 			_window.Controls.AddRange([ _stageLabel, _bar, _detailLabel ]);
+			if (_cancellable)
+			{
+				Button cancel = new()
+				{
+					Text = "Cancel",
+					Location = new(UIHelper.ScaleX(12), UIHelper.ScaleY(94)),
+					Size = new(UIHelper.ScaleX(110), UIHelper.ScaleY(28)),
+				};
+				cancel.Click += (_, _) =>
+				{
+					// the caller's tick reads this and stops; the button says so at
+					// once, so a long megabyte does not look like a dead click
+					_cancelRequested = true;
+					cancel.Enabled = false;
+					cancel.Text = "Stopping...";
+				};
+				_window.Controls.Add(cancel);
+			}
 			if (center is { } c)
 			{
 				_window.StartPosition = FormStartPosition.Manual;

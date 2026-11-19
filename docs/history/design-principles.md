@@ -3631,3 +3631,7 @@ Not proved: a game in each core, a project made through the C# wizard, and the C
 ## The New Project wizard reads a package's words (2026-11-18)
 
 1.2.0 taught the window to read a package's `languages/en.json` and resolve the settings, file slots and firmware it names by key, but the wizard's own read of `waterbox.config` did not pass the table. The machine list and the settings page showed keys such as `setting.machine`, while the rest of the window showed the words. It now reads the declaration through the same table. A test holds a keyed declaration and its table to the words, and a package from before the cut still keeps the words it carries.
+
+## A button's header may be any printable character (2026-11-19, upstream #607)
+
+The package contract took one to eight characters of printable ASCII for a button's column header, and the engine dropped anything else without a word. The newest RPCS3 package declares the PlayStation symbols by code point (`U+25B3` triangle, `U+25CB` circle, `U+2715` cross, `U+25A1` square), so this window refused a package that is correct: the published-core job failed on it. The engine's rule and the C# test that mirrors it now take any printable Unicode character, one to eight counted as characters and not bytes, with a space allowed only between two characters; invalid UTF-8, control characters, spaces of other widths, invisible marks, noncharacters and private-use code points are still refused. The column is headed by the declared header, and the package is not pinned or skipped.

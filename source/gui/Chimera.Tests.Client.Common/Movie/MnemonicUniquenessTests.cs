@@ -233,8 +233,9 @@ namespace Chimera.Tests.Client.Common
 
 		/// <summary>
 		/// A header is what a package gives a button whose letter does not tell
-		/// it from its neighbours (chimera#225): one to eight characters of
-		/// printable ASCII with no space at either end, which is what the engine
+		/// it from its neighbours (chimera#225): one to eight printable
+		/// characters, counted as characters and not bytes, with no space at
+		/// either end. Any script or symbol is welcome, which is what the engine
 		/// takes - anything else it drops without a word and the column is
 		/// headed by the letter again. It names a control that is there, and it
 		/// heads one column of a player: a header that another column of the
@@ -250,7 +251,7 @@ namespace Chimera.Tests.Client.Common
 				foreach (var pair in c.Headers)
 				{
 					var h = pair.Value;
-					if (h.Length is 0 or > 8 || h[0] is ' ' || h[h.Length - 1] is ' ' || h.Any(static ch => ch < ' ' || ch >= 0x7F))
+					if (!IsUsableHeader(h))
 						complaints.Add($"{c.Core} ({c.Where}): {pair.Key} = \"{h}\" is not a header");
 					if (!names.Contains(pair.Key))
 						complaints.Add($"{c.Core} ({c.Where}): a header for {pair.Key}, which is not a button");
@@ -269,6 +270,44 @@ namespace Chimera.Tests.Client.Common
 			}
 
 			Assert.AreEqual(0, complaints.Count, string.Join("; ", complaints.Take(40)));
+		}
+
+		/// <summary>
+		/// The engine's rule for a header (source/engine/source/control_names.cpp):
+		/// one to eight printable Unicode characters, counted as characters and not
+		/// bytes, with no space at either end; a space between two characters is
+		/// allowed.
+		/// </summary>
+		private static bool IsUsableHeader(string header)
+		{
+			if (header.Length is 0) return false;
+			var characters = 0;
+			for (var at = 0; at < header.Length; )
+			{
+				if (char.IsSurrogate(header[at]) && !char.IsSurrogatePair(header, at)) return false;
+				var cp = char.ConvertToUtf32(header, at);
+				var width = char.IsSurrogatePair(header, at) ? 2 : 1;
+				var inner = cp == ' ' && at > 0 && at + width < header.Length;
+				if (!inner && !IsPrintableCodePoint(cp)) return false;
+				if (++characters > 8) return false;
+				at += width;
+			}
+			return true;
+		}
+
+		private static bool IsPrintableCodePoint(int cp)
+		{
+			if (cp <= ' ' || cp == 0x7F) return false;
+			if (cp >= 0x80 && cp < 0xA0) return false;
+			if (cp == 0xA0 || cp == 0xAD || cp == 0x1680) return false;
+			if (cp >= 0x2000 && cp <= 0x200F) return false;
+			if (cp >= 0x2028 && cp <= 0x202F) return false;
+			if (cp >= 0x205F && cp <= 0x206F) return false;
+			if (cp == 0x3000 || cp == 0xFEFF) return false;
+			if (cp >= 0xFDD0 && cp <= 0xFDEF) return false;
+			if ((cp & 0xFFFE) == 0xFFFE) return false;
+			if (cp >= 0xE000 && cp <= 0xF8FF) return false;
+			return true;
 		}
 
 		/// <summary>"P2 Start" belongs to player 2; "Reset" belongs to the console.</summary>

@@ -3644,4 +3644,4 @@ The two rows are upstream's own, field for field, and the roster is 74 cores; Do
 
 Measured here on 2026-11-19: the 1.2.0, 1.4.0 and 1.4.1 set files with these two x86_64 packages, 72 files, against the 74-row roster. The package, roster, mnemonic, language-table and theme contract tests ran 39 tests, 0 failed and 0 skipped. Alone, the two packages had left two of them inconclusive because the roster did not name them. Not proved: a game in either core, and a project made with them through the wizard; the cores' own repositories measure gameplay.
 
-The 74-package set waits in chimera-csx-cores for the release that ships it, because each set's folder and index are named for the release that uses them.
+The 74-package set is published in chimera-csx-cores as `1.4.4Cores`, ahead of the release it is named for, so both packages can be downloaded before 1.4.4 exists; `cores-1.4.4.json` indexes all 74, and every digest in it matched its file when it was published.

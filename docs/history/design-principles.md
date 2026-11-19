@@ -3635,3 +3635,13 @@ Not proved: a game in each core, a project made through the C# wizard, and the C
 ## A button's header may be any printable character (2026-11-19, upstream #607)
 
 The package contract took one to eight characters of printable ASCII for a button's column header, and the engine dropped anything else without a word. The newest RPCS3 package declares the PlayStation symbols by code point (`U+25B3` triangle, `U+25CB` circle, `U+2715` cross, `U+25A1` square), so this window refused a package that is correct: the published-core job failed on it. The engine's rule and the C# test that mirrors it now take any printable Unicode character, one to eight counted as characters and not bytes, with a space allowed only between two characters; invalid UTF-8, control characters, spaces of other widths, invisible marks, noncharacters and private-use code points are still refused. The column is headed by the declared header, and the package is not pinned or skipped.
+
+## The roster gains fheroes2, TheXTech and Dolphin's Triforce (2026-11-19, user-decided)
+
+Upstream added two game cores to its official roster on 2026-11-19 and listed Triforce among Dolphin's systems: fheroes2 (Heroes of Might and Magic II, from the game's own data file or its free demo) and TheXTech (Super Mario Bros. X, SMBX 1.3, with an asset pack the player brings), each x86_64 only. The owner took both and the Triforce row for this fork on the same day, and chose to prepare the batch now and cut the release later, so the version is theirs to name.
+
+The two rows are upstream's own, field for field, and the roster is 74 cores; Dolphin's row now lists Triforce beside GameCube and Wii, which its package has always declared. The README's game-core table gains a row each and Dolphin's row names the arcade board. Neither package needs an engine or C# change: both say what they need in their own declarations, and the `windows/` SaveData QML they carry from miniBox's kit is ignored by this window, whose own Export Save Data remains.
+
+Measured here on 2026-11-19: the 1.2.0, 1.4.0 and 1.4.1 set files with these two x86_64 packages, 72 files, against the 74-row roster. The package, roster, mnemonic, language-table and theme contract tests ran 39 tests, 0 failed and 0 skipped. Alone, the two packages had left two of them inconclusive because the roster did not name them. Not proved: a game in either core, and a project made with them through the wizard; the cores' own repositories measure gameplay.
+
+The 74-package set waits in chimera-csx-cores for the release that ships it, because each set's folder and index are named for the release that uses them.

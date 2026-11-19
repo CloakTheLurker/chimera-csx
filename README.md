@@ -44,7 +44,7 @@ To use a core, download its `.chimeraCore` package (hosted on [this repository](
 | [ares](https://github.com/ToolAssisted-run/chimera-core-ares) | Nintendo Entertainment System / Famicom, Super Nintendo, Satellaview, Sufami Turbo, Nintendo 64, Nintendo 64DD, Game Boy / Game Boy Color, Game Boy Advance, Mega Drive / Genesis, Mega Drive 32X, Sega CD / Mega CD, Sega CD 32X, Master System, Game Gear, SG-1000, PlayStation, Atari 2600, Atari 5200, ColecoVision, MSX / MSX2, PC Engine / TurboGrafx-16 / SuperGrafx, PC Engine CD / TurboDuo, Neo Geo AES, Neo Geo Pocket / Color, WonderSwan / WonderSwan Color |
 | [Snes9x](https://github.com/ToolAssisted-run/chimera-core-snes9x) | Super Nintendo |
 | [bsnes v115](https://github.com/ToolAssisted-run/chimera-core-bsnes115) | Super Nintendo, Super Game Boy |
-| [Dolphin](https://github.com/ToolAssisted-run/chimera-core-dolphin) | GameCube, Wii |
+| [Dolphin](https://github.com/ToolAssisted-run/chimera-core-dolphin) | GameCube, Wii, Triforce (arcade) |
 | [Cemu](https://github.com/ToolAssisted-run/chimera-core-cemu) | Wii U |
 | [Azahar](https://github.com/ToolAssisted-run/chimera-core-azahar) | Nintendo 3DS / New Nintendo 3DS |
 | [melonDS](https://github.com/ToolAssisted-run/chimera-core-melonds) | Nintendo DS, Nintendo DSi |
@@ -117,6 +117,8 @@ One game each, run from the game's own files ([docs/game-cores.md](docs/game-cor
 | [Sonic 3 A.I.R.](https://github.com/ToolAssisted-run/chimera-core-sonic3air) | Sonic 3 & Knuckles (the A.I.R. remaster, from your own Sonic & Knuckles + Sonic 3 ROM) |
 | [DSDA-Doom](https://github.com/ToolAssisted-run/chimera-core-dsda) | Doom, Doom II, Final Doom, Heretic, Hexen, Chex Quest, Freedoom |
 | [Open4DBoxing](https://github.com/ToolAssisted-run/chimera-core-open4dboxing) | 4D Sports Boxing (DOS) |
+| [fheroes2](https://github.com/ToolAssisted-run/chimera-core-fheroes2) | Heroes of Might and Magic II (from your own game's data file, or its free demo's) |
+| [TheXTech](https://github.com/ToolAssisted-run/chimera-core-thextech) | Super Mario Bros. X (SMBX 1.3) and its episodes, with an asset pack you bring |
 
 SRB2 (Sonic Robo Blast 2) is published by its author, P-AS, from [their own repository](https://github.com/P-AS/chimera-core-srb2), so it is not in the official roster.
 

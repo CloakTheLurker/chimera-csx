@@ -135,11 +135,13 @@ Both are game cores, and both packages passed the four contract classes here: 34
 
 The roster row for Dolphin gains Triforce, the arcade board its package already runs.
 
-### What is proposed
+### What was proposed, and what was done
 
-- **1.4.3, a patch**: port #607's engine rule and update the C# test that mirrors it. No roster change. This turns the published-cores job green again; the RPCS3 package is correct and should not be pinned or skipped.
-- **A later cores batch, the owner's number**: fheroes2 and TheXTech, and Dolphin's Triforce row. The roster becomes 74, the README's game-core table gains two rows, and the 1.4.1Cores set plus the two x86_64 packages becomes 74. No engine or C# change is needed for these packages; the `windows/` QML is ignored and the C# window's tools remain.
-- **Not in either**: the core windows architecture and the large-file wizard work. The first is the Qt window's, and the second needs a C# progress dialog and two new engine exports.
+- **1.4.3, a patch**: port #607's engine rule and update the C# test that mirrors it. No roster change. Done and published on 2026-11-19 from `798543b0`; the published-cores job is green again, and the RPCS3 package was not pinned or skipped.
+- **The cores batch**: fheroes2, TheXTech and Dolphin's Triforce row were taken on 2026-11-19. The roster is 74 cores and the README's game-core table has the two new rows; the 74-package set is published in [chimera-csx-cores](https://github.com/CloakTheLurker/chimera-csx-cores) when the release that ships it is named, because each set's folder is named for its release. No engine or C# change is needed for these packages; the `windows/` QML is ignored and the C# window's tools remain.
+- **Not taken**: the core windows architecture and the large-file wizard work. The first is the Qt window's, and the second needs a C# progress dialog and two new engine exports.
+
+Measured here on 2026-11-19 against the 74-row roster: the 1.2.0, 1.4.0 and 1.4.1 set files with the two new x86_64 packages (72 files; the two oversize, Cemu and ScummVM, were not downloaded) passed 39 tests with 0 failed and 0 skipped, where the same two packages alone had left two tests inconclusive for the roster rows they lacked.
 
 ### Asked for, not built (2026-11-19)
 

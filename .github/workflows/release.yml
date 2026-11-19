@@ -146,19 +146,11 @@ jobs:
             echo "| Windows x64 | \`$name.zip\` |"
             echo "| Linux x64 | \`$name.tar.gz\` |"
             echo
-            echo "Both carry the frontend and its natives. They carry **no cores**, and"
-            echo "Chimera downloads none: get a core's \`.chimeraCore\` package from the"
-            echo "project that builds it and put it in the \`Cores\` folder beside Chimera."
-            echo "\`BUILD.txt\` names the exact commit this was built from and"
-            echo "\`LICENSES.md\` states its terms."
+            echo "Both carry the frontend and its natives. They carry **no cores**, and Chimera downloads none: get a core's \`.chimeraCore\` package from the project that builds it and put it in the \`Cores\` folder beside Chimera. \`BUILD.txt\` names the exact commit this was built from and \`LICENSES.md\` states its terms."
             echo
-            echo "Each core brings its own licence with it, and some (Genesis Plus GX,"
-            echo "Opera, Snes9x) forbid commercial use - which binds whatever they are"
-            echo "installed into. Chimera shows a core's terms once it is in the folder."
+            echo "Each core brings its own licence with it, and some (Genesis Plus GX, Opera, Snes9x) forbid commercial use - which binds whatever they are installed into. Chimera shows a core's terms once it is in the folder."
             echo
-            echo "Windows will warn that the executable is unsigned and from an unknown"
-            echo "publisher; it is not signed, and there is no way around that warning"
-            echo "short of buying a certificate."
+            echo "Windows will warn that the executable is unsigned and from an unknown publisher; it is not signed, and there is no way around that warning short of buying a certificate."
             echo
           } > build/release/NOTES.md
 

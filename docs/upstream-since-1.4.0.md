@@ -112,3 +112,65 @@ The long seek's engine export is the only engine work. It adds one function to `
 The gamepad commits would need SDL 3 in place of SDL 2 and a C# version of the face-button-by-place model. They are held, not taken: the C# window's controller configuration is its own and the fork's goal is the behaviour its projects were made with.
 
 The rest is the Qt window. There is nothing in them for this fork.
+
+## The second batch: upstream after 1.4.2 (2026-11-19)
+
+Upstream main is 99adbca8 (2026-11-19), 17 commits after c98a3565, the tip the first assessment judged; main was not rebased. The official roster is 74 cores, up from 72: fheroes2 and TheXTech, both game cores.
+
+The new cores are one commit; the other 16 are four groups.
+
+- **A core's windows (#610), 8 commits.** A core draws QML windows of its own from its package (`windows/`, declared in `waterbox.config`) and may hold its frame while a window is open. Chimera loses its own Export Save Data, CPU Registers, Trace Logger and Surface Viewer; miniBox's kit (`waterbox_windows.h`, `add-windows.py`) gives the cores ready-made ones from the exports they already have. This is the Qt window's architecture: QML, a view model and a package window host. It is not a port for the C# window: the host would have to be written in WinForms, the tools removed and re-provided by the packages, and the miniBox kit is an extern bump that changes replay determinism. The C# window keeps its own tools and ignores a package's `windows/` QML. Held or skipped, not in a batch.
+- **Input headers (#607), 2 commits.** A button's header may be any printable Unicode character, one to eight characters counted as characters and not ASCII only. The engine half is a small port and it is the fix for the current published-cores failure: the newest RPCS3 package (70d2a537) declares the PlayStation symbols by code point (`U+25B3` triangle, `U+25CB` circle, `U+2715` cross and `U+25A1` square), and this fork's engine and the C# test that mirrors it still take ASCII only, so the test refuses the package. The C# test must adopt the same rule. The other commit shows a column's header to a script in the Qt view model; skip.
+- **New project large files (#611), 3 commits.** A large file is hashed away from the window with a progress bar and Cancel, through two new engine exports (`ce_sha1_file_progress` and `ce_sha1_file_known`). The engine half is a candidate; the C# wizard would need a progress dialog and Cancel, and the exports are the owner's to add. The other two commits are the Qt form and its test; skip.
+- **Three single commits.** The Windows OpenAL build takes only Windows's sound backends (`meson.build`; a portable build fix), Dolphin's roster row lists Triforce (portable roster and README), and `--measure` with `--play` counts from the machine's start (Qt; skip).
+
+### The two new cores
+
+Both are game cores, and both packages passed the four contract classes here: 34 passed, 2 inconclusive because the roster does not name them yet, 0 failed. Each is x86_64 only and carries a `windows/` SaveData QML from miniBox's kit, which the C# window ignores; its own Export Save Data remains.
+
+| Core | Game | Package | What it needs | Terms |
+| --- | --- | --- | --- | --- |
+| fheroes2 | Heroes of Might and Magic II | nightly-2026-11-19, 0645d327, 5.6 MB | `HEROES2.AGG` from the game, or its free demo | GPL-2.0 |
+| TheXTech | Super Mario Bros. X (SMBX 1.3) | nightly-2026-11-19, 5372b92b, 4.4 MB | An SMBX asset pack in the file slots | GPL-3.0 |
+
+The roster row for Dolphin gains Triforce, the arcade board its package already runs.
+
+### What is proposed
+
+- **1.4.3, a patch**: port #607's engine rule and update the C# test that mirrors it. No roster change. This turns the published-cores job green again; the RPCS3 package is correct and should not be pinned or skipped.
+- **A later cores batch, the owner's number**: fheroes2 and TheXTech, and Dolphin's Triforce row. The roster becomes 74, the README's game-core table gains two rows, and the 1.4.1Cores set plus the two x86_64 packages becomes 74. No engine or C# change is needed for these packages; the `windows/` QML is ignored and the C# window's tools remain.
+- **Not in either**: the core windows architecture and the large-file wizard work. The first is the Qt window's, and the second needs a C# progress dialog and two new engine exports.
+
+### Asked for, not built (2026-11-19)
+
+Three open `core-request` issues were on upstream. Two of the earlier seven are now cores: TheXTech for 608, and fheroes2 for 601's HoMM II part; 601 stays open for HoMM III.
+
+| Issue | Request |
+| --- | --- |
+| 604 | OpenGMK (GameMaker) |
+| 601 | Heroes of Might and Magic II and III (II is fheroes2; III remains) |
+| 592 | Unleashed Recompiled and Marathon Recompiled |
+
+The current CI: witness level A and the full frontend pass; published cores fails on the RPCS3 package's Unicode headers, which the #607 port fixes.
+
+### The 17 commits
+
+| Commit | Subject | Verdict |
+| --- | --- | --- |
+| 46d9b817 | feat(cores): a core may add windows of its own and hold its frame (#610) | skip (Qt) and hold (miniBox kit) |
+| c9b68913 | docs(readme): Dolphin lists Triforce among its systems (#606) | portable (roster and README) |
+| ad7c30ac | fix(cores): a core's window reaches a file only through Chimera's dialog (#610) | skip (Qt) |
+| e7ebf0c9 | feat(cores): Chimera has no tools of its own for a core (#610) | skip (Qt) |
+| e778d80d | fix(build): the Windows build's OpenAL takes only Windows's own sound backends | portable (build) |
+| faa98d77 | fix(cores): a core's save exported in windows reaches the zip whole (#610) | hold (miniBox kit) |
+| 4a2afeb2 | fix(cores): a core's window writes the file Chimera gave it (#610) | hold (miniBox kit) |
+| 07463056 | fix(cores): every core's windows link, whatever its code model (#610) | hold (miniBox kit) |
+| cc7fda63 | feat(input): a button's header may be any printable characters (#607) | engine candidate (fixes RPCS3) |
+| e5734a6e | feat(tastudio): a script sees a column's header, not only its mnemonic (#607) | skip (Qt) |
+| bf3fe228 | feat(new-project): a large file is read away from the window, with progress and Cancel (#611) | engine candidate and C# work |
+| f38820fc | feat(new-project): Cancel keeps the file, and a firmware scan reads large files away (#611) | skip (Qt) |
+| 9e5dae9a | fix(cores): a core's windows kit compiles in a C core built with -std=c11 (#610) | hold (miniBox kit) |
+| 49ecb065 | test(new-project): the large-file test makes its files right on Windows (#611) | skip (Qt test) |
+| e2b51565 | test(cores): a core window's refused pictures are checked on a Qt without its network module (#610) | skip (Qt test) |
+| 53341840 | fix(window): --measure with --play counts from when the machine starts | skip (Qt) |
+| 99adbca8 | feat(cores): fheroes2 and TheXTech join the official cores (#601, #608) | portable (roster) |

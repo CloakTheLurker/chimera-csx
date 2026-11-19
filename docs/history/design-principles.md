@@ -3644,7 +3644,11 @@ The two rows are upstream's own, field for field, and the roster is 74 cores; Do
 
 Measured here on 2026-11-19: the 1.2.0, 1.4.0 and 1.4.1 set files with these two x86_64 packages, 72 files, against the 74-row roster. The package, roster, mnemonic, language-table and theme contract tests ran 39 tests, 0 failed and 0 skipped. Alone, the two packages had left two of them inconclusive because the roster did not name them. Not proved: a game in either core, and a project made with them through the wizard; the cores' own repositories measure gameplay.
 
-The 74-package set is published in chimera-csx-cores as `1.4.4Cores`, ahead of the release it is named for, so both packages can be downloaded before 1.4.4 exists; `cores-1.4.4.json` indexes all 74, and every digest in it matched its file when it was published.
+The 74-package set is published in chimera-csx-cores ahead of its release, so both packages can be downloaded before that release exists. It was named for the version expected next, `1.4.4Cores`, and renamed `1.5.0Cores` - `cores-1.5.0.json` - when the release took the number 1.5.0; every digest in the index matched its file at both names.
+
+## 1.5.0 is a minor (user-decided, 2026-11-19)
+
+The batch since 1.4.3 adds what the frontend may ask of the engine - `ce_sha1_file_progress` and `ce_sha1_file_known` for a large file read with a Cancel, and `ce_session_greenzone_budget_now` - a File menu item that was not there (Import Project...), a new project input form and a project zip the reader takes, a seek that measures itself and can be stopped from its bar, and a miniBox bump. A minor bump is a major feature, which this is by more than one measure; the number is the owner's, and the tag is made by hand on the commit the batch ends at, as a minor's is.
 
 ## A large file is read away from New Project's window (2026-11-19, user-decided, upstream #611)
 

@@ -595,6 +595,54 @@ int main(int argc, char **argv)
 		}
 	}
 
+	// ---- a project zip (upstream since 2026-11-02): project.json, the input's
+	// lines in input.input, a branch's in branches/<n>.input ----
+	{
+		const std::string folder = g_dir + "/zip-src";
+		std::filesystem::create_directories(folder + "/branches");
+		writeFile("zip-src/project.json",
+			"{\"id\":\"fedcba9876543210\",\"core\":{\"name\":\"dosbox-x\",\"version\":\"v\",\"sha1\":\"\"},"
+			"\"files\":[],\"inputs\":{\"columns\":[[\"Reset\",\"Power\"],[\"P1 Up\",\"P1 Down\"]]},"
+			"\"branches\":[{\"name\":\"risky\",\"frame\":400,\"inputs\":{}}]}");
+		writeFile("zip-src/input.input", "|..|..|\n|.U|D.|\n");
+		writeFile("zip-src/branches/1.input", "|..|..|\n");
+		const std::string zip = g_dir + "/project.chimeraProject";
+		assert(ce_media_make(folder.c_str(), zip.c_str(), CE_MEDIA_ZIP_STORED, nullptr, nullptr) == 1);
+
+		ce_project *p = ce_project_open(zip.c_str(), &err);
+		assert(p != nullptr);
+		const std::string expected = "[Input]\nLogKey:#Reset|Power|#P1 Up|P1 Down|\n|..|..|\n|.U|D.|\n[/Input]\n";
+		uint64_t len = 0;
+		const char *log = ce_project_log_text(p, &len);
+		assert(std::string(log, len) == expected);
+		assert(ce_project_branch_count(p) == 1);
+		uint64_t branchLen = 0;
+		const char *branchLog = ce_project_branch_log_text(p, 0, &branchLen);
+		assert(std::string(branchLog, branchLen) == "[Input]\n|..|..|\n[/Input]\n");
+		/* saved as this build's one JSON file, and that reads back the same */
+		const std::string saved = g_dir + "/zip-saved.chimeraProject";
+		assert(ce_project_save(p, saved.c_str(), &err) == 0);
+		ce_project_free(p);
+		p = ce_project_open(saved.c_str(), &err);
+		assert(p != nullptr);
+		len = 0;
+		log = ce_project_log_text(p, &len);
+		assert(std::string(log, len) == expected);
+		branchLen = 0;
+		branchLog = ce_project_branch_log_text(p, 0, &branchLen);
+		assert(std::string(branchLog, branchLen) == "[Input]\n|..|..|\n[/Input]\n");
+		ce_project_free(p);
+
+		/* an entry a project zip does not have is refused, and named */
+		std::filesystem::create_directories(folder + "/extra");
+		writeFile("zip-src/extra/stray.txt", "x");
+		assert(ce_media_make(folder.c_str(), zip.c_str(), CE_MEDIA_ZIP_STORED, nullptr, nullptr) == 1);
+		err = nullptr;
+		assert(ce_project_open(zip.c_str(), &err) == nullptr);
+		assert(err != nullptr && std::strstr(err, "stray") != nullptr);
+		std::filesystem::remove_all(folder + "/extra");
+	}
+
 	std::printf("project: all assertions passed\n");
 	return 0;
 }

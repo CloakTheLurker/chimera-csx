@@ -147,7 +147,9 @@ The settings are changed in File > Project Settings (issue 370, user-decided 202
 
 Opening a project resolves its files in three steps, and only asks for what is left: beside the project file first, then where THIS machine last found them, then the file-resolution dialog. As each file is provided its SHA1 is checked and divergence is warned about immediately, in the dialog. A differing file NAME on disk is fine - the project's recorded name is the canonical label and mount name, the hash is the identity.
 
-A project's input is held as the movie's text block in one `"input"` string, and a build of upstream since 2026-10-28 writes it as `"inputs"` instead: the key's columns, each group a list of names, and the entries, a frame each. Both open here - the columns become the `LogKey:` line and the entries the lines after it, for the project and for each branch - and this window still writes the `"input"` string, which that build reads back too.
+A project's input is held as the movie's text block in one `"input"` string, and a build of upstream since 2026-10-28 writes it as `"inputs"` instead: the key's columns, each group a list of names, and the entries, a frame each. Since 2026-11-02 that build writes the project itself as a zip - `project.json`, the input's lines in `input.input`, and each branch's in `branches/<n>.input` - which this build reads and does not write. All of these open here: the columns become the `LogKey:` line and the entries the lines after it, for the project and for each branch. This window still writes the one-file, `"input"` form, which that build reads back too.
+
+**File > Import Project...** is the door for a project another build made: it reads the file whatever its form, writes a copy beside it in this build's form (never over the original, so the file stays what the build that made it expects), and opens the copy.
 
 ### Where this machine last found the files
 

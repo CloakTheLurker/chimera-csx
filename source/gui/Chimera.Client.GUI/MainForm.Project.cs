@@ -286,6 +286,53 @@ namespace Chimera.Client.GUI
 			if (chosen is not null) LoadProject(chosen);
 		}
 
+		/// <summary>
+		/// Brings in a project another build made: one holding its input as
+		/// "inputs" (upstream since 2026-10-28), or a project zip (since
+		/// 2026-11-02), which this build reads but does not write. The copy is
+		/// what opens, written beside the original and never over it, so the
+		/// file stays exactly as the build that made it expects to find it.
+		/// </summary>
+		private void ImportProjectDialog()
+		{
+			using OpenFilePicker dialog = new()
+			{
+				Filter = new FilesystemFilterSet(FilesystemFilter.TAStudioProjects).ToString(),
+				Title = "Import a Chimera Project",
+				InitialDirectory = MovieService.ProjectsOpenIn(Config.RecentProjects.MostRecent, Config.PathEntries.MovieAbsolutePath()),
+			};
+			if (dialog.ShowDialog(this) is not DialogResult.OK) return;
+			var source = dialog.FileName.WithoutWslgMirror();
+			string copy;
+			try
+			{
+				using var project = EngineProject.Open(source);
+				copy = ImportedProjectPath(source);
+				project.Save(copy);
+			}
+			catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+			{
+				ShowMessageBox(owner: null, ex.Message, "Cannot import the project");
+				return;
+			}
+			AddOnScreenMessage($"Imported {Path.GetFileName(source)} as {Path.GetFileName(copy)}");
+			LoadProject(copy);
+		}
+
+		/// <summary>Where an imported project goes: beside the original, under a name that is free.</summary>
+		private static string ImportedProjectPath(string source)
+		{
+			var folder = Path.GetDirectoryName(source) ?? "";
+			var stem = Path.GetFileNameWithoutExtension(source);
+			var plain = Path.Combine(folder, stem + ".chimeraProject");
+			if (!string.Equals(plain, source, StringComparison.OrdinalIgnoreCase) && !File.Exists(plain)) return plain;
+			for (var n = 1; ; n++)
+			{
+				var candidate = Path.Combine(folder, $"{stem} (imported{(n is 1 ? "" : " " + n)}).chimeraProject");
+				if (!File.Exists(candidate)) return candidate;
+			}
+		}
+
 		/// <param name="seed">the answers to open on instead of the last project's - what a movie made elsewhere dictates</param>
 		/// <returns>the created project, in memory and unwritten, or null when cancelled</returns>
 		private EngineProject RunNewProjectWizard(string startFrom = null, ProjectAnswers seed = null)

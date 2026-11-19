@@ -31,9 +31,12 @@
 #include <initializer_list>
 #include <cstring>
 #include <ctime>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
+
+#include "../../extern/miniz/miniz.h"
 
 #ifndef _WIN32
 #include <sys/random.h>
@@ -292,90 +295,202 @@ static std::string joinKey(const std::vector<std::vector<std::string>> &groups)
 	return key;
 }
 
-/* "inputs" back to the movie's text block: the columns as its LogKey and the
- * entries a frame each. Upstream writes this form since 2026-10-28 (a key
- * "columns" beside "entries", rather than one "input" string), and a project
- * made by such a build opens here as it does there; this one still writes the
- * "input" string, which that build reads. False, with why, for an "inputs"
- * that is not that. */
-static bool lumpOf(const cJSON *inputs, std::string &lump, std::string &why)
+/* "inputs" (and, from a project zip, the lines of its input.input) back to
+ * the movie's text block: the columns as its LogKey and the entries a frame
+ * each. Upstream writes the key this way since 2026-10-28, with the entries
+ * beside it and, since 2026-11-02, in a file of their own; both open here,
+ * and a project made by either build opens as it does there. This build yet
+ * writes the "input" string, which every build of the fork reads and which
+ * that build reads too. False, with why, for an "inputs" that is not that. */
+static bool lumpOf(const cJSON *inputs, const std::string &lines, std::string &lump, std::string &why)
 {
-	if (!cJSON_IsObject(inputs))
-	{
-		why = "is not an object";
-		return false;
-	}
-	if (const char *k = unknownKey(inputs, { "columns", "key", "entries" }))
-	{
-		why = std::string("has an unknown key \"") + k + "\"";
-		return false;
-	}
-	const cJSON *columns = cJSON_GetObjectItemCaseSensitive(inputs, "columns");
-	const cJSON *key = cJSON_GetObjectItemCaseSensitive(inputs, "key");
-	const cJSON *entries = cJSON_GetObjectItemCaseSensitive(inputs, "entries");
-	if (columns != nullptr && key != nullptr)
-	{
-		why = "has both \"columns\" and \"key\"";
-		return false;
-	}
+	lump.clear();
+	if (inputs == nullptr && lines.empty()) return true;
 	lump = "[Input]\n";
-	if (columns != nullptr)
+	if (inputs != nullptr)
 	{
-		std::vector<std::vector<std::string>> groups;
-		if (!cJSON_IsArray(columns))
+		if (!cJSON_IsObject(inputs))
 		{
-			why = "\"columns\" is not a list of groups";
+			why = "is not an object";
 			return false;
 		}
-		for (const cJSON *g = columns->child; g != nullptr; g = g->next)
+		if (const char *k = unknownKey(inputs, { "columns", "key", "entries" }))
 		{
-			if (!cJSON_IsArray(g))
+			why = std::string("has an unknown key \"") + k + "\"";
+			return false;
+		}
+		const cJSON *columns = cJSON_GetObjectItemCaseSensitive(inputs, "columns");
+		const cJSON *key = cJSON_GetObjectItemCaseSensitive(inputs, "key");
+		const cJSON *entries = cJSON_GetObjectItemCaseSensitive(inputs, "entries");
+		if (columns != nullptr && key != nullptr)
+		{
+			why = "has both \"columns\" and \"key\"";
+			return false;
+		}
+		if (columns != nullptr)
+		{
+			std::vector<std::vector<std::string>> groups;
+			if (!cJSON_IsArray(columns))
 			{
-				why = "\"columns\" holds a group that is not a list of names";
+				why = "\"columns\" is not a list of groups";
 				return false;
 			}
-			groups.emplace_back();
-			for (const cJSON *n = g->child; n != nullptr; n = n->next)
+			for (const cJSON *g = columns->child; g != nullptr; g = g->next)
 			{
-				if (!cJSON_IsString(n))
+				if (!cJSON_IsArray(g))
 				{
-					why = "\"columns\" holds a name that is not a string";
+					why = "\"columns\" holds a group that is not a list of names";
 					return false;
 				}
-				groups.back().push_back(n->valuestring);
+				groups.emplace_back();
+				for (const cJSON *n = g->child; n != nullptr; n = n->next)
+				{
+					if (!cJSON_IsString(n))
+					{
+						why = "\"columns\" holds a name that is not a string";
+						return false;
+					}
+					groups.back().push_back(n->valuestring);
+				}
 			}
+			lump += "LogKey:" + joinKey(groups) + "\n";
 		}
-		lump += "LogKey:" + joinKey(groups) + "\n";
-	}
-	else if (key != nullptr)
-	{
-		if (!cJSON_IsString(key))
+		else if (key != nullptr)
 		{
-			why = "\"key\" is not a string";
-			return false;
-		}
-		lump += std::string("LogKey:") + key->valuestring + "\n";
-	}
-	if (entries != nullptr)
-	{
-		if (!cJSON_IsArray(entries))
-		{
-			why = "\"entries\" is not a list";
-			return false;
-		}
-		for (const cJSON *e = entries->child; e != nullptr; e = e->next)
-		{
-			/* a line that is not an entry would be dropped when the movie is read */
-			if (!cJSON_IsString(e) || e->valuestring[0] != '|' || std::strchr(e->valuestring, '\n') != nullptr)
+			if (!cJSON_IsString(key))
 			{
-				why = "\"entries\" holds one that is not a frame's input (\"|...|\")";
+				why = "\"key\" is not a string";
 				return false;
 			}
-			lump += std::string(e->valuestring) + "\n";
+			lump += std::string("LogKey:") + key->valuestring + "\n";
 		}
+		if (entries != nullptr)
+		{
+			if (!lines.empty())
+			{
+				why = "holds entries beside a project zip's input file";
+				return false;
+			}
+			if (!cJSON_IsArray(entries))
+			{
+				why = "\"entries\" is not a list";
+				return false;
+			}
+			for (const cJSON *e = entries->child; e != nullptr; e = e->next)
+			{
+				/* a line that is not an entry would be dropped when the movie is read */
+				if (!cJSON_IsString(e) || e->valuestring[0] != '|' || std::strchr(e->valuestring, '\n') != nullptr)
+				{
+					why = "\"entries\" holds one that is not a frame's input (\"|...|\")";
+					return false;
+				}
+				lump += std::string(e->valuestring) + "\n";
+			}
+			lump += "[/Input]\n";
+			return true;
+		}
+	}
+	/* a line each, as Copy writes them; a line ended by "\r\n" (a file kept on
+	 * Windows) is the same line */
+	size_t at = 0;
+	int64_t number = 0;
+	while (at < lines.size())
+	{
+		size_t end = lines.find('\n', at);
+		if (end == std::string::npos) end = lines.size();
+		std::string line = lines.substr(at, end - at);
+		at = end + 1;
+		number++;
+		if (!line.empty() && line.back() == '\r') line.pop_back();
+		if (line.empty() || line[0] != '|')
+		{
+			why = "has a line that is not a frame's input (\"|...|\"), number " + std::to_string(number);
+			return false;
+		}
+		lump += line + "\n";
 	}
 	lump += "[/Input]\n";
 	return true;
+}
+
+/* The parts of a project as a project zip holds them (upstream, 2026-11-02):
+ * project.json, the input's lines in input.input, and each branch's in
+ * branches/<n>.input, numbered from 1 in the branches' order. A project this
+ * build writes is one JSON file, and only its json is set. */
+struct Parts
+{
+	std::string json, input;
+	std::map<int, std::string> branches;
+};
+
+/* a branch's .input file by its number, or -1 for a name that is not one */
+static int branchInputNumber(const std::string &name)
+{
+	static const std::string head = "branches/", tail = ".input";
+	if (name.size() <= head.size() + tail.size() || name.compare(0, head.size(), head) != 0
+		|| name.compare(name.size() - tail.size(), tail.size(), tail) != 0)
+		return -1;
+	const std::string digits = name.substr(head.size(), name.size() - head.size() - tail.size());
+	if (digits.empty() || digits.size() > 6 || digits[0] == '0') return -1;
+	for (char c : digits)
+		if (c < '0' || c > '9') return -1;
+	return std::stoi(digits);
+}
+
+/* The parts of a project file: the JSON this build writes, or the zip upstream
+ * has written since 2026-11-02. False, with why, for one that is neither. */
+static bool partsOf(const std::vector<uint8_t> &raw, Parts &parts, std::string &why)
+{
+	size_t first = raw.size() >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF ? 3 : 0;
+	while (first < raw.size() && std::isspace(raw[first])) first++;
+	if (first < raw.size() && raw[first] == '{')
+	{
+		parts.json.assign(reinterpret_cast<const char *>(raw.data()), raw.size());
+		return true;
+	}
+	mz_zip_archive zip{};
+	if (mz_zip_reader_init_mem(&zip, raw.data(), raw.size(), 0) == MZ_FALSE)
+	{
+		why = "the project is not JSON and not a project zip";
+		return false;
+	}
+	bool haveJson = false;
+	const mz_uint count = mz_zip_reader_get_num_files(&zip);
+	for (mz_uint i = 0; i < count && why.empty(); i++)
+	{
+		if (mz_zip_reader_is_file_a_directory(&zip, i)) continue;
+		char nameBuf[512] = {};
+		mz_zip_reader_get_filename(&zip, i, nameBuf, sizeof nameBuf);
+		const std::string name = nameBuf;
+		std::string *into = nullptr;
+		if (name == "project.json")
+		{
+			into = &parts.json;
+			haveJson = true;
+		}
+		else if (name == "input.input") into = &parts.input;
+		else if (const int n = branchInputNumber(name); n > 0) into = &parts.branches[n];
+		else
+		{
+			why = "unknown entry \"" + name + "\" in the project zip";
+			break;
+		}
+		/* a part of a gigabyte or more is no project's */
+		mz_zip_archive_file_stat stat{};
+		size_t len = 0;
+		void *data = mz_zip_reader_file_stat(&zip, i, &stat) == MZ_TRUE && stat.m_uncomp_size < (uint64_t{1} << 30)
+			? mz_zip_reader_extract_to_heap(&zip, i, &len, 0) : nullptr;
+		if (data == nullptr)
+		{
+			why = "the project zip's \"" + name + "\" could not be read";
+			break;
+		}
+		into->assign(static_cast<const char *>(data), len);
+		mz_free(data);
+	}
+	mz_zip_reader_end(&zip);
+	if (why.empty() && !haveJson) why = "the project zip has no project.json";
+	return why.empty();
 }
 
 static ce_project *openProject(const char *path, const char **error_out)
@@ -388,7 +503,15 @@ static ce_project *openProject(const char *path, const char **error_out)
 		fail(std::string("cannot read ") + path, error_out);
 		return nullptr;
 	}
-	cJSON *root = cJSON_ParseWithLength(reinterpret_cast<const char *>(raw.data()), raw.size());
+	/* one JSON file, or the zip upstream writes: project.json with the input
+	 * in input.input, a branch's in branches/<n>.input */
+	Parts parts;
+	if (std::string why; !partsOf(raw, parts, why))
+	{
+		fail(why, error_out);
+		return nullptr;
+	}
+	cJSON *root = cJSON_ParseWithLength(parts.json.data(), parts.json.size());
 	if (root == nullptr)
 	{
 		fail("the project is not valid JSON", error_out);
@@ -545,14 +668,22 @@ static ce_project *openProject(const char *path, const char **error_out)
 		{
 			return rejectP("the project has both \"input\" and \"inputs\"");
 		}
+		if (!parts.input.empty()) return rejectP("the project has both \"input\" and an input.input file");
 		if (!cJSON_IsString(j)) return rejectP("\"input\" is not a string");
 		p->log = j->valuestring;
 	}
-	/* "inputs", the form upstream writes since 2026-10-28 (see lumpOf) */
+	/* "inputs", the form upstream writes since 2026-10-28 (see lumpOf); in a
+	 * project zip its entries are the input.input file */
 	if ((j = cJSON_GetObjectItemCaseSensitive(root, "inputs")) != nullptr)
 	{
 		std::string why;
-		if (!lumpOf(j, p->log, why)) return rejectP("\"inputs\" " + why);
+		if (!lumpOf(j, parts.input, p->log, why)) return rejectP("\"inputs\" " + why);
+	}
+	else if (!parts.input.empty())
+	{
+		/* a movie that names no key: its lines alone */
+		std::string why;
+		if (!lumpOf(nullptr, parts.input, p->log, why)) return rejectP("input.input " + why);
 	}
 	if ((j = cJSON_GetObjectItemCaseSensitive(root, "markers")) != nullptr)
 	{
@@ -594,7 +725,8 @@ static ce_project *openProject(const char *path, const char **error_out)
 	if ((j = cJSON_GetObjectItemCaseSensitive(root, "branches")) != nullptr)
 	{
 		if (!cJSON_IsArray(j)) return rejectP("\"branches\" is not an array");
-		for (cJSON *item = j->child; item != nullptr; item = item->next)
+		int branchIndex = 0;
+		for (cJSON *item = j->child; item != nullptr; item = item->next, branchIndex++)
 		{
 			if (const char *k = unknownKey(item, { "name", "frame", "input", "inputs", "time", "markers", "userdata" })) return rejectP(std::string("unknown key \"") + k + "\" in a branch");
 			cJSON *name = cJSON_GetObjectItemCaseSensitive(item, "name");
@@ -612,8 +744,19 @@ static ce_project *openProject(const char *path, const char **error_out)
 			Branch b;
 			b.name = name->valuestring;
 			b.frame = static_cast<int64_t>(frame->valuedouble);
-			if (input != nullptr) b.log = input->valuestring;
-			else if (std::string why; !lumpOf(inputs, b.log, why)) return rejectP("a branch's \"inputs\" " + why);
+			/* a project zip keeps this branch's lines in branches/<n>.input,
+			 * numbered from 1 in the branches' order */
+			std::string branchLines;
+			if (const auto at = parts.branches.find(branchIndex + 1); at != parts.branches.end()) branchLines = at->second;
+			if (input != nullptr)
+			{
+				if (!branchLines.empty()) return rejectP("a branch has both \"input\" and a branches/*.input of its own");
+				b.log = input->valuestring;
+			}
+			else if (std::string why; !lumpOf(inputs, branchLines, b.log, why))
+			{
+				return rejectP("a branch's \"inputs\" " + why);
+			}
 			if (time != nullptr)
 			{
 				if (!cJSON_IsString(time)) return rejectP("a branch's \"time\" is not a string");
@@ -652,6 +795,10 @@ static ce_project *openProject(const char *path, const char **error_out)
 			}
 			p->branches.push_back(std::move(b));
 		}
+	}
+	if (!parts.branches.empty() && parts.branches.size() != p->branches.size())
+	{
+		return rejectP("the project zip holds an input file for a branch it does not have");
 	}
 	if ((j = cJSON_GetObjectItemCaseSensitive(root, "subtitles")) != nullptr)
 	{

@@ -1,4 +1,4 @@
-﻿using Chimera.WinForms.Controls;
+using Chimera.WinForms.Controls;
 
 namespace Chimera.Client.GUI
 {
@@ -22,6 +22,7 @@ namespace Chimera.Client.GUI
 			this.FileSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.NewProjectMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.OpenProjectMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.ImportProjectMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.RecentProjectSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator3 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.CloseRomMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -197,6 +198,7 @@ namespace Chimera.Client.GUI
 			this.FileSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.NewProjectMenuItem,
             this.OpenProjectMenuItem,
+            this.ImportProjectMenuItem,
             this.RecentProjectSubMenu,
             this.SaveProjectMenuItem,
             this.SaveProjectAsMenuItem,
@@ -220,6 +222,11 @@ namespace Chimera.Client.GUI
 			//
 			this.OpenProjectMenuItem.Text = "&Open Project...";
 			this.OpenProjectMenuItem.Click += new System.EventHandler(this.OpenProjectMenuItem_Click);
+			//
+			// ImportProjectMenuItem
+			//
+			this.ImportProjectMenuItem.Text = "&Import Project...";
+			this.ImportProjectMenuItem.Click += new System.EventHandler(this.ImportProjectMenuItem_Click);
 			// 
 			// RecentProjectSubMenu
 			// 
@@ -1161,6 +1168,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx FileSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx NewProjectMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx OpenProjectMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx ImportProjectMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripMenuItem1;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ExitMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SystemSubMenu;

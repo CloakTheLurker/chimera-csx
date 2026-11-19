@@ -60,6 +60,9 @@ namespace Chimera.Client.GUI
 		private void OpenProjectMenuItem_Click(object sender, EventArgs e)
 			=> OpenProjectDialog();
 
+		private void ImportProjectMenuItem_Click(object sender, EventArgs e)
+			=> ImportProjectDialog();
+
 		private void RecentProjectSubMenu_DropDownOpened(object sender, EventArgs e)
 			=> RecentProjectSubMenu.ReplaceDropDownItems(Config.RecentProjects.RecentMenu(this, path => LoadProject(path), "Project", noAutoload: true));
 

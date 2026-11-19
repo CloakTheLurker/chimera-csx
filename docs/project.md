@@ -147,6 +147,8 @@ The settings are changed in File > Project Settings (issue 370, user-decided 202
 
 Opening a project resolves its files in three steps, and only asks for what is left: beside the project file first, then where THIS machine last found them, then the file-resolution dialog. As each file is provided its SHA1 is checked and divergence is warned about immediately, in the dialog. A differing file NAME on disk is fine - the project's recorded name is the canonical label and mount name, the hash is the identity.
 
+A project's input is held as the movie's text block in one `"input"` string, and a build of upstream since 2026-10-28 writes it as `"inputs"` instead: the key's columns, each group a list of names, and the entries, a frame each. Both open here - the columns become the `LogKey:` line and the entries the lines after it, for the project and for each branch - and this window still writes the `"input"` string, which that build reads back too.
+
 ### Where this machine last found the files
 
 The project carries names and hashes and never a path, because it is meant to be handed to someone else and a path is true of one machine only. But the machine that made it knows where those files are, and asking it again every time you open your own work is friction for nothing.

@@ -281,6 +281,103 @@ ce_project *ce_project_new(void)
 
 void ce_project_free(ce_project *p) { delete p; }
 
+static std::string joinKey(const std::vector<std::vector<std::string>> &groups)
+{
+	std::string key;
+	for (const auto &g : groups)
+	{
+		key += '#';
+		for (const std::string &name : g) key += name + "|";
+	}
+	return key;
+}
+
+/* "inputs" back to the movie's text block: the columns as its LogKey and the
+ * entries a frame each. Upstream writes this form since 2026-10-28 (a key
+ * "columns" beside "entries", rather than one "input" string), and a project
+ * made by such a build opens here as it does there; this one still writes the
+ * "input" string, which that build reads. False, with why, for an "inputs"
+ * that is not that. */
+static bool lumpOf(const cJSON *inputs, std::string &lump, std::string &why)
+{
+	if (!cJSON_IsObject(inputs))
+	{
+		why = "is not an object";
+		return false;
+	}
+	if (const char *k = unknownKey(inputs, { "columns", "key", "entries" }))
+	{
+		why = std::string("has an unknown key \"") + k + "\"";
+		return false;
+	}
+	const cJSON *columns = cJSON_GetObjectItemCaseSensitive(inputs, "columns");
+	const cJSON *key = cJSON_GetObjectItemCaseSensitive(inputs, "key");
+	const cJSON *entries = cJSON_GetObjectItemCaseSensitive(inputs, "entries");
+	if (columns != nullptr && key != nullptr)
+	{
+		why = "has both \"columns\" and \"key\"";
+		return false;
+	}
+	lump = "[Input]\n";
+	if (columns != nullptr)
+	{
+		std::vector<std::vector<std::string>> groups;
+		if (!cJSON_IsArray(columns))
+		{
+			why = "\"columns\" is not a list of groups";
+			return false;
+		}
+		for (const cJSON *g = columns->child; g != nullptr; g = g->next)
+		{
+			if (!cJSON_IsArray(g))
+			{
+				why = "\"columns\" holds a group that is not a list of names";
+				return false;
+			}
+			groups.emplace_back();
+			for (const cJSON *n = g->child; n != nullptr; n = n->next)
+			{
+				if (!cJSON_IsString(n))
+				{
+					why = "\"columns\" holds a name that is not a string";
+					return false;
+				}
+				groups.back().push_back(n->valuestring);
+			}
+		}
+		lump += "LogKey:" + joinKey(groups) + "\n";
+	}
+	else if (key != nullptr)
+	{
+		if (!cJSON_IsString(key))
+		{
+			why = "\"key\" is not a string";
+			return false;
+		}
+		lump += std::string("LogKey:") + key->valuestring + "\n";
+	}
+	if (entries != nullptr)
+	{
+		if (!cJSON_IsArray(entries))
+		{
+			why = "\"entries\" is not a list";
+			return false;
+		}
+		for (const cJSON *e = entries->child; e != nullptr; e = e->next)
+		{
+			/* a line that is not an entry would be dropped when the movie is read */
+			if (!cJSON_IsString(e) || e->valuestring[0] != '|' || std::strchr(e->valuestring, '\n') != nullptr)
+			{
+				why = "\"entries\" holds one that is not a frame's input (\"|...|\")";
+				return false;
+			}
+			lump += std::string(e->valuestring) + "\n";
+		}
+	}
+	lump += "[/Input]\n";
+	return true;
+}
+
 static ce_project *openProject(const char *path, const char **error_out)
 {
 	if (error_out != nullptr) *error_out = nullptr;
@@ -314,7 +411,7 @@ static ce_project *openProject(const char *path, const char **error_out)
 	/* the format is strict: a key this build does not know is an error, not
 	 * something to drop silently on the next save */
 	static const char *known[] = { "id", "title", "description", "core", "rerecords", "clockStart",
-		"files", "settings", "firmware", "coreCache", "input", "markers", "branches", "subtitles",
+		"files", "settings", "firmware", "coreCache", "input", "inputs", "markers", "branches", "subtitles",
 		"headers", "tastudio" };
 	for (cJSON *item = root->child; item != nullptr; item = item->next)
 	{
@@ -444,8 +541,18 @@ static ce_project *openProject(const char *path, const char **error_out)
 	}
 	if ((j = cJSON_GetObjectItemCaseSensitive(root, "input")) != nullptr)
 	{
+		if (cJSON_GetObjectItemCaseSensitive(root, "inputs") != nullptr)
+		{
+			return rejectP("the project has both \"input\" and \"inputs\"");
+		}
 		if (!cJSON_IsString(j)) return rejectP("\"input\" is not a string");
 		p->log = j->valuestring;
+	}
+	/* "inputs", the form upstream writes since 2026-10-28 (see lumpOf) */
+	if ((j = cJSON_GetObjectItemCaseSensitive(root, "inputs")) != nullptr)
+	{
+		std::string why;
+		if (!lumpOf(j, p->log, why)) return rejectP("\"inputs\" " + why);
 	}
 	if ((j = cJSON_GetObjectItemCaseSensitive(root, "markers")) != nullptr)
 	{
@@ -489,21 +596,24 @@ static ce_project *openProject(const char *path, const char **error_out)
 		if (!cJSON_IsArray(j)) return rejectP("\"branches\" is not an array");
 		for (cJSON *item = j->child; item != nullptr; item = item->next)
 		{
-			if (const char *k = unknownKey(item, { "name", "frame", "input", "time", "markers", "userdata" })) return rejectP(std::string("unknown key \"") + k + "\" in a branch");
+			if (const char *k = unknownKey(item, { "name", "frame", "input", "inputs", "time", "markers", "userdata" })) return rejectP(std::string("unknown key \"") + k + "\" in a branch");
 			cJSON *name = cJSON_GetObjectItemCaseSensitive(item, "name");
 			cJSON *frame = cJSON_GetObjectItemCaseSensitive(item, "frame");
 			cJSON *input = cJSON_GetObjectItemCaseSensitive(item, "input");
+			cJSON *inputs = cJSON_GetObjectItemCaseSensitive(item, "inputs");
 			cJSON *time = cJSON_GetObjectItemCaseSensitive(item, "time");
 			cJSON *markers = cJSON_GetObjectItemCaseSensitive(item, "markers");
 			cJSON *userdata = cJSON_GetObjectItemCaseSensitive(item, "userdata");
-			if (!cJSON_IsString(name) || !cJSON_IsNumber(frame) || !cJSON_IsString(input))
+			if (!cJSON_IsString(name) || !cJSON_IsNumber(frame) || (input == nullptr) == (inputs == nullptr)
+				|| (input != nullptr && !cJSON_IsString(input)))
 			{
-				return rejectP("every branch needs string \"name\", number \"frame\" and string \"input\"");
+				return rejectP("every branch needs string \"name\", number \"frame\" and its \"input\" (or \"inputs\")");
 			}
 			Branch b;
 			b.name = name->valuestring;
 			b.frame = static_cast<int64_t>(frame->valuedouble);
-			b.log = input->valuestring;
+			if (input != nullptr) b.log = input->valuestring;
+			else if (std::string why; !lumpOf(inputs, b.log, why)) return rejectP("a branch's \"inputs\" " + why);
 			if (time != nullptr)
 			{
 				if (!cJSON_IsString(time)) return rejectP("a branch's \"time\" is not a string");

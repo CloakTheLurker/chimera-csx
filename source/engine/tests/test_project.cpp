@@ -542,6 +542,59 @@ int main(int argc, char **argv)
 		std::remove(cpath.c_str());
 	}
 
+	// ---- "inputs": the input as columns and entries, the form upstream has
+	// written since 2026-10-28, opens as the text block it stands for, and is
+	// saved back as the one string every build reads ----
+	{
+		const std::string inPath = g_dir + "/inputs.chimeraProject";
+		writeFile("inputs.chimeraProject",
+			"{\"id\":\"0123456789abcdef\",\"core\":{\"name\":\"dosbox-x\",\"version\":\"v\",\"sha1\":\"\"},"
+			"\"files\":[],\"inputs\":{\"columns\":[[\"Reset\",\"Power\"],[\"P1 Up\",\"P1 Down\"]],"
+			"\"entries\":[\"|..|..|\",\"|.U|D.|\"]},"
+			"\"branches\":[{\"name\":\"risky\",\"frame\":400,\"inputs\":{\"entries\":[\"|..|..|\"]}}]}");
+		ce_project *p = ce_project_open(inPath.c_str(), &err);
+		assert(p != nullptr);
+		const std::string expected = "[Input]\nLogKey:#Reset|Power|#P1 Up|P1 Down|\n|..|..|\n|.U|D.|\n[/Input]\n";
+		uint64_t len = 0;
+		const char *log = ce_project_log_text(p, &len);
+		assert(std::string(log, len) == expected);
+		assert(ce_project_branch_count(p) == 1);
+		uint64_t branchLen = 0;
+		const char *branchLog = ce_project_branch_log_text(p, 0, &branchLen);
+		assert(std::string(branchLog, branchLen) == "[Input]\n|..|..|\n[/Input]\n");
+		assert(ce_project_save(p, inPath.c_str(), &err) == 0);
+		ce_project_free(p);
+		p = ce_project_open(inPath.c_str(), &err);
+		assert(p != nullptr);
+		len = 0;
+		log = ce_project_log_text(p, &len);
+		assert(std::string(log, len) == expected);
+		ce_project_free(p);
+
+		/* a whole "key", for a name the split cannot hold */
+		writeFile("inputs-key.chimeraProject", "{\"inputs\":{\"key\":\"#A|B|\",\"entries\":[]}}");
+		p = ce_project_open((g_dir + "/inputs-key.chimeraProject").c_str(), &err);
+		assert(p != nullptr);
+		len = 0;
+		log = ce_project_log_text(p, &len);
+		assert(std::string(log, len) == "[Input]\nLogKey:#A|B|\n[/Input]\n");
+		ce_project_free(p);
+
+		/* and what is not this form is refused, as every other bad key is */
+		for (const char *bad : {
+			"{\"input\":\"[Input]\\n[/Input]\\n\",\"inputs\":{\"entries\":[]}}",
+			"{\"inputs\":{\"entries\":[\"not an entry\"]}}",
+			"{\"inputs\":{\"columns\":[[\"A\"]],\"key\":\"#A|\"}}",
+			"{\"inputs\":{\"entries\":[],\"extra\":1}}",
+			"{\"branches\":[{\"name\":\"b\",\"frame\":1,\"input\":\"[Input]\\n[/Input]\\n\",\"inputs\":{\"entries\":[]}}]}" })
+		{
+			writeFile("inputs-bad.chimeraProject", bad);
+			err = nullptr;
+			assert(ce_project_open((g_dir + "/inputs-bad.chimeraProject").c_str(), &err) == nullptr);
+			assert(err != nullptr && std::strstr(err, "input") != nullptr);
+		}
+	}
+
 	std::printf("project: all assertions passed\n");
 	return 0;
 }

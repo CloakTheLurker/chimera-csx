@@ -979,6 +979,13 @@ namespace Chimera.Client.GUI
 				}
 			}
 
+			// A project does not carry the movie's game hash - it pins its files
+			// instead, and they were resolved and checked before this boot - so the
+			// movie takes the hash of the game that booted. Without it, opening a
+			// project that has input said "Movie is missing hash, skipping hash
+			// check", which for a project is not true of anything the person did.
+			if (string.IsNullOrEmpty(tasMovie.Hash) && !string.IsNullOrEmpty(Game.Hash)) tasMovie.Hash = Game.Hash;
+
 			// what this project was built from, for the next wizard to open on -
 			// taken here rather than at the wizard, so opening a project remembers
 			// its answers as much as making one does

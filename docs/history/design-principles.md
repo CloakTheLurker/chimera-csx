@@ -3646,6 +3646,12 @@ Measured here on 2026-11-19: the 1.2.0, 1.4.0 and 1.4.1 set files with these two
 
 The 74-package set is published in chimera-csx-cores ahead of its release, so both packages can be downloaded before that release exists. It was named for the version expected next, `1.4.4Cores`, and renamed `1.5.0Cores` - `cores-1.5.0.json` - when the release took the number 1.5.0; every digest in the index matched its file at both names.
 
+## A project's movie takes the game's hash (2026-11-19, user-reported)
+
+Importing a movie, and every project opened after its first boot, said "Movie is missing hash, skipping hash check". A project does not store the movie's game hash - it pins its files instead - and the hash was filled only on a project's first boot, so any later open found the movie with none and warned about it. The movie now takes the hash of the game that booted on every open, and a project no longer says that warning at all: its files were resolved and pinned before the boot, so a movie that names no hash is nothing to warn about there. A movie opened on its own still says it, which is where it means something.
+
+Measured: the interface suite is 127 / 72 / 653 / 390 with none failed. Two runs of the same suite reported one failure in the client-common tests under parallel load, and the same suite passed when run alone; it is not this change. Not proved: the warning's absence itself - no test reads the window's on-screen messages, so what is shown here is the condition the code tests, and the suite.
+
 ## 1.5.0 is a minor (user-decided, 2026-11-19)
 
 The batch since 1.4.3 adds what the frontend may ask of the engine - `ce_sha1_file_progress` and `ce_sha1_file_known` for a large file read with a Cancel, and `ce_session_greenzone_budget_now` - a File menu item that was not there (Import Project...), a new project input form and a project zip the reader takes, a seek that measures itself and can be stopped from its bar, and a miniBox bump. A minor bump is a major feature, which this is by more than one measure; the number is the owner's, and the tag is made by hand on the commit the batch ends at, as a minor's is.

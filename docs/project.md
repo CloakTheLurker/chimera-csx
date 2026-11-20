@@ -167,6 +167,8 @@ Core pin mismatch (the pinned build is not installed, and another build of the c
 
 Build skew (issue #115): once the core is running, the date this Chimera was built on is held against the date the core package says it was built on (`versionDate`, issue #67). More than a fortnight apart and an on-screen message names both dates, both builds and what to do. It is a heuristic and nothing more: it never refuses, never asks, and says nothing at all when either side does not date itself. What actually decides whether a state can be read is the savestate format number, checked state by state in the engine (docs/state-manager.md).
 
+The movie a project opens as takes its game hash from the game that booted - the project itself pins files, not a hash - so a project never says a movie has none, while a movie opened on its own still does.
+
 Opening boots the machine EXACTLY ONCE. The movie (which is the project) is queued before the rom load, so the single boot already runs with the project's core and its recorded settings - never a throwaway boot on config settings followed by a reboot, and never a re-init when TAStudio engages (the BizHawk lineage cost three full core inits: rom load, TAStudio open, tasproj load - seconds each on a machine with a 2GB hard disk image). The witness gate's P leg counts the boots and checks a project-recorded setting is live in the guest. Headless runs skip the TAStudio landing (it opens paused, and nobody is there to operate it): they just play the project.
 
 ## Saving

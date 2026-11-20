@@ -92,7 +92,10 @@ namespace Chimera.Client.GUI
 			// turns out this was too late for .chimeraProject autoloading and restoring playback position (loads savestate but wasn't checking game match)
 			if (string.IsNullOrEmpty(MovieSession.Movie.Hash))
 			{
-				AddOnScreenMessage("Movie is missing hash, skipping hash check");
+				// a project's files were resolved and pinned before this boot, so a
+				// movie that names no game hash is nothing to warn about there; a
+				// movie opened on its own still is
+				if (_openProject is null) AddOnScreenMessage("Movie is missing hash, skipping hash check");
 			}
 			else if (MovieSession.Movie.Hash != Game.Hash)
 			{

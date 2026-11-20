@@ -3650,7 +3650,9 @@ The 74-package set is published in chimera-csx-cores ahead of its release, so bo
 
 Importing a movie, and every project opened after its first boot, said "Movie is missing hash, skipping hash check". A project does not store the movie's game hash - it pins its files instead - and the hash was filled only on a project's first boot, so any later open found the movie with none and warned about it. The movie now takes the hash of the game that booted on every open, and a project no longer says that warning at all: its files were resolved and pinned before the boot, so a movie that names no hash is nothing to warn about there. A movie opened on its own still says it, which is where it means something.
 
-Measured: the interface suite is 127 / 72 / 653 / 390 with none failed. Two runs of the same suite reported one failure in the client-common tests under parallel load, and the same suite passed when run alone; it is not this change. Not proved: the warning's absence itself - no test reads the window's on-screen messages, so what is shown here is the condition the code tests, and the suite.
+Writing the hash marks the movie changed, so the first attempt made a project open dirty: the status strip said there was unsaved work, the close said the same, and two witness legs and the reopen leg failed on it. The hash is written and the changed flag put back when the project opened clean; work recovered from a crash keeps its flag, because that is unsaved.
+
+Measured: the interface suite is 127 / 72 / 653 / 390 with none failed. Two runs of the same suite reported one failure in the client-common tests under parallel load, and the same suite passed when run alone; it is not this change. Level B of the witness, which drives the window, is 29 of 29 with the fix and 3 legs failing without it - the two MCP window legs (the status said there was unsaved work) and the reopen leg. Not proved: the warning's absence itself - no test reads the window's on-screen messages, so what is shown here is the condition the code tests, the suite, and the witness.
 
 ## 1.5.0 is a minor (user-decided, 2026-11-19)
 

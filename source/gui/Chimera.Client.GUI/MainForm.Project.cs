@@ -984,7 +984,16 @@ namespace Chimera.Client.GUI
 			// movie takes the hash of the game that booted. Without it, opening a
 			// project that has input said "Movie is missing hash, skipping hash
 			// check", which for a project is not true of anything the person did.
-			if (string.IsNullOrEmpty(tasMovie.Hash) && !string.IsNullOrEmpty(Game.Hash)) tasMovie.Hash = Game.Hash;
+			//
+			// Writing it marks the movie changed, and a project opens clean: the
+			// status strip and the close read that flag, so it is put back. Work
+			// recovered from a crash is left as found - that IS unsaved.
+			if (string.IsNullOrEmpty(tasMovie.Hash) && !string.IsNullOrEmpty(Game.Hash))
+			{
+				var wasChanged = tasMovie.Changes;
+				tasMovie.Hash = Game.Hash;
+				if (!wasChanged) tasMovie.ClearChanges();
+			}
 
 			// what this project was built from, for the next wizard to open on -
 			// taken here rather than at the wizard, so opening a project remembers

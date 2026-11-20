@@ -122,6 +122,10 @@ One game each, run from the game's own files ([docs/game-cores.md](docs/game-cor
 
 SRB2 (Sonic Robo Blast 2) is published by its author, P-AS, from [their own repository](https://github.com/P-AS/chimera-core-srb2), so it is not in the official roster.
 
+## Documentation
+
+Help > Open Documentation shows this repository's documents inside the window - the project format, the Core Manager, the game cores, the compile cache and the rest - so they are at hand without the repository.
+
 ## Getting a build
 
 The frontend is built for Linux and Windows and published here:

@@ -60,6 +60,9 @@ namespace Chimera.Client.GUI
 		private void OpenProjectMenuItem_Click(object sender, EventArgs e)
 			=> OpenProjectDialog();
 
+		private void DocumentationMenuItem_Click(object sender, EventArgs e)
+			=> new DocumentationForm().Show(this);
+
 		private void ImportProjectMenuItem_Click(object sender, EventArgs e)
 			=> ImportProjectDialog();
 

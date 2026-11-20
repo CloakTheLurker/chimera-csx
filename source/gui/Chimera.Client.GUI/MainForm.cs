@@ -1162,6 +1162,8 @@ namespace Chimera.Client.GUI
 		{
 #pragma warning disable CS0618 // this is the sanctioned call-site
 			OSD.AddMessage(message, duration);
+			// the log window keeps the same line: what the screen said is what the log says
+			Tools?.OpenLogWindow?.Append(message);
 #pragma warning restore CS0618
 			if (!this.SafeScreenReaderAnnounce(message)) Util.DebugWriteLine($"{nameof(AddOnScreenMessage)}: {nameof(AccessibleObject.RaiseAutomationNotification)} failed");
 		}

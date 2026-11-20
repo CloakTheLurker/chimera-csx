@@ -130,6 +130,7 @@ namespace Chimera.Client.GUI
 			this.HelpSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ShowTAStudioMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.OnlineHelpMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.DocumentationMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.CopyVersionInfoMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ReportIssueMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.AboutMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -847,6 +848,7 @@ namespace Chimera.Client.GUI
 			// HelpSubMenu
 			// 
 			this.HelpSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.DocumentationMenuItem,
             this.OnlineHelpMenuItem,
             this.CopyVersionInfoMenuItem,
             this.ReportIssueMenuItem,
@@ -861,6 +863,11 @@ namespace Chimera.Client.GUI
 			this.ShowTAStudioMenuItem.Text = "Show TAStudio >>";
 			this.ShowTAStudioMenuItem.Visible = false;
 			this.ShowTAStudioMenuItem.Click += new System.EventHandler(this.ShowTAStudioMenuItem_Click);
+			// 
+			// DocumentationMenuItem
+			// 
+			this.DocumentationMenuItem.Text = "&Open Documentation...";
+			this.DocumentationMenuItem.Click += new System.EventHandler(this.DocumentationMenuItem_Click);
 			// 
 			// OnlineHelpMenuItem
 			// 
@@ -1181,6 +1188,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator1;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx RebootCoreMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx OnlineHelpMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx DocumentationMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx CopyVersionInfoMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ReportIssueMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx AboutMenuItem;

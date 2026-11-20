@@ -714,6 +714,11 @@ namespace Chimera.Client.GUI
 
 		public TAStudio TAStudio => GetTool<TAStudio>();
 
+		/// <summary>The log window when it is open, or null. Asked for by lines that belong
+		/// in it but must not open it - an on-screen message is one.</summary>
+		public LogWindow OpenLogWindow
+			=> _tools.OfType<LogWindow>().FirstOrDefault(static t => t.IsActive);
+
 		public void LoadRamWatch(bool loadDialog)
 		{
 			if (IsLoaded<RamWatch>() && !_config.DisplayWatchesOnScreen)

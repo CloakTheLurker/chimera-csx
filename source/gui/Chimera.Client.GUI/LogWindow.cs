@@ -62,6 +62,10 @@ namespace Chimera.Client.GUI
 			_logWriter = null;
 		}
 
+		/// <summary>A line this window did not get through the console: the on-screen
+		/// messages, which are as much a record as the console's own.</summary>
+		public void Append(string message) => append(message, true);
+
 		public void ShowReport(string title, string report)
 		{
 			var ss = report.Split('\n');

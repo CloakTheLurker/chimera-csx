@@ -16,6 +16,18 @@
 	<ItemGroup>
 		<Reference Include="PresentationFramework" />
 	</ItemGroup>
+	<!-- Help > Open Documentation: the documents this window shows, read from the
+	     repository's own files at build time and carried inside the assembly, so a
+	     Help menu cannot point at something that is not there -->
+	<ItemGroup>
+		<EmbeddedResource Include="$(MSBuildThisFileDirectory)..\..\..\docs\*.md">
+			<LogicalName>docs/%(Filename)%(Extension)</LogicalName>
+		</EmbeddedResource>
+		<EmbeddedResource Remove="$(MSBuildThisFileDirectory)..\..\..\docs\upstream-since-1.4.0.md" />
+		<EmbeddedResource Include="$(MSBuildThisFileDirectory)..\..\..\README.md">
+			<LogicalName>docs/00-overview.md</LogicalName>
+		</EmbeddedResource>
+	</ItemGroup>
 	<ItemGroup>
 		<PackageReference Include="SharpCompress" PrivateAssets="all" NoWarn="NU1902" />
 		<!-- not consumed by Chimera itself: built here so the settings source generator lands in build/dll for core-package builds (see ProvideCoreAuthorKit) -->

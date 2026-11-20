@@ -680,7 +680,7 @@ namespace Chimera.Client.GUI
 			ShowPage(0);
 		}
 
-		private const string IssuesUrl = "https://github.com/ToolAssisted-run/chimera/issues";
+		private const string IssuesUrl = "https://github.com/CloakTheLurker/chimera-csx/issues";
 
 		/// <summary>
 		/// Where to say something when Chimera gets it wrong. It sits on the first

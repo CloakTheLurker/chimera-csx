@@ -3646,6 +3646,12 @@ Measured here on 2026-11-19: the 1.2.0, 1.4.0 and 1.4.1 set files with these two
 
 The 74-package set is published in chimera-csx-cores ahead of its release, so both packages can be downloaded before that release exists. It was named for the version expected next, `1.4.4Cores`, and renamed `1.5.0Cores` - `cores-1.5.0.json` - when the release took the number 1.5.0; every digest in the index matched its file at both names.
 
+## The window's links point at this fork (user-decided, 2026-11-19)
+
+New Project's notice, Help > Report an Issue and About all pointed at ToolAssisted-run/chimera, the upstream project, whose tracker is not where a report about this fork belongs. They point here now: the New Project notice at `https://github.com/CloakTheLurker/chimera-csx/issues`, Report an Issue at `https://github.com/CloakTheLurker/chimera-csx/issues/new/choose` (the form reads the project's home page), and About's repository link, and its commit link with it, at `github.com/CloakTheLurker/chimera-csx`. The commit link had to change too: a build's commit exists in this repository only, so the old one led to a page that is not this build. The project's site link (toolassisted.run) is left alone - it is where the engine and the cores come from.
+
+Measured: AboutBoxTests 4 of 4 and IssueReportTests 10 of 10, and the interface suite is 127 / 72 / 653 / 390 with none failed.
+
 ## A project's movie takes the game's hash (2026-11-19, user-reported)
 
 Importing a movie, and every project opened after its first boot, said "Movie is missing hash, skipping hash check". A project does not store the movie's game hash - it pins its files instead - and the hash was filled only on a project's first boot, so any later open found the movie with none and warned about it. The movie now takes the hash of the game that booted on every open, and a project no longer says that warning at all: its files were resolved and pinned before the boot, so a movie that names no hash is nothing to warn about there. A movie opened on its own still says it, which is where it means something.

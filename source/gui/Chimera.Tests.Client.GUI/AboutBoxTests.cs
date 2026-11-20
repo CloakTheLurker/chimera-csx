@@ -51,7 +51,7 @@ namespace Chimera.Tests.Client.GUI
 			// the commit's time in Central European time, with the zone (issue 331)
 			StringAssert.Matches(commit.Text, new Regex(@"^Commit [0-9a-f]{9} \(\d{4}-\d{2}-\d{2} \d{2}:\d{2} CES?T\)$"));
 			Assert.AreEqual(VersionInfo.GIT_SHORTHASH, commit.Text.Substring(commit.LinkArea.Start, commit.LinkArea.Length), "only the commit is the link");
-			Assert.AreEqual($"https://github.com/ToolAssisted-run/chimera/commit/{VersionInfo.GIT_HASH}", (string) commit.Tag);
+			Assert.AreEqual($"https://github.com/CloakTheLurker/chimera-csx/commit/{VersionInfo.GIT_HASH}", (string) commit.Tag);
 		}
 
 		[TestMethod]
@@ -61,8 +61,8 @@ namespace Chimera.Tests.Client.GUI
 			box.Show();
 			var repo = (LinkLabel) box.Controls["RepoLink"];
 			var site = (LinkLabel) box.Controls["SiteLink"];
-			Assert.AreEqual("github.com/ToolAssisted-run/chimera", repo.Text);
-			Assert.AreEqual("https://github.com/ToolAssisted-run/chimera", (string) repo.Tag);
+			Assert.AreEqual("github.com/CloakTheLurker/chimera-csx", repo.Text);
+			Assert.AreEqual("https://github.com/CloakTheLurker/chimera-csx", (string) repo.Tag);
 			Assert.AreEqual("toolAssisted.run", site.Text);
 			Assert.AreEqual("https://toolassisted.run", (string) site.Tag);
 		}

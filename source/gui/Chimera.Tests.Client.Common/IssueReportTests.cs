@@ -17,7 +17,7 @@ namespace Chimera.Tests.Client.Common
 
 		[TestMethod]
 		public void TheLinkIsTheProjectsOwnIssueForm()
-			=> Assert.AreEqual("https://github.com/ToolAssisted-run/chimera/issues/new/choose", IssueReport.FormUrl);
+			=> Assert.AreEqual("https://github.com/CloakTheLurker/chimera-csx/issues/new/choose", IssueReport.FormUrl);
 
 		[TestMethod]
 		public void ASessionWithAProjectFillsEveryLine()

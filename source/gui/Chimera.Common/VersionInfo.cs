@@ -6,7 +6,7 @@ namespace Chimera.Common
 {
 	public static partial class VersionInfo
 	{
-		public static readonly string HomePage = "https://github.com/ToolAssisted-run/chimera";
+		public static readonly string HomePage = "https://github.com/CloakTheLurker/chimera-csx";
 
 		public static readonly string? CustomBuildString;
 
@@ -36,7 +36,7 @@ namespace Chimera.Common
 		public static readonly string SiteURI = "https://toolassisted.run";
 
 		/// <summary>The commit this build was made from, on the web.</summary>
-		public static readonly string CommitURI = $"https://github.com/ToolAssisted-run/chimera/commit/{GIT_HASH}";
+		public static readonly string CommitURI = $"{HomePage}/commit/{GIT_HASH}";
 
 		/// <summary>
 		/// What this build is called wherever it is named - the About box, a bug

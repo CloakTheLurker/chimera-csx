@@ -3646,6 +3646,14 @@ Measured here on 2026-11-19: the 1.2.0, 1.4.0 and 1.4.1 set files with these two
 
 The 74-package set is published in chimera-csx-cores ahead of its release, so both packages can be downloaded before that release exists. It was named for the version expected next, `1.4.4Cores`, and renamed `1.5.0Cores` - `cores-1.5.0.json` - when the release took the number 1.5.0; every digest in the index matched its file at both names.
 
+## A selected marker checkpoints the greenzone (user-decided, 2026-11-19)
+
+The greenzone was written to the project's cache when the project was saved and at no other time, so everything a session captured after its last save died with the session - a crash, a core that fell over, or simply closing without saving, after which the next open replayed from power-on. The owner asked for a checkpoint at a marker: a marker row selected in TAStudio is now one, and when the machine reaches that frame the greenzone, the lag log, the session position, the branch states and the state history are written to the cache.
+
+What a checkpoint writes is exactly the regenerable half of a save, under the same machine identity, so what lands is loaded by the next open when the machine still matches and refused when it does not. What it does not do is save: the project file is untouched, nothing is marked unsaved, and where this machine last found the project's files is left as it was. The state history is queued rather than waited for, as a save queues it, because it is the longest part and needs no machine. It fires once per arrival: standing on the marker's frame does not write again, and crossing it again does only after the machine has left it. A failed write is said on screen and the run carries on - a cache is the one file whose loss costs recomputation.
+
+Measured: a test saves a project, deletes its greenzone, checkpoints, and finds the greenzone back with the project file byte-for-byte unchanged and no unsaved change; with the checkpoint made a no-op the test fails at the existence check. The interface suite is 127 / 72 / 654 / 390, none failed. Not proved: the trigger itself, which is a frame update in TAStudio and which no test drives - the selection, the reach and the once-per-arrival rule are read, not exercised.
+
 ## Three things the window no longer offers (user-decided, 2026-11-19)
 
 - **Path Configuration has no "by System" page.** The dialog edits the Global paths only. The per-system entries stay in the collection, and the frontend's lookups still fall back through them, but nothing in this window edits them: a project names its files, and a core asks for firmware and its own data through its package. The page's inner tab control, its system selector and the code that filled them went with it. The Global rows are rebuilt each time the dialog opens and when Defaults is pressed, which the old code did not do and which a second press of Defaults needed.

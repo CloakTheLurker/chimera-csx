@@ -481,6 +481,14 @@ With a period, a marker set on the frame the machine stands on had no state unti
 
 The history halves its budget when the machine runs out of memory (see "What the history is allowed to cost"), and the halving used to outlive a Clear Greenzone: the clear gave the memory back but not the budget, so the greenzone went on thinning. `configure` now remembers the budget as it was set, and `clear` gives it back; running out again halves it again. `ce_session_greenzone_budget_now` says both numbers, for a frontend that wants to show them. The engine test halves a budget four times, clears, and finds the budget that was set; the clear also stores again at that budget.
 
+## A selected marker is a checkpoint (user-decided, 2026-11-19)
+
+The greenzone reached the project's cache only when the project was saved, so a crash, a core that fell over, or a session closed without saving lost every state it held; the next open replayed from power-on. A marker row selected in TAStudio is now a checkpoint: when the machine reaches that marker's frame, the project's greenzone - the greenzone file, the lag log, the session position and the branch states - and its state history are written to the cache, under the same machine identity a save writes, so the next open loads them when the machine still matches and refuses them when it does not.
+
+The project file is not written and nothing is marked unsaved: this is the regenerable half of a save, not a save. The greenzone file is written at the frame, which is why a marker is the place to ask for it; the state history is queued, as a save queues it. It happens once per arrival - standing on the frame, or crossing it again, writes again only after the machine has left it - and a write that fails says so on screen and leaves the run alone, because a cache is the one file whose loss costs recomputation.
+
+Measured: a test saves a project, deletes its greenzone, checkpoints, and finds the greenzone back, the project file byte-for-byte unchanged and no unsaved change; with the checkpoint made a no-op the test fails at that existence check.
+
 ## Phasing
 
 Each phase is separately gated and separately landable.

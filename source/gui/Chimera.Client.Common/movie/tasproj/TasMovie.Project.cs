@@ -504,31 +504,7 @@ namespace Chimera.Client.Common
 
 			if (!isBackup)
 			{
-				EngineProgress.Report("writing the greenzone");
-				ProjectCache.Ensure(p.Id);
-				WriteCacheFile(GreenZoneFilename);
-				// A machine a GPU drew makes states good only in the session that
-				// made them (docs/gpu-bridge.md), so it writes none - and removes
-				// any an earlier session left, which would otherwise be loaded
-				// into a machine that cannot draw.
-				// Queued, not waited for. This is the longest thing a save does -
-				// the history is written against budgets of four gigabytes in
-				// memory and ten on disk, which measured ten seconds to a Linux
-				// disk and over a minute to NTFS - and none of it needs the
-				// machine, so the run carries on while it is written. What lands
-				// in the file is the history as it stands right here; frames
-				// captured afterwards belong to the next save. The barrier is at
-				// Dispose, where the project is let go of.
-				if (States is not null && !_savingWithoutGreenzone && GreenzoneMayOutliveSession)
-				{
-					States.SaveLater(StateHistoryFilename, MachineIdentityOf(p));
-				}
-				else
-				{
-					// a save an earlier call queued may still be writing that very file
-					States?.SaveWait();
-					TryDelete(StateHistoryFilename);
-				}
+				SaveGreenzoneCache();
 				// and where this machine keeps the project's files, in a sibling of
 				// its own: the project itself stays distributable, carrying names and
 				// hashes and no paths at all (docs/project.md). Merged over whatever
@@ -690,6 +666,39 @@ namespace Chimera.Client.Common
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 			{
 				// it stays; it is a cache, and the machine check refuses it anyway
+			}
+		}
+
+		/// <summary>
+		/// The regenerable half of a save - the greenzone, the lag log, the session
+		/// position, the branch states - written to the project's cache under the
+		/// machine identity the next open checks. The project FILE is not touched
+		/// and nothing is marked saved, because this is not a save: it is the
+		/// checkpoint a selected marker asks for while the run goes on (TAStudio).
+		///
+		/// A machine a GPU drew makes states good only in the session that made
+		/// them (docs/gpu-bridge.md), so it writes none - and removes any an
+		/// earlier session left, which would otherwise be loaded into a machine
+		/// that cannot draw. The history is queued, not waited for: it is the
+		/// longest thing a save does, none of it needs the machine, and what lands
+		/// in the file is the history as it stands right here. The barrier is at
+		/// Dispose, where the project is let go of.
+		/// </summary>
+		public void SaveGreenzoneCache()
+		{
+			var p = Project;
+			EngineProgress.Report("writing the greenzone");
+			ProjectCache.Ensure(p.Id);
+			WriteCacheFile(GreenZoneFilename);
+			if (States is not null && !_savingWithoutGreenzone && GreenzoneMayOutliveSession)
+			{
+				States.SaveLater(StateHistoryFilename, MachineIdentityOf(p));
+			}
+			else
+			{
+				// a save an earlier call queued may still be writing that very file
+				States?.SaveWait();
+				TryDelete(StateHistoryFilename);
 			}
 		}
 

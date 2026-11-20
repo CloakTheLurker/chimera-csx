@@ -398,6 +398,30 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		/// <summary>
+		/// A selected marker is a checkpoint (TAStudio): when the machine reaches it,
+		/// the greenzone goes to the cache - a save's regenerable half - without saving
+		/// the project. The one file people hand to each other must not change, and a
+		/// checkpoint is not unsaved work.
+		/// </summary>
+		[TestMethod]
+		public void TheGreenzoneIsWrittenWithoutSavingTheProject()
+		{
+			var path = Path.Combine(_dir, "checkpoint.chimeraProject");
+			var movie = MakeWorkedMovie(path);
+			Assert.IsFalse(movie.Save().IsError);
+			var before = File.ReadAllBytes(path);
+			File.Delete(movie.GreenZoneFilename);
+			Assert.IsFalse(File.Exists(movie.GreenZoneFilename));
+
+			movie.SaveGreenzoneCache();
+
+			Assert.IsTrue(File.Exists(movie.GreenZoneFilename), "the checkpoint writes the greenzone");
+			CollectionAssert.AreEqual(before, File.ReadAllBytes(path),
+				"and leaves the project file exactly as it was");
+			Assert.IsFalse(movie.Changes, "a checkpoint is not an unsaved change");
+		}
+
+		/// <summary>
 		/// A session whose machine DIED keeps nothing, however tidily it then shut down.
 		///
 		/// The core-stopped dialog offers four ways on, and only one of them ("save inputs and close")

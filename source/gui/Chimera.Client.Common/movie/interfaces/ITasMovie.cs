@@ -22,6 +22,15 @@ namespace Chimera.Client.Common
 		/// <summary>Before the machine moves, every frame.</summary>
 		void GreenzoneBeforeFrame();
 
+		/// <summary>
+		/// Writes the greenzone, the lag log, the session position and the branch
+		/// states to the project's cache now, without saving the project: the
+		/// checkpoint a selected marker asks for. What lands is what a save would
+		/// have written, under this machine's identity, so the next open loads it
+		/// when the machine still matches and refuses it when it does not.
+		/// </summary>
+		void SaveGreenzoneCache();
+
 		/// <summary>Re-tells the history which frames must survive its thinning.</summary>
 		void RefreshPins();
 

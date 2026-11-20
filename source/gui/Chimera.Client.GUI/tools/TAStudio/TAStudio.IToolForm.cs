@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 
 using Chimera.Client.Common;
 using Chimera.Emulation.Common;
@@ -167,6 +168,42 @@ namespace Chimera.Client.GUI
 				_shouldMoveGreenArrow = smga;
 			}
 			UpdateProgressBar();
+			SaveGreenzoneAtSelectedMarker();
+		}
+
+		// the frame the selected marker's checkpoint was last taken at, so crossing
+		// the marker again is a new checkpoint and standing on it is not
+		private int _greenzoneCheckpointFrame = -1;
+
+		/// <summary>
+		/// A selected marker is a checkpoint: when the machine reaches its frame, the
+		/// project's greenzone is written to its cache - the regenerable half of a
+		/// save, without the project - so the states up to there survive a crash, a
+		/// core that falls over, or a session that simply ends. Once per arrival:
+		/// standing on the frame, or coming back to it, writes again only after the
+		/// machine has left it.
+		/// </summary>
+		private void SaveGreenzoneAtSelectedMarker()
+		{
+			var marker = MarkerControl.SelectedMarker;
+			if (marker is null || Emulator.Frame != marker.Frame)
+			{
+				_greenzoneCheckpointFrame = -1;
+				return;
+			}
+			if (_greenzoneCheckpointFrame == marker.Frame) return;
+			_greenzoneCheckpointFrame = marker.Frame;
+			try
+			{
+				CurrentTasMovie.SaveGreenzoneCache();
+				MainForm.AddOnScreenMessage($"Greenzone saved at marker {marker.Frame}");
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+			{
+				// the cache is the part that may fail; the run is not. What did not
+				// land now is written by the next save
+				MainForm.AddOnScreenMessage($"Could not save the greenzone at marker {marker.Frame}");
+			}
 		}
 
 		public override void Restart()

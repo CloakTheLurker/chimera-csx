@@ -19,6 +19,16 @@ namespace Chimera.Client.GUI
 		private TasMovieMarker FirstSelectedMarker
 			=> Markers[MarkerView.FirstSelectedRowIndex];
 
+		/// <summary>
+		/// The marker whose row is selected, or null when none is: the frame a
+		/// checkpoint of the greenzone is taken at (see <see cref="TAStudio"/>).
+		/// </summary>
+		public TasMovieMarker SelectedMarker
+			=> MarkerView.AnyRowsSelected && MarkerView.FirstSelectedRowIndex >= 0
+				&& MarkerView.FirstSelectedRowIndex < Markers.Count
+					? Markers[MarkerView.FirstSelectedRowIndex]
+					: null;
+
 		public MarkerControl()
 		{
 			InitializeComponent();

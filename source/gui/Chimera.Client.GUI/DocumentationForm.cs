@@ -58,14 +58,34 @@ namespace Chimera.Client.GUI
 			_split.Orientation = Orientation.Vertical;
 			_split.Panel1.Controls.Add(_topics);
 			_split.Panel2.Controls.Add(_view);
-			_split.Panel1MinSize = UIHelper.ScaleX(140);
-			_split.Panel2MinSize = UIHelper.ScaleX(320);
 			Controls.Add(_split);
 
 			LoadDocs();
-			_split.SplitterDistance = UIHelper.ScaleX(260);
 			_topics.SelectedIndexChanged += (_, _) => ShowDoc(_topics.SelectedIndex);
 			if (_topics.Items.Count is not 0) _topics.SelectedIndex = 0;
+		}
+
+		/// <summary>
+		/// The splitter takes its parts here, not in the constructor: a panel's
+		/// minimum is measured against the control's width, and before the window is
+		/// laid out that width is the SplitContainer's own default, so setting a
+		/// minimum from the constructor throws "SplitterDistance must be between
+		/// Panel1MinSize and Width - Panel2MinSize" before anything is on screen.
+		/// The window has its real width by now.
+		/// </summary>
+		protected override void OnLoad(EventArgs e)
+		{
+			base.OnLoad(e);
+			var width = _split.Width;
+			if (width <= 0) return;
+			var listMin = Math.Min(UIHelper.ScaleX(140), Math.Max(1, width / 4));
+			var viewMin = Math.Min(UIHelper.ScaleX(320), Math.Max(1, width / 3));
+			_split.Panel1MinSize = 0;
+			_split.Panel2MinSize = 0;
+			var distance = Math.Max(listMin, Math.Min(UIHelper.ScaleX(260), width - viewMin));
+			_split.SplitterDistance = distance;
+			_split.Panel1MinSize = listMin;
+			_split.Panel2MinSize = viewMin;
 		}
 
 		/// <summary>The documents this window carries, by resource name: for tests.</summary>

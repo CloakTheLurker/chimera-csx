@@ -41,6 +41,23 @@ namespace Chimera.Tests.Client.GUI
 			}
 		}
 
+		/// <summary>
+		/// The window opens: its splitter takes its parts only once the window has a
+		/// width, and taking them too early is the exception a person saw rather than
+		/// a cold window. What the test can hold is that opening it works and the
+		/// first document is drawn.
+		/// </summary>
+		[TestMethod]
+		public void TheWindowOpensWithADocumentOnScreen()
+		{
+			using DocumentationForm form = new();
+			form.Show();
+			form.Refresh();
+			Assert.IsTrue(form.Visible);
+			Assert.IsFalse(string.IsNullOrWhiteSpace(form.Viewer.Rtf), "the first document is on screen");
+			form.Close();
+		}
+
 		[TestMethod]
 		public void EveryDocumentHasAHeadingToNameIt()
 		{

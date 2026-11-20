@@ -12,6 +12,10 @@ namespace Chimera.Tests.Client.Common.CorePackages
 	/// downloads nothing, so there is no second place it fills.
 	/// </summary>
 	[TestClass]
+	// CHIMERA_DATA_HOME is process-wide and these tests point it at their own folder; a
+	// class running beside them read the other's, which is how a theme went missing once in
+	// six runs.
+	[DoNotParallelize]
 	public class CoresFolderTests
 	{
 		private static string NewDir()

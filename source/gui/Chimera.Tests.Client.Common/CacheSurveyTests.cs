@@ -13,6 +13,10 @@ namespace Chimera.Tests.Client.Common
 	/// as what does.
 	/// </summary>
 	[TestClass]
+	// CHIMERA_DATA_HOME is process-wide and these tests point it at their own folder; a
+	// class running beside them read the other's, which is how a theme went missing once in
+	// six runs.
+	[DoNotParallelize]
 	public class CacheSurveyTests
 	{
 		private static string _dir = "";

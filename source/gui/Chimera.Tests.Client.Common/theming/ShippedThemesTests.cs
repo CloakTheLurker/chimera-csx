@@ -19,6 +19,10 @@ namespace Chimera.Tests.Client.Common
 	/// report because nobody would know it was missing.
 	/// </summary>
 	[TestClass]
+	// CHIMERA_DATA_HOME is process-wide and these tests point it at their own folder; a
+	// class running beside them read the other's, which is how a theme went missing once in
+	// six runs.
+	[DoNotParallelize]
 	public class ShippedThemesTests
 	{
 		/// <summary>The repository's Themes folder, found by walking up for the file only the repository root has.</summary>

@@ -15,8 +15,6 @@ namespace Chimera.Client.GUI
 
 		private readonly Action<string> _setMovieBackupPath;
 
-		private readonly string _sysID;
-
 		private static AutoCompleteStringCollection AutoCompleteOptions => new AutoCompleteStringCollection
 		{
 			"%recent%",
@@ -34,7 +32,6 @@ namespace Chimera.Client.GUI
 		{
 			_pathEntries = pathEntries;
 			_setMovieBackupPath = setMovieBackupPath;
-			_sysID = sysID;
 			DialogController = dialogController;
 			InitializeComponent();
 			SpecialCommandsBtn.Image = Properties.Resources.Help;
@@ -44,14 +41,12 @@ namespace Chimera.Client.GUI
 		{
 			RecentForROMs.Checked = _pathEntries.UseRecentForRoms;
 
-			DoTabs(_pathEntries.Paths, focusTabOfSystem: _sysID);
+			DoTabs(_pathEntries.Paths);
 			DoRomToggle();
 		}
 
-		private void DoTabs(IReadOnlyList<PathEntry> pathCollection, string focusTabOfSystem)
+		private void DoTabs(IReadOnlyList<PathEntry> pathCollection)
 		{
-			bool IsTabPendingFocus(string system) => system == focusTabOfSystem || system.Split('_').Contains(focusTabOfSystem);
-
 			int x = UIHelper.ScaleX(6);
 			int textBoxWidth = UIHelper.ScaleX(70);
 			int padding = UIHelper.ScaleX(5);
@@ -115,36 +110,15 @@ namespace Chimera.Client.GUI
 					y += rowHeight;
 				}
 			}
-			void AddTabPageForSystem(string system, string systemDisplayName)
-			{
-				var t = new TabPage
-				{
-					Name = system,
-					Text = systemDisplayName,
-					Width = UIHelper.ScaleX(200), // Initial Left/Width of child controls are based on this size.
-					AutoScroll = true,
-				};
-				PopulateTabPage(t, system);
-				comboSystem.Items.Add(systemDisplayName);
-				PathTabControl.TabPages.Add(t);
-				if (IsTabPendingFocus(system))
-				{
-					comboSystem.SelectedIndex = comboSystem.Items.Count - 1; // event handler selects correct tab in inner TabControl
-					tcMain.SelectTab(1);
-				}
-			}
 
+			/* The dialog edits the Global paths. The "by System" page went (user,
+			 * 2026-11-19): a project names its files, the cores ask for firmware and
+			 * their own data through their packages, and the per-system entries had
+			 * become a place to be wrong in. Their values stay in the collection and
+			 * still fall back as they did. */
 			tcMain.Visible = false;
-
-			PathTabControl.TabPages.Clear();
-			var systems = _pathEntries.Paths.Select(static e => e.System).Distinct() // group entries by "system" (intentionally using instance field here, not parameter)
-				.Select(sys => (SysGroup: sys, DisplayName: PathEntryCollection.GetDisplayNameFor(sys)))
-				.OrderBy(tuple => tuple.DisplayName)
-				.ToList();
-
-			// add the Global tab first...
+			tpGlobal.Controls.Clear();
 			tpGlobal.Name = PathEntryCollection.GLOBAL; // required for SaveSettings
-			systems.RemoveAll(tuple => tuple.SysGroup == PathEntryCollection.GLOBAL);
 			var hack = tpGlobal.Size.Width - UIHelper.ScaleX(220); // whyyyyyyyyyy
 			textBoxWidth += hack;
 			widgetOffset += hack;
@@ -152,19 +126,6 @@ namespace Chimera.Client.GUI
 			PopulateTabPage(tpGlobal, PathEntryCollection.GLOBAL);
 			tpGlobal.Controls[tpGlobal.Controls.Count - 1].Size -= hack1; // TextBox
 			tpGlobal.Controls[tpGlobal.Controls.Count - 2].Location -= hack1; // Button
-			textBoxWidth -= hack;
-			widgetOffset -= hack;
-
-			// ...then continue with the others
-			foreach (var (sys, dispName) in systems) AddTabPageForSystem(sys, dispName);
-
-			if (IsTabPendingFocus(PathEntryCollection.GLOBAL))
-			{
-				// the first system there is, if there is one (-1 selects none); the event handler selects the matching tab in the inner TabControl
-				comboSystem.SelectedIndex = systems.Count is 0 ? -1 : 0;
-				// selected tab in tcMain is already 0 (Global)
-			}
-
 			tcMain.Visible = true;
 		}
 
@@ -206,8 +167,7 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		private IEnumerable<Control> AllPathControls
-			=> new[] { tpGlobal }.Concat(PathTabControl.TabPages.Cast<TabPage>()).SelectMany(tp => tp.Controls());
+		private IEnumerable<Control> AllPathControls => tpGlobal.Controls();
 
 		private void NewPathConfig_Load(object sender, EventArgs e)
 		{
@@ -230,7 +190,7 @@ namespace Chimera.Client.GUI
 		}
 
 		private void DefaultsBtn_Click(object sender, EventArgs e)
-			=> DoTabs(PathEntryCollection.Defaults.Value, PathEntryCollection.GLOBAL);
+			=> DoTabs(PathEntryCollection.Defaults.Value);
 
 		private void Ok_Click(object sender, EventArgs e)
 		{
@@ -243,11 +203,6 @@ namespace Chimera.Client.GUI
 		private void Cancel_Click(object sender, EventArgs e)
 		{
 			Close();
-		}
-
-		private void comboSystem_SelectedIndexChanged(object sender, EventArgs e)
-		{
-			PathTabControl.SelectTab(((ComboBox) sender).SelectedIndex);
 		}
 	}
 }

@@ -50,8 +50,6 @@ namespace Chimera.Client.Common
 
 		private IEmulator GlobalEmulator;
 
-		public SnowyNullVideo SnowyVP { get; private set; }
-
 		protected DisplayManagerBase(
 			Config config,
 			IEmulator emulator,
@@ -62,10 +60,6 @@ namespace Chimera.Client.Common
 		{
 			GlobalConfig = config;
 			GlobalEmulator = emulator;
-			SnowyVP = new()
-			{
-				LiveSettings = GlobalConfig.GetCoreSettings<NullEmulator, SnowyNullVideo.Settings>() ?? new(),
-			};
 			OSD = new(config, emulator, inputManager, movieSession);
 			_gl = gl;
 			_renderer = renderer;
@@ -93,10 +87,6 @@ namespace Chimera.Client.Common
 		{
 			GlobalConfig = config;
 			GlobalEmulator = emulator;
-			SnowyVP = new()
-			{
-				LiveSettings = GlobalConfig.GetCoreSettings<NullEmulator, SnowyNullVideo.Settings>() ?? new(),
-			};
 			OSD.UpdateGlobals(config, emulator);
 		}
 
@@ -363,12 +353,12 @@ namespace Chimera.Client.Common
 		/// This will receive an emulated output frame from an IVideoProvider and run it through the complete frame processing pipeline
 		/// Then it will stuff it into the bound PresentationPanel.
 		/// </summary>
-		public void UpdateSource(IVideoProvider videoProvider, bool useSnow = false)
+		public void UpdateSource(IVideoProvider videoProvider)
 		{
 			var displayNothing = GlobalConfig.DispSpeedupFeatures == 0;
 			var job = new JobInfo
 			{
-				VideoProvider = useSnow ? SnowyVP : videoProvider,
+				VideoProvider = videoProvider,
 				Simulate = displayNothing,
 				ChainOutsize = GetGraphicsControlSize(),
 				IncludeOSD = true,

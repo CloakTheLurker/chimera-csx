@@ -3646,6 +3646,14 @@ Measured here on 2026-11-19: the 1.2.0, 1.4.0 and 1.4.1 set files with these two
 
 The 74-package set is published in chimera-csx-cores ahead of its release, so both packages can be downloaded before that release exists. It was named for the version expected next, `1.4.4Cores`, and renamed `1.5.0Cores` - `cores-1.5.0.json` - when the release took the number 1.5.0; every digest in the index matched its file at both names.
 
+## Three things the window no longer offers (user-decided, 2026-11-19)
+
+- **Path Configuration has no "by System" page.** The dialog edits the Global paths only. The per-system entries stay in the collection, and the frontend's lookups still fall back through them, but nothing in this window edits them: a project names its files, and a core asks for firmware and its own data through its package. The page's inner tab control, its system selector and the code that filled them went with it. The Global rows are rebuilt each time the dialog opens and when Defaults is pressed, which the old code did not do and which a second press of Defaults needed.
+- **The snowy null core is gone**, not switched off: the video provider, the Always/During Christmas/Never setting behind it, and the Display window's group are deleted. With nothing loaded the screen has one idle picture, the eye.
+- **The eye has a switch.** Display > Misc carries "The Chimera eye follows the pointer (when no project is open)", on by default; off, the eye is not drawn and the empty screen is the null core's own frame. It sits where the snowy setting did.
+
+Measured: the interface suite is 127 / 72 / 653 / 390 with none failed. One run had ShippedThemesTests fail under parallel load; it passes alone three times, and no theme is touched here. Not proved: the three windows driven by a person - the tests construct forms, they do not click them - and the eye's switch, which is read where the frame is built and which no test drives.
+
 ## The window's links point at this fork (user-decided, 2026-11-19)
 
 New Project's notice, Help > Report an Issue and About all pointed at ToolAssisted-run/chimera, the upstream project, whose tracker is not where a report about this fork belongs. They point here now: the New Project notice at `https://github.com/CloakTheLurker/chimera-csx/issues`, Report an Issue at `https://github.com/CloakTheLurker/chimera-csx/issues/new/choose` (the form reads the project's home page), and About's repository link, and its commit link with it, at `github.com/CloakTheLurker/chimera-csx`. The commit link had to change too: a build's commit exists in this repository only, so the old one led to a page that is not this build. The project's site link (toolassisted.run) is left alone - it is where the engine and the cores come from.

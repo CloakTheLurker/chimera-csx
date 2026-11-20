@@ -515,6 +515,8 @@ namespace Chimera.Client.Common
 
 		public int RelativeMouseSensitivity { get; set; } = 100;
 
-		public SnowyNullVideo.TriggerCriterion SnowyNullCore { get; set; } = SnowyNullVideo.TriggerCriterion.WeekOfChristmas;
+		/// <summary>When no project is open, the idle screen is the Chimera eye, which
+		/// follows the pointer. Off, the empty screen is the null core's own frame.</summary>
+		public bool ChimeraEyeScreensaver { get; set; } = true;
 	}
 }

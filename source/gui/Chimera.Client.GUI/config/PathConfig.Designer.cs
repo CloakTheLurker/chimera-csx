@@ -30,7 +30,6 @@
 		{
 			this.Ok = new System.Windows.Forms.Button();
 			this.Cancel = new System.Windows.Forms.Button();
-			this.PathTabControl = new System.Windows.Forms.TabControl();
 			this.SaveBtn = new System.Windows.Forms.Button();
 			this.label1 = new Chimera.WinForms.Controls.LocLabelEx();
 			this.SpecialCommandsBtn = new System.Windows.Forms.Button();
@@ -38,11 +37,7 @@
 			this.DefaultsBtn = new System.Windows.Forms.Button();
 			this.tcMain = new System.Windows.Forms.TabControl();
 			this.tpGlobal = new System.Windows.Forms.TabPage();
-			this.tpSystems = new System.Windows.Forms.TabPage();
-			this.comboSystem = new System.Windows.Forms.ComboBox();
-			this.lblSystem = new Chimera.WinForms.Controls.LocLabelEx();
 			this.tcMain.SuspendLayout();
-			this.tpSystems.SuspendLayout();
 			this.SuspendLayout();
 			// 
 			// Ok
@@ -67,21 +62,6 @@
 			this.Cancel.Text = "&Cancel";
 			this.Cancel.UseVisualStyleBackColor = true;
 			this.Cancel.Click += new System.EventHandler(this.Cancel_Click);
-			// 
-			// PathTabControl
-			// 
-			this.PathTabControl.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-			this.PathTabControl.Appearance = System.Windows.Forms.TabAppearance.FlatButtons;
-			this.PathTabControl.ItemSize = new System.Drawing.Size(0, 1);
-			this.PathTabControl.Location = new System.Drawing.Point(6, 31);
-			this.PathTabControl.Multiline = true;
-			this.PathTabControl.Name = "PathTabControl";
-			this.PathTabControl.SelectedIndex = 0;
-			this.PathTabControl.Size = new System.Drawing.Size(747, 401);
-			this.PathTabControl.SizeMode = System.Windows.Forms.TabSizeMode.Fixed;
-			this.PathTabControl.TabIndex = 2;
 			// 
 			// SaveBtn
 			// 
@@ -139,7 +119,6 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
 			this.tcMain.Controls.Add(this.tpGlobal);
-			this.tcMain.Controls.Add(this.tpSystems);
 			this.tcMain.Location = new System.Drawing.Point(12, 41);
 			this.tcMain.Name = "tcMain";
 			this.tcMain.SelectedIndex = 0;
@@ -157,33 +136,6 @@
 			this.tpGlobal.Text = "Global";
 			this.tpGlobal.UseVisualStyleBackColor = true;
 			// 
-			// tpSystems
-			// 
-			this.tpSystems.Controls.Add(this.lblSystem);
-			this.tpSystems.Controls.Add(this.comboSystem);
-			this.tpSystems.Controls.Add(this.PathTabControl);
-			this.tpSystems.Location = new System.Drawing.Point(4, 22);
-			this.tpSystems.Name = "tpSystems";
-			this.tpSystems.Padding = new System.Windows.Forms.Padding(3);
-			this.tpSystems.Size = new System.Drawing.Size(752, 432);
-			this.tpSystems.TabIndex = 1;
-			this.tpSystems.Text = "by System";
-			this.tpSystems.UseVisualStyleBackColor = true;
-			// 
-			// comboSystem
-			// 
-			this.comboSystem.FormattingEnabled = true;
-			this.comboSystem.Location = new System.Drawing.Point(48, 4);
-			this.comboSystem.Name = "comboSystem";
-			this.comboSystem.Size = new System.Drawing.Size(200, 21);
-			this.comboSystem.TabIndex = 3;
-			this.comboSystem.SelectedIndexChanged += new System.EventHandler(this.comboSystem_SelectedIndexChanged);
-			// 
-			// lblSystem
-			// 
-			this.lblSystem.Location = new System.Drawing.Point(3, 7);
-			this.lblSystem.Name = "lblSystem";
-			this.lblSystem.Text = "System:";
 			// 
 			// PathConfig
 			// 
@@ -207,8 +159,6 @@
 			this.Text = "Path Configuration";
 			this.Load += new System.EventHandler(this.NewPathConfig_Load);
 			this.tcMain.ResumeLayout(false);
-			this.tpSystems.ResumeLayout(false);
-			this.tpSystems.PerformLayout();
 			this.ResumeLayout(false);
 			this.PerformLayout();
 
@@ -218,7 +168,6 @@
 
 		private System.Windows.Forms.Button Ok;
 		private System.Windows.Forms.Button Cancel;
-		private System.Windows.Forms.TabControl PathTabControl;
 		private System.Windows.Forms.Button SaveBtn;
 		private Chimera.WinForms.Controls.LocLabelEx label1;
 		private System.Windows.Forms.Button SpecialCommandsBtn;
@@ -226,8 +175,5 @@
 		private System.Windows.Forms.Button DefaultsBtn;
 		private System.Windows.Forms.TabControl tcMain;
 		private System.Windows.Forms.TabPage tpGlobal;
-		private System.Windows.Forms.TabPage tpSystems;
-		private System.Windows.Forms.ComboBox comboSystem;
-		private WinForms.Controls.LocLabelEx lblSystem;
 	}
 }

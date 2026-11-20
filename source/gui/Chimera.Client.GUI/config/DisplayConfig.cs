@@ -16,29 +16,12 @@ namespace Chimera.Client.GUI
 	{
 		private readonly Config _config;
 
-		private readonly RadioButtonGroupTracker _snowRadioTracker;
-
-		private readonly SzNUDEx nudSnowBias = new()
+		private readonly CheckBoxEx _cbEye = new()
 		{
-			DecimalPlaces = 2,
-			Increment = 0.25m,
-			Maximum = 2.0m,
-			Minimum = -2.0m,
-			Size = new(48, 23),
-		};
-
-		private readonly SzNUDEx nudSnowIntensity = new()
-		{
-			DecimalPlaces = 1,
-			Increment = 0.1m,
-			Maximum = 1.0m,
-			Minimum = 0.1m,
-			Size = new(48, 23),
+			Text = "The Chimera eye follows the pointer (when no project is open)",
 		};
 
 		private readonly SzTextBoxEx txtSWTOverride;
-
-		private readonly TransparentTrackBar tbSnowFramerate = new() { Maximum = 20, Minimum = 1, Size = new(160, 45) };
 
 		public IDialogController DialogController { get; }
 
@@ -46,8 +29,6 @@ namespace Chimera.Client.GUI
 		{
 			_config = config;
 			DialogController = dialogController;
-			var snowSettings = _config.GetCoreSettings<NullEmulator, SnowyNullVideo.Settings>() ?? new();
-
 			InitializeComponent();
 			flpStaticWindowTitles.Controls.Remove(cbStaticWindowTitles);
 			txtSWTOverride = new() { Size = new(80, 23), Text = _config.MainFormStaticWindowTitleOverrideEffective };
@@ -63,59 +44,17 @@ namespace Chimera.Client.GUI
 						txtSWTOverride,
 					},
 				});
-			LocSzGroupBoxEx grpSnow = new() { Location = new(6, 200), Size = new(371, 160), Text = "Snowy null core" };
-			_snowRadioTracker = grpSnow.Tracker;
-			RadioButtonEx rbSnowAlways = new(_snowRadioTracker)
-			{
-				Checked = config.SnowyNullCore is SnowyNullVideo.TriggerCriterion.Always,
-				Name = nameof(rbSnowAlways),
-				Tag = SnowyNullVideo.TriggerCriterion.Always,
-				Text = "Always",
-			};
-			RadioButtonEx rbSnowForChristmas = new(_snowRadioTracker)
-			{
-				Checked = config.SnowyNullCore is SnowyNullVideo.TriggerCriterion.WeekOfChristmas,
-				Name = nameof(rbSnowForChristmas),
-				Tag = SnowyNullVideo.TriggerCriterion.WeekOfChristmas,
-				Text = "During Christmas (Dec. 20th through 26th)",
-			};
-			RadioButtonEx rbSnowNever = new(_snowRadioTracker)
-			{
-				Checked = config.SnowyNullCore is SnowyNullVideo.TriggerCriterion.Never,
-				Name = nameof(rbSnowNever),
-				Tag = SnowyNullVideo.TriggerCriterion.Never,
-				Text = "Never",
-			};
-			LabelEx lblFramerate = new();
-			tbSnowFramerate.ValueChanged += (changedSender, _) =>
-			{
-				var val = ((TrackBar) changedSender).Value;
-				lblFramerate.Text = $"Framerate: {60.0 / val:F1} Hz";
-			};
-			tbSnowFramerate.Value = snowSettings.FramerateScalar;
-			nudSnowIntensity.Value = new(snowSettings.Intensity);
-			nudSnowBias.Value = new(snowSettings.Bias);
-			grpSnow.Controls.Add(new LocSzSingleColumnFLP
+			LocSzGroupBoxEx grpEye = new() { Location = new(6, 200), Size = new(371, 58), Text = "Idle screen" };
+			_cbEye.Checked = _config.ChimeraEyeScreensaver;
+			grpEye.Controls.Add(new LocSzSingleColumnFLP
 			{
 				Controls =
 				{
-					new LabelEx { Text = "When no rom loaded, draw \"snow\" (white noise):" },
-					new SingleRowFLP { Controls = { rbSnowAlways, rbSnowNever } },
-					rbSnowForChristmas,
-					new SingleRowFLP
-					{
-						Controls =
-						{
-							new LabelEx { Text = "Brightness multiplier:" },
-							nudSnowIntensity,
-							new LabelEx { Text = "RNG bias:" },
-							nudSnowBias,
-						},
-					},
-					new SingleRowFLP { Controls = { lblFramerate, tbSnowFramerate } },
+					new LabelEx { Text = "Nothing is loaded: show the Chimera eye, which follows the pointer." },
+					_cbEye,
 				},
 				Location = new(5, 15),
-				Size = new(320, 144),
+				Size = new(340, 40),
 			});
 			tpMisc.Controls.Remove(flpStaticWindowTitles);
 			tpMisc.Controls.Remove(groupBox5);
@@ -125,7 +64,7 @@ namespace Chimera.Client.GUI
 				{
 					groupBox5,
 					flpStaticWindowTitles,
-					grpSnow,
+					grpEye,
 				},
 			});
 
@@ -227,18 +166,11 @@ namespace Chimera.Client.GUI
 
 			_config.UseStaticWindowTitles = cbStaticWindowTitles.Checked;
 
-			_config.SnowyNullCore = _snowRadioTracker.GetSelectionTagAs<SnowyNullVideo.TriggerCriterion>()
-				?? SnowyNullVideo.TriggerCriterion.WeekOfChristmas;
 			_config.MainFormStaticWindowTitleOverride = string.IsNullOrWhiteSpace(txtSWTOverride.Text)
 				|| txtSWTOverride.Text.Equals(VersionInfo.CustomBuildString, StringComparison.Ordinal)
 					? string.Empty
 					: txtSWTOverride.Text;
-			_config.PutCoreSettings(
-				new SnowyNullVideo.Settings(
-					Bias: nudSnowBias.Value.ConvertToF32(),
-					FramerateScalar: tbSnowFramerate.Value,
-					Intensity: nudSnowIntensity.Value.ConvertToF32()),
-				typeof(NullEmulator));
+			_config.ChimeraEyeScreensaver = _cbEye.Checked;
 
 			if (rbUseRaw.Checked)
 				_config.DispManagerAR = EDispManagerAR.None;

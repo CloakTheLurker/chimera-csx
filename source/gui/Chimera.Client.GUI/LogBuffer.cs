@@ -9,8 +9,9 @@ namespace Chimera.Client.GUI
 	/// the window, which is only a view of it: the log can run in the background,
 	/// kept from the moment Chimera starts, so opening the window later shows the
 	/// whole session and closing it throws nothing away. While it records it
-	/// holds the console, and it hands the console back when it stops, so a
-	/// headless run's output stays what it was.
+	/// holds the console and writes every line on to it as well, then hands it
+	/// back when it stops, so a headless run's output stays what it was - scripts,
+	/// and the witness, read that.
 	/// </summary>
 	public sealed class LogBuffer
 	{
@@ -80,6 +81,9 @@ namespace Chimera.Client.GUI
 			Capturing = true;
 			_console = Console.Out;
 			_writer.Emit = Append;
+			// what is kept is also written on to the console this took, so a
+			// headless run's output still reaches whoever started it
+			_writer.Tee = _console;
 			Console.SetOut(_writer);
 		}
 
@@ -87,9 +91,10 @@ namespace Chimera.Client.GUI
 		{
 			if (!Capturing) return;
 			Capturing = false;
+			_writer.Emit = null;
+			_writer.Tee = null;
 			Console.SetOut(_console ?? new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true });
 			_console = null;
-			_writer.Emit = null;
 		}
 
 		/// <summary>A line from somewhere the console does not reach: an on-screen
@@ -135,8 +140,18 @@ namespace Chimera.Client.GUI
 		{
 			public Action<string> Emit;
 
+			/// <summary>where the line also goes: the console this writer replaced</summary>
+			public TextWriter Tee;
+
 			public override void Write(char[] buffer, int offset, int count)
-				=> Emit?.Invoke(new string(buffer, offset, count));
+			{
+				Emit?.Invoke(new string(buffer, offset, count));
+				if (Tee is null) return;
+				Tee.Write(buffer, offset, count);
+				Tee.Flush();
+			}
+
+			public override void Flush() => Tee?.Flush();
 
 			public override Encoding Encoding => Encoding.Unicode;
 		}

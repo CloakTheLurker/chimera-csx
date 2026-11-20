@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 
 using Chimera.Client.GUI;
 
@@ -119,6 +120,34 @@ namespace Chimera.Tests.Client.GUI
 				Assert.AreNotSame(console, Console.Out, "the log did not take the console");
 				log.Stop();
 				Assert.AreSame(console, Console.Out, "the log did not give the console back");
+			}
+			finally
+			{
+				log.Stop();
+				Console.SetOut(console);
+			}
+		}
+
+		/// <summary>
+		/// Holding the console must not hide the output from whoever started the
+		/// process: the witness counts a core's boot line and waits for the MCP
+		/// server's started line on it, and a person running a script does the
+		/// same. Every line the log keeps goes on to the console it took.
+		/// </summary>
+		[TestMethod]
+		public void TheConsoleStillGetsWhatTheLogKeeps()
+		{
+			LogBuffer log = new();
+			var console = Console.Out;
+			StringWriter outside = new();
+			try
+			{
+				Console.SetOut(outside);
+				log.SetBackground(true);
+				Console.WriteLine("a line both places see");
+				Assert.AreEqual(1, log.Count);
+				Assert.AreEqual("a line both places see", log[0]);
+				StringAssert.Contains(outside.ToString(), "a line both places see", "the console did not get the line");
 			}
 			finally
 			{

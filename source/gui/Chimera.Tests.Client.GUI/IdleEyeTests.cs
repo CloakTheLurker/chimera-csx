@@ -95,6 +95,67 @@ namespace Chimera.Tests.Client.GUI
 			Assert.AreEqual(1, frameRight.Count, $"the mark's right edge moved with the eye ({string.Join(",", frameRight)})");
 		}
 
+		/// <summary>
+		/// The idle screen can be asked for the plain eye, and then it must be one
+		/// picture: no glance after the pointer, no blinking, no breathing. It is
+		/// drawn once and handed back, whatever the pointer does.
+		/// </summary>
+		[TestMethod]
+		public void TheStillEyeNeverMoves()
+		{
+			IdleEyeVideo eye = new(animated: false);
+			var first = (int[]) eye.GetVideoBuffer().Clone();
+			for (var i = 0; i < 400; i++)
+			{
+				eye.LookAt(i < 200 ? -1f : 1f);
+				eye.GetVideoBuffer();
+			}
+			CollectionAssert.AreEqual(first, eye.GetVideoBuffer(), "the eye held still changed its picture");
+		}
+
+		/// <summary>
+		/// The idle screen can be television static. It must be grey, it must move,
+		/// and it must not be the bright white an untuned set is on a real
+		/// television: nothing on the idle screen lights a room.
+		/// </summary>
+		[TestMethod]
+		public void TheTelevisionStaticMovesAndStaysDim()
+		{
+			IdleStaticVideo tv = new();
+			var first = (int[]) tv.GetVideoBuffer().Clone();
+			var brightest = 0;
+			var changed = false;
+			for (var i = 0; i < 40; i++)
+			{
+				var frame = tv.GetVideoBuffer();
+				for (var p = 0; p < frame.Length; p += 101)
+				{
+					var r = (frame[p] >> 16) & 0xFF;
+					Assert.AreEqual(r, (frame[p] >> 8) & 0xFF, "the static must have no colour");
+					Assert.AreEqual(r, frame[p] & 0xFF, "the static must have no colour");
+					if (r > brightest) brightest = r;
+				}
+				for (var p = 0; p < frame.Length; p += 4096)
+				{
+					if (frame[p] == first[p]) continue;
+					changed = true;
+					break;
+				}
+			}
+			Assert.IsTrue(changed, "the static never changed");
+			Assert.IsTrue(brightest is > 8 and < 120, $"the static should be dim, but its brightest pixel is {brightest}");
+		}
+
+		/// <summary>The picture changes twelve times a second and is held in
+		/// between: two calls in a row are the same picture.</summary>
+		[TestMethod]
+		public void TheTelevisionStaticHoldsItsPictureBetweenChanges()
+		{
+			IdleStaticVideo tv = new();
+			var first = (int[]) tv.GetVideoBuffer().Clone();
+			CollectionAssert.AreEqual(first, tv.GetVideoBuffer(), "the static was redrawn between two frames");
+		}
+
 		/// <summary>the outermost lit columns of the mark: its frame, which never moves</summary>
 		private static (int Left, int Right) Edges(int[] frame)
 		{

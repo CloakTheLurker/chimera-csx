@@ -2,6 +2,7 @@
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Runtime.Serialization;
 
 using Chimera.Display;
 using Chimera.Common;
@@ -515,8 +516,28 @@ namespace Chimera.Client.Common
 
 		public int RelativeMouseSensitivity { get; set; } = 100;
 
-		/// <summary>When no project is open, the idle screen is the Chimera eye, which
-		/// follows the pointer. Off, the empty screen is the null core's own frame.</summary>
-		public bool ChimeraEyeScreensaver { get; set; } = true;
+		/// <summary>What the screen shows when no project is open: nothing, the
+		/// still Chimera eye, the animated one, or television static.</summary>
+		public EIdleScreen IdleScreen { get; set; } = EIdleScreen.AnimatedEye;
+
+		/// <summary>The eye's old on/off switch. A config written before the idle
+		/// screen had four choices says whether the eye was shown, and only that;
+		/// it is read once, applied to <see cref="IdleScreen"/>, and never written
+		/// again.</summary>
+		[JsonProperty("ChimeraEyeScreensaver", NullValueHandling = NullValueHandling.Ignore)]
+		public bool? OldChimeraEyeScreensaver { get; set; }
+
+		[OnDeserialized]
+		private void ReadOldEyeSwitch(StreamingContext context)
+		{
+			if (OldChimeraEyeScreensaver is not { } eye) return;
+			IdleScreen = eye ? EIdleScreen.AnimatedEye : EIdleScreen.Off;
+			OldChimeraEyeScreensaver = null;
+		}
+
+		/// <summary>Whether the Log Window keeps the log while it is closed. On,
+		/// the log records from startup and opening the window shows the whole
+		/// session; off, it records only while the window is open.</summary>
+		public bool LogWindowBackground { get; set; } = true;
 	}
 }

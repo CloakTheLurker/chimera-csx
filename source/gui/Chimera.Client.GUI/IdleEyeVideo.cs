@@ -7,12 +7,17 @@ namespace Chimera.Client.GUI
 {
 	/// <summary>
 	/// What the screen shows when no project is open: the Chimera mark, very faint
-	/// and colourless, glancing about and blinking now and then. It is the idle
+	/// and colourless, glancing about and blinking now and then - or, when it is
+	/// asked to hold still, the same mark as one unmoving picture. It is the idle
 	/// screen, so it must cost nothing - the frame is redrawn only while something
 	/// is actually moving, and held otherwise.
 	/// </summary>
 	public sealed class IdleEyeVideo : IVideoProvider
 	{
+		/// <summary>Whether the eye moves at all: false draws the mark once, centred
+		/// and wide open, and never changes it.</summary>
+		private readonly bool _animated;
+
 		private const int Width = 480;
 
 		private const int Height = 360;
@@ -84,14 +89,26 @@ namespace Chimera.Client.GUI
 			Opening,
 		}
 
+		/// <param name="animated">False holds the eye still: it looks straight
+		/// ahead, never blinks and never changes brightness, so the same picture
+		/// is drawn once and handed back for as long as the screen is idle.</param>
+		public IdleEyeVideo(bool animated = true)
+		{
+			_animated = animated;
+		}
+
 		/// <summary>
 		/// Tells the eye where to look, -1 hard left to +1 hard right. The caller
 		/// reports the pointer; the eye does the moving - a quick slide that
 		/// settles, the way a glance lands. Off-screen positions just peg the
-		/// gaze, which is what an eye watching someone leave the room does.
+		/// gaze, which is what an eye watching someone leave the room does. An
+		/// eye that was asked to hold still ignores this.
 		/// </summary>
 		public void LookAt(float gaze)
-			=> _gazeTarget = Math.Max(-1f, Math.Min(1f, gaze));
+		{
+			if (!_animated) return;
+			_gazeTarget = Math.Max(-1f, Math.Min(1f, gaze));
+		}
 
 		public int VirtualWidth => Width;
 
@@ -109,6 +126,18 @@ namespace Chimera.Client.GUI
 
 		public int[] GetVideoBuffer()
 		{
+			if (!_animated)
+			{
+				// a still eye is one picture, so it is drawn once and the same
+				// buffer is handed back until the screen stops being idle
+				if (_drawnKey < 0)
+				{
+					_drawnKey = 0;
+					Draw();
+				}
+				return _buffer;
+			}
+
 			Animate();
 			// the eye is still most of the time, and a still eye is the same picture:
 			// only redraw when what would be drawn has actually changed

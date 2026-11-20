@@ -43,6 +43,10 @@ namespace Chimera.Client.GUI
 		// Also a UsesRam, and similar method
 		private readonly List<IToolForm> _tools = new List<IToolForm>();
 
+		/// <summary>The Log Window's lines, kept here rather than in the window so
+		/// that closing the window does not throw them away.</summary>
+		public LogBuffer Log { get; } = new();
+
 		/// <summary>
 		/// Initializes a new instance of the <see cref="ToolManager"/> class.
 		/// </summary>
@@ -62,6 +66,8 @@ namespace Chimera.Client.GUI
 			_emulator = emulator;
 			_movieSession = movieSession;
 			_game = game;
+			// a tool manager built with no config, as a test does, records nothing
+			if (config is not null) Log.SetBackground(config.LogWindowBackground);
 		}
 
 		private IExternalApiProvider GetOrInitApiProvider()
@@ -500,6 +506,7 @@ namespace Chimera.Client.GUI
 			_emulator = emulator;
 			_game = game;
 			_apiProvider = null;
+			if (config is not null) Log.SetBackground(config.LogWindowBackground);
 
 			var unavailable = new List<IToolForm>();
 
@@ -713,11 +720,6 @@ namespace Chimera.Client.GUI
 		public LuaConsole LuaConsole => GetTool<LuaConsole>();
 
 		public TAStudio TAStudio => GetTool<TAStudio>();
-
-		/// <summary>The log window when it is open, or null. Asked for by lines that belong
-		/// in it but must not open it - an on-screen message is one.</summary>
-		public LogWindow OpenLogWindow
-			=> _tools.OfType<LogWindow>().FirstOrDefault(static t => t.IsActive);
 
 		public void LoadRamWatch(bool loadDialog)
 		{

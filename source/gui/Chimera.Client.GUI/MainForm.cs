@@ -1163,7 +1163,7 @@ namespace Chimera.Client.GUI
 #pragma warning disable CS0618 // this is the sanctioned call-site
 			OSD.AddMessage(message, duration);
 			// the log window keeps the same line: what the screen said is what the log says
-			Tools?.OpenLogWindow?.Append(message);
+			Tools?.Log?.Append(message);
 #pragma warning restore CS0618
 			if (!this.SafeScreenReaderAnnounce(message)) Util.DebugWriteLine($"{nameof(AddOnScreenMessage)}: {nameof(AccessibleObject.RaiseAutomationNotification)} failed");
 		}
@@ -1207,6 +1207,12 @@ namespace Chimera.Client.GUI
 
 		/// <summary>What an idle Chimera looks at you with while no project is open.</summary>
 		private readonly IdleEyeVideo _idleEye = new();
+
+		/// <summary>The same eye held still, for the idle screen that does not move.</summary>
+		private readonly IdleEyeVideo _idleStillEye = new(animated: false);
+
+		/// <summary>The idle screen's untuned television.</summary>
+		private readonly IdleStaticVideo _idleStatic = new();
 
 		private ISoundProvider _currentSoundProvider = new NullSound(44100 / 60); // Reasonable default until we have a core instance
 
@@ -2033,6 +2039,9 @@ namespace Chimera.Client.GUI
 		{
 			_currAviWriter?.CloseFile();
 			_currAviWriter = null;
+			// the console goes back to where it came from, as it did when the log
+			// window was the one holding it
+			Tools?.Log?.Stop();
 		}
 
 		private DateTime _lastMessageCheck = DateTime.MinValue;
@@ -2139,21 +2148,10 @@ namespace Chimera.Client.GUI
 				return;
 			}
 
-			// nothing is loaded, so there is nothing to show but the eye, when the
-			// eye screensaver is on
-			var idleEye = Emulator is NullEmulator && Config.ChimeraEyeScreensaver;
-			if (idleEye)
-			{
-				// the idle eye watches the pointer: its horizontal place over the
-				// display, pegged when it wanders off
-				var panel = _presentationPanel.Control;
-				if (panel.Width > 0)
-				{
-					var mouseX = panel.PointToClient(Control.MousePosition).X;
-					_idleEye.LookAt(((mouseX / (float) panel.Width) * 2f) - 1f);
-				}
-			}
-			var video = idleEye ? _idleEye : _currentVideoProvider;
+			// nothing is loaded, so the screen shows whatever the idle screen is
+			// set to, and the null core's own frame when that is off
+			var idle = IdleVideo();
+			var video = idle ?? _currentVideoProvider;
 			Size currVideoSize = new Size(video.BufferWidth, video.BufferHeight);
 			Size currVirtualSize = new Size(video.VirtualWidth, video.VirtualHeight);
 
@@ -2184,6 +2182,32 @@ namespace Chimera.Client.GUI
 			else
 			{
 				DisplayManager.UpdateSource(video);
+			}
+		}
+
+		/// <summary>The picture an idle Chimera shows, or null when it shows the null
+		/// core's own frame.</summary>
+		private IVideoProvider IdleVideo()
+		{
+			if (Emulator is not NullEmulator) return null;
+			switch (Config.IdleScreen)
+			{
+				case EIdleScreen.Eye:
+					return _idleStillEye;
+				case EIdleScreen.AnimatedEye:
+					// the eye watches the pointer: its horizontal place over the
+					// display, pegged when it wanders off
+					var panel = _presentationPanel.Control;
+					if (panel.Width > 0)
+					{
+						var mouseX = panel.PointToClient(Control.MousePosition).X;
+						_idleEye.LookAt(((mouseX / (float) panel.Width) * 2f) - 1f);
+					}
+					return _idleEye;
+				case EIdleScreen.TvStatic:
+					return _idleStatic;
+				default:
+					return null;
 			}
 		}
 

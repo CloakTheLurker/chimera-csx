@@ -16,9 +16,28 @@ namespace Chimera.Client.GUI
 	{
 		private readonly Config _config;
 
-		private readonly CheckBoxEx _cbEye = new()
+		private readonly RadioButton _rbIdleOff = new()
 		{
-			Text = "The Chimera eye follows the pointer (when no project is open)",
+			AutoSize = true,
+			Text = "Nothing: the empty screen",
+		};
+
+		private readonly RadioButton _rbIdleEye = new()
+		{
+			AutoSize = true,
+			Text = "The Chimera eye, held still",
+		};
+
+		private readonly RadioButton _rbIdleAnimatedEye = new()
+		{
+			AutoSize = true,
+			Text = "The animated eye: follows the pointer and blinks",
+		};
+
+		private readonly RadioButton _rbIdleStatic = new()
+		{
+			AutoSize = true,
+			Text = "TV static",
 		};
 
 		private readonly SzTextBoxEx txtSWTOverride;
@@ -44,17 +63,34 @@ namespace Chimera.Client.GUI
 						txtSWTOverride,
 					},
 				});
-			LocSzGroupBoxEx grpEye = new() { Location = new(6, 200), Size = new(371, 58), Text = "Idle screen" };
-			_cbEye.Checked = _config.ChimeraEyeScreensaver;
-			grpEye.Controls.Add(new LocSzSingleColumnFLP
+			LocSzGroupBoxEx grpIdle = new() { Location = new(6, 200), Size = new(371, 126), Text = "Idle screen" };
+			switch (_config.IdleScreen)
+			{
+				case EIdleScreen.Off:
+					_rbIdleOff.Checked = true;
+					break;
+				case EIdleScreen.Eye:
+					_rbIdleEye.Checked = true;
+					break;
+				case EIdleScreen.TvStatic:
+					_rbIdleStatic.Checked = true;
+					break;
+				default:
+					_rbIdleAnimatedEye.Checked = true;
+					break;
+			}
+			grpIdle.Controls.Add(new LocSzSingleColumnFLP
 			{
 				Controls =
 				{
-					new LabelEx { Text = "Nothing is loaded: show the Chimera eye, which follows the pointer." },
-					_cbEye,
+					new LabelEx { Text = "What the screen shows when no project is open:" },
+					_rbIdleOff,
+					_rbIdleEye,
+					_rbIdleAnimatedEye,
+					_rbIdleStatic,
 				},
 				Location = new(5, 15),
-				Size = new(340, 40),
+				Size = new(340, 104),
 			});
 			tpMisc.Controls.Remove(flpStaticWindowTitles);
 			tpMisc.Controls.Remove(groupBox5);
@@ -64,7 +100,7 @@ namespace Chimera.Client.GUI
 				{
 					groupBox5,
 					flpStaticWindowTitles,
-					grpEye,
+					grpIdle,
 				},
 			});
 
@@ -170,7 +206,13 @@ namespace Chimera.Client.GUI
 				|| txtSWTOverride.Text.Equals(VersionInfo.CustomBuildString, StringComparison.Ordinal)
 					? string.Empty
 					: txtSWTOverride.Text;
-			_config.ChimeraEyeScreensaver = _cbEye.Checked;
+			_config.IdleScreen = _rbIdleOff.Checked
+				? EIdleScreen.Off
+				: _rbIdleEye.Checked
+					? EIdleScreen.Eye
+					: _rbIdleStatic.Checked
+						? EIdleScreen.TvStatic
+						: EIdleScreen.AnimatedEye;
 
 			if (rbUseRaw.Checked)
 				_config.DispManagerAR = EDispManagerAR.None;

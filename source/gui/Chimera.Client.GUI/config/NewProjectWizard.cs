@@ -3175,7 +3175,7 @@ namespace Chimera.Client.GUI
 				if (need.Decl is not null)
 				{
 					var found = FirmwareLocator.FindEither(need.Decl, _firmwareIndex);
-					if (found is null && string.IsNullOrEmpty(need.Decl.Sha1)
+					if (found is null && need.Decl.KnownSha1s.Count is 0
 						&& _rememberedFirmwarePath(ChosenCoreName ?? "", need.Id) is { } last)
 					{
 						found = _firmwareIndex.FirstOrDefault(f =>
@@ -3350,7 +3350,7 @@ namespace Chimera.Client.GUI
 				foreach (var need in _firmwareNeeds)
 				{
 					if (need.ChosenPath is not null || need.Decl is null) continue;
-					if (!string.IsNullOrEmpty(need.Decl.Sha1))
+					if (need.Decl.KnownSha1s.Count > 0)
 					{
 						if (FirmwareLocator.FindFor(need.Decl, index) is { } match)
 						{

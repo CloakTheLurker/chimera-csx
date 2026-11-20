@@ -79,8 +79,8 @@ namespace Chimera.Client.Common
 		/// <summary>The SHA1 of the file the user provided (uppercase hex), or null if there is none or it would not read.</summary>
 		public string? Sha1 { get; init; }
 
-		/// <summary>The SHA1s the core says are right, in declaration order. Empty when it pins none.</summary>
-		public IReadOnlyList<string> ExpectedSha1 => Decl.Sha1 is { Length: > 0 } pinned ? [ pinned ] : [ ];
+		/// <summary>The SHA1s the core says are right, in declaration order (the verified dump first). Empty when it pins none.</summary>
+		public IReadOnlyList<string> ExpectedSha1 => Decl.KnownSha1s;
 
 		/// <summary>Short form for a column; the full value goes in the detail line.</summary>
 		public static string Short(string? sha1) => sha1 is null ? "" : sha1.ToUpperInvariant()[..8];
@@ -145,8 +145,16 @@ namespace Chimera.Client.Common
 		/// can all find every dump a person ever pointed at. An unpinned
 		/// declaration has no hash to remember by and keeps the plain key.
 		/// </summary>
+		/// <summary>
+		/// The key the declaration's own dump is remembered under: its first known
+		/// hash, the one it was verified with. A declaration may know several dumps
+		/// of one file; they are one requirement, so they share one slot, and which
+		/// of them the file on hand is shows in its own hash rather than here.
+		/// </summary>
 		public static string KeyFor(string coreName, CoreFirmwareDecl decl)
-			=> decl.Sha1 is { Length: > 0 } pinned ? $"{coreName}/{decl.Id}#{pinned.ToUpperInvariant()}" : KeyFor(coreName, decl.Id);
+			=> decl.KnownSha1s.Count > 0
+				? $"{coreName}/{decl.Id}#{decl.KnownSha1s[0]}"
+				: KeyFor(coreName, decl.Id);
 
 		/// <summary>
 		/// The firmware the open project pins, by id, for its core - set when a
@@ -170,16 +178,21 @@ namespace Chimera.Client.Common
 			if (ProjectPins is { } project
 				&& project.Core.Equals(coreName, StringComparison.OrdinalIgnoreCase)
 				&& project.Pins.TryGetValue(decl.Id, out var pin)
-				&& !pin.Equals(decl.Sha1 ?? "", StringComparison.OrdinalIgnoreCase)
+				&& !decl.KnownSha1s.Any(h => h.Equals(pin, StringComparison.OrdinalIgnoreCase))
 				&& config.CoreFirmware.TryGetValue(KeyFor(coreName, new CoreFirmwareDecl { Id = decl.Id, Sha1 = pin }), out var pinned)
 				&& !string.IsNullOrWhiteSpace(pinned))
 			{
 				return (pinned, CoreFirmwareSource.Project);
 			}
-			if (!string.IsNullOrEmpty(decl.Sha1)
-				&& config.CoreFirmware.TryGetValue(KeyFor(coreName, decl), out var own) && !string.IsNullOrWhiteSpace(own))
+			// the file chosen for this requirement: it may be any of the dumps the
+			// core knows, and it was remembered under the one it turned out to be
+			foreach (var hash in decl.KnownSha1s)
 			{
-				return (own, CoreFirmwareSource.Chosen);
+				if (config.CoreFirmware.TryGetValue(KeyFor(coreName, new CoreFirmwareDecl { Id = decl.Id, Sha1 = hash }), out var own)
+					&& !string.IsNullOrWhiteSpace(own))
+				{
+					return (own, CoreFirmwareSource.Chosen);
+				}
 			}
 			return GetPath(config, coreName, decl.Id) is { } chosen ? (chosen, CoreFirmwareSource.Chosen) : (null, CoreFirmwareSource.None);
 		}
@@ -236,7 +249,7 @@ namespace Chimera.Client.Common
 				.OfType<ICoreFirmwareUser>()
 				.SelectMany(user => user.Firmware.Select(decl => Describe(config, ((ICoreFactory) user).CoreName, decl, FolderIndex)))
 				// two builds of one core loaded side by side declare the same files once
-				.GroupBy(static e => KeyFor(e.CoreName, e.Decl), StringComparer.OrdinalIgnoreCase)
+				.GroupBy(static e => $"{e.CoreName}/{e.Decl.Id}#{string.Join(",", e.Decl.KnownSha1s)}", StringComparer.OrdinalIgnoreCase)
 				.Select(static g => g.First())
 				.ToList();
 		}
@@ -260,7 +273,7 @@ namespace Chimera.Client.Common
 		private static string? InFirmwareFolder(Config config, CoreFirmwareDecl decl)
 		{
 			if (FirmwareFolder(config) is not { } dir) return null;
-			if (string.IsNullOrEmpty(decl.Sha1))
+			if (decl.KnownSha1s.Count is 0)
 			{
 				// nothing to ask by but the name, and a name is compared the way
 				// the platform that wrote it would: a dump called Complex_4627.bin
@@ -330,7 +343,7 @@ namespace Chimera.Client.Common
 			}
 			var sha1 = Sha1Of(bytes); // computed even for a file that will be refused: the user wants to see WHAT they pointed at
 			// the verdict is the engine's (see docs/engine-migration.md)
-			var state = EngineFirmware.Classify(decl.Size, decl.Sha1 is { Length: > 0 } pinned ? [ pinned ] : [ ], bytes.Length, sha1) switch
+			var state = EngineFirmware.Classify(decl.Size, decl.KnownSha1s, bytes.Length, sha1) switch
 			{
 				EngineFirmware.Verdict.WrongSize => CoreFirmwareState.Custom,
 				EngineFirmware.Verdict.Unrecognised => CoreFirmwareState.Unrecognised,

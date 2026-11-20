@@ -3,6 +3,8 @@
 using System.Collections.Generic;
 using System.Linq;
 
+using Newtonsoft.Json;
+
 namespace Chimera.Emulation.Common
 {
 	/// <summary>
@@ -33,12 +35,41 @@ namespace Chimera.Emulation.Common
 		public int Size { get; set; }
 
 		/// <summary>
-		/// SHA1s of the dumps known to be right (uppercase hex, no separators). A file
-		/// that matches none of them is still usable - it is reported as unrecognised
-		/// rather than rejected, because a good dump this list has never seen is more
-		/// likely than a frontend that should refuse to run.
+		/// SHA1 of the dump the core was verified with (uppercase hex, no separators).
+		/// A file that matches none of the known hashes is still usable - it is
+		/// reported as unrecognised rather than rejected, because a good dump this
+		/// list has never seen is more likely than a frontend that should refuse to run.
 		/// </summary>
 		public string? Sha1 { get; set; }
+
+		/// <summary>
+		/// OTHER dumps of the same file, beyond <see cref="Sha1"/>, that the core
+		/// knows to be right. One ROM is often dumped several ways - a Game Boy
+		/// Color boot ROM has a 256-byte gap in the middle that some dumpers fill
+		/// and others leave out - and a person holding a good copy should not be
+		/// told it is not one. A package written before this key existed still
+		/// reads, and a frontend that predates it ignores a key it does not know,
+		/// so a package may add it without cutting off older frontends.
+		/// </summary>
+		public List<string>? Sha1s { get; set; }
+
+		/// <summary>Every hash this declaration accepts, <see cref="Sha1"/> first, uppercase, no blanks or repeats.</summary>
+		[JsonIgnore]
+		public IReadOnlyList<string> KnownSha1s
+		{
+			get
+			{
+				List<string> hashes = new();
+				void Add(string? hash)
+				{
+					var one = hash?.Trim().ToUpperInvariant();
+					if (!string.IsNullOrEmpty(one) && !hashes.Contains(one)) hashes.Add(one);
+				}
+				Add(Sha1);
+				foreach (var hash in Sha1s ?? [ ]) Add(hash);
+				return hashes;
+			}
+		}
 
 		/// <summary>the file name this dump usually goes by - a hint, never a requirement</summary>
 		public string? Name { get; set; }

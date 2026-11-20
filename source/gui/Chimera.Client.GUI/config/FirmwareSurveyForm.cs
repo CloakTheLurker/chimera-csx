@@ -330,7 +330,7 @@ namespace Chimera.Client.GUI
 						ListViewItem item = new("", MarkFor(row.State)) { Group = lvg };
 						item.SubItems.Add(row.Decl.DisplayName);
 						item.SubItems.Add(row.Decl.Label ?? (row.Condition.Length is 0 ? "" : $"when {row.Condition}"));
-						item.SubItems.Add(string.IsNullOrEmpty(row.Decl.Sha1) ? "(any)" : CoreFirmwareEntry.Short(row.Decl.Sha1));
+						item.SubItems.Add(row.Decl.KnownSha1s.Count is 0 ? "(any)" : CoreFirmwareEntry.Short(row.Decl.KnownSha1s[0]));
 						item.SubItems.Add(row.Path is null ? "" : Path.GetFileName(row.Path));
 						item.SubItems.Add(row.Where is FirmwareWhere.Chosen ? "chosen" : row.WhereText);
 						item.SubItems.Add(row.StatusText);
@@ -411,7 +411,7 @@ namespace Chimera.Client.GUI
 		}
 
 		private static bool SameRow(FirmwareSurveyRow a, FirmwareSurveyRow b)
-			=> a.CoreName == b.CoreName && a.Decl.Id == b.Decl.Id && string.Equals(a.Decl.Sha1, b.Decl.Sha1, StringComparison.OrdinalIgnoreCase)
+			=> a.CoreName == b.CoreName && a.Decl.Id == b.Decl.Id && string.Equals(string.Join(",", a.Decl.KnownSha1s), string.Join(",", b.Decl.KnownSha1s), StringComparison.OrdinalIgnoreCase)
 				&& a.Decl.Label == b.Decl.Label;
 
 		public FirmwareSurveyRow? SelectedRow
@@ -548,9 +548,9 @@ namespace Chimera.Client.GUI
 				return;
 			}
 			var what = row.Decl.Description ?? $"{row.Decl.DisplayName}, {row.Decl.Size} bytes";
-			var expected = string.IsNullOrEmpty(row.Decl.Sha1)
+			var expected = row.Decl.KnownSha1s.Count is 0
 				? (string.IsNullOrEmpty(row.Decl.Name) ? "any file" : $"a file called {row.Decl.Name}, any bytes")
-				: $"expects {row.Decl.Sha1!.ToUpperInvariant()}";
+				: $"expects {string.Join("  or  ", row.Decl.KnownSha1s)}";
 			var when = row.Condition.Length is 0 ? "" : $" · needed when {row.Condition}";
 			var actual = row.Path is null ? "nothing yet"
 				: row.Sha1 is null ? $"{row.Path} could not be read"

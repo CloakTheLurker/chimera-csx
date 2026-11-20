@@ -26,15 +26,18 @@ namespace Chimera.Client.Common
 		}
 
 		/// <summary>
-		/// The file that satisfies the requirement, if the index holds one: hash
-		/// equals the entry's - the name plays no part. The decisions upstream
-		/// nailed the requirement to one exact file, so there is nothing to
-		/// choose between; duplicate copies are the same bytes, first one wins.
+		/// The file that satisfies the requirement, if the index holds one: its hash
+		/// is one of the dumps the core knows - the name plays no part. The decisions
+		/// upstream nailed the requirement to a set of exact files, and a person own
+		/// any of them; duplicate copies are the same bytes, first one wins.
 		/// </summary>
 		public static IndexedFile? FindFor(CoreFirmwareDecl decl, IReadOnlyList<IndexedFile> index)
-			=> string.IsNullOrEmpty(decl.Sha1)
+		{
+			var known = decl.KnownSha1s;
+			return known.Count is 0
 				? null
-				: index.FirstOrDefault(f => f.Sha1.Equals(decl.Sha1, StringComparison.OrdinalIgnoreCase));
+				: index.FirstOrDefault(f => known.Any(h => h.Equals(f.Sha1, StringComparison.OrdinalIgnoreCase)));
+		}
 
 		/// <summary>
 		/// The file that answers a requirement that pins no hash - a dump only
@@ -58,7 +61,7 @@ namespace Chimera.Client.Common
 		/// </summary>
 		public static IReadOnlyList<IndexedFile> HintCandidates(CoreFirmwareDecl decl, IReadOnlyList<IndexedFile> index)
 		{
-			if (!string.IsNullOrEmpty(decl.Sha1) || decl.NameHints is not { Count: > 0 } hints) return [ ];
+			if (decl.KnownSha1s.Count > 0 || decl.NameHints is not { Count: > 0 } hints) return [ ];
 			return index
 				.Where(f => (decl.Size is 0 || f.Length == decl.Size)
 					&& hints.Any(h => h.Length is not 0
@@ -75,7 +78,7 @@ namespace Chimera.Client.Common
 		/// </summary>
 		public static IndexedFile? FindEither(CoreFirmwareDecl decl, IReadOnlyList<IndexedFile> index)
 		{
-			if (!string.IsNullOrEmpty(decl.Sha1)) return FindFor(decl, index);
+			if (decl.KnownSha1s.Count > 0) return FindFor(decl, index);
 			if (FindNamed(decl, index) is { } named) return named;
 			var candidates = HintCandidates(decl, index);
 			return candidates.Count is 1 ? candidates[0] : null;

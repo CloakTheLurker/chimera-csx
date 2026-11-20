@@ -45,7 +45,7 @@ namespace Chimera.Client.Common
 
 		public string StatusText => State switch
 		{
-			CoreFirmwareState.Good => !string.IsNullOrEmpty(Decl.Sha1) ? "found, hash matches"
+			CoreFirmwareState.Good => Decl.KnownSha1s.Count > 0 ? "found, hash matches"
 				: Path is not null && !string.IsNullOrEmpty(Decl.Name)
 					&& !string.Equals(System.IO.Path.GetFileName(Path), Decl.Name, StringComparison.OrdinalIgnoreCase)
 					? "found by size and name"
@@ -86,7 +86,7 @@ namespace Chimera.Client.Common
 				if (Rows.Count is 0) return "needs no firmware";
 				var byId = Rows.GroupBy(static r => r.Decl.Id).ToList();
 				var onHand = Rows.Count(static r => r.OnHand);
-				var unpinned = Rows.All(static r => string.IsNullOrEmpty(r.Decl.Sha1));
+				var unpinned = Rows.All(static r => r.Decl.KnownSha1s.Count is 0);
 				if (byId.Count is 1 && Rows.Count > 1)
 				{
 					return $"{Rows[0].Decl.DisplayName} · {onHand} of {Rows.Count} dumps on hand · any one satisfies a project that chooses it";
@@ -187,7 +187,7 @@ namespace Chimera.Client.Common
 					for (var i = 0; i < decls.Count; i++)
 					{
 						var decl = decls[i];
-						if (!seen.Add($"{decl.Id}#{decl.Sha1}")) continue;
+						if (!seen.Add($"{decl.Id}#{string.Join(",", decl.KnownSha1s)}")) continue;
 						var entry = CoreFirmwareStore.Describe(config, first.Name, decl, index);
 						rows.Add(new FirmwareSurveyRow
 						{

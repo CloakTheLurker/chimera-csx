@@ -178,3 +178,77 @@ The current CI: witness level A and the full frontend pass; published cores fail
 | e2b51565 | test(cores): a core window's refused pictures are checked on a Qt without its network module (#610) | skip (Qt test) |
 | 53341840 | fix(window): --measure with --play counts from when the machine starts | skip (Qt) |
 | 99adbca8 | feat(cores): fheroes2 and TheXTech join the official cores (#601, #608) | portable (roster) |
+
+## The third batch: upstream after 1.5.0 (2026-11-21)
+
+Upstream main is 9d65d5d5 (2026-11-21), 21 commits after 99adbca8, the tip the second batch judged; main was not rebased. The official roster is 77 cores, up from 74: OpenGMK, XaviXEmu and OpenSurge join, and Supermodel declares Sega Model 2 and Model 1 beside Model 3.
+
+### The short answer
+
+- **Portable: four commits, three cores and two systems.** The rows, the README, and the packages. The four packages (OpenGMK 9.8 MB, XaviXEmu 165 KB, OpenSurge 42 MB, Supermodel 31 MB) were fetched here and the four contract classes run on them: 36 tests, 35 passed, 1 skipped, 0 failed. No engine, C# or miniBox change is needed to read or run them.
+- **Engine candidate: one commit (#614).** A save names the build it runs on, and a replayed branch gets a new state. The window's own save already names the running core (`RunningCoreIdentity` in `TasMovie.Project.cs`), so that half is not needed here; the engine's MCP save and the branch state written after a replay are not in this fork. It would be a new engine export (`ce_package_core_version`), the MCP save, and TAStudio's branch load - a decision of its own, not part of a cores batch.
+- **The rest: 16 commits, the Qt window and its view model.** TAS Studio's roll (#621, #622, #625), the new project's suggestions and compile page (#626, #618), the RAM Watch file drop (#623), the right-click menu (#616), the media maker's text (#619), the Lua Console's separator text (#624), two test-only commits, and the issue-intake rule. Two of them are worth a look in the C# window but are not ports: #622's unbound players (this window shows every player's columns, which is its own choice) and #618's compile bar (this window counts the manifest, so it cannot show "116 of 95", but its bar reads zero while one big module compiles).
+
+### The 21 commits
+
+| Commit | Subject | Verdict |
+| --- | --- | --- |
+| 9d65d5d5 | feat(cores): OpenSurge joins the official cores (#628) | portable (roster) |
+| d14105a9 | feat(cores): XaviXEmu joins the official cores (#631) | portable (roster) |
+| 4553f606 | feat(cores): OpenGMK joins the official cores (#604) | portable (roster) |
+| ccb542e7 | feat(cores): Supermodel offers Sega Model 2 and Model 1 besides Model 3 (#627) | portable (roster) |
+| 29e9bebe | chore(issues): a core request must name the TAS it is for | docs only |
+| b2f3de7b | test(ram-watch): the drop test compares paths as paths (#623) | skip (Qt test) |
+| 9f8e23b7 | test(vm): three races in the view model tests | skip (Qt test) |
+| 30a5942f | docs(design): the issue 626 section is marked as the owner's decision | docs only |
+| f6a666f8 | fix(newProject): the core is asked for suggestions again when any file changes (#626) | skip (Qt view model; this window asks again when the files page is left) |
+| 8c52c147 | fix(newProject): the compile page counts right, its bar moves and its list follows (#618) | engine comment and Qt; the C# page counts the manifest (see above) |
+| a3e0cd42 | fix(tastudio): a key on a device that is not plugged in does not make its player bound (#622) | skip (Qt view model) |
+| c49c663b | fix(tastudio): an unbound player has no columns, with no exceptions (#622) | skip (Qt view model; a behaviour choice here) |
+| a5384c72 | feat(tastudio): the roll has no columns for a player nothing is bound to (#622, #621) | skip (Qt view model; a behaviour choice here) |
+| 6f7ef5c0 | fix(tastudio): the roll scrolls, drags, picks cells, plays on the middle button, Edit shows its keys (#621, #625) | skip (Qt) |
+| 20432557 | feat(ram-watch): a .wch file dropped on the RAM Watch window opens (#623) | skip (Qt; this window's RAM Watch already takes dropped files) |
+| 5987b981 | fix(new-project): the wizard's last line is red only for an error (#620) | skip (Qt) |
+| f11fc5e8 | fix(media-maker): the result text wraps and the buttons stay clear of it (#619) | skip (Qt) |
+| 1fc144bd | fix(window): a right click opens the menu unless a machine button holds the right button (#616) | skip (Qt; this window already suppresses it for a bound right button) |
+| d691e058 | fix(lua): the Lua Console's Insert Separator text has one key, spelt right (#624) | skip (Qt); the C# context item still says "Insert Seperator", a one-word fix |
+| 78c389b1 | test(project): the other-build test closes its project first (#614) | skip (Qt test; it guards #614) |
+| d22e1ebe | fix(project): a save names the build it runs on, and a replayed branch gets a new state (#614) | engine candidate |
+
+### The three new cores and Supermodel's two
+
+All packages are x86_64 only except where said; each carries miniBox's `windows/kit/*.qml` (Save Data, Registers), which the C# window ignores and replaces with its own tools.
+
+| Core | Systems | Package | What it needs | Terms |
+| --- | --- | --- | --- | --- |
+| OpenGMK | GameMaker 8 | nightly-2026-11-21, e8f34d3c, 9.8 MB (game core) | The person's GameMaker 8.0 or 8.1 game (its `.exe`); no firmware. A GameMaker function OpenGMK lacks stops the machine with a sentence naming it | GPL-2.0-only |
+| XaviXEmu | XaviX | nightly-2026-11-21, cac105e3, 165 KB | The set's own ROM. Excite Boxing plays; MX Dirt Rebel and IDATEN Jump are accepted but not tried; the 26 sets with motion sensors, sticks, keyboards or a card scanner, and the XaviX 2, are refused with a reason | BSD-3-Clause |
+| OpenSurge | Open Surge Engine | nightly-2026-11-21, 2f0e2e70, 42 MB (game core) | Ships Surge the Rabbit's free assets; another game made with the engine is given as a zip; a gamepad is not tried. Software OpenGL costs about 0.37 s of CPU a drawn frame, so it does not play in real time | GPL-3.0 |
+| Supermodel | Adds Model 2 and Model 1 to Model 3 | nightly-2026-11-21, 87c38407, 31 MB | The board's ROM sets. Model 2 ran only the core's own test program and Model 1 only a start-up test; no real Model 2 or Model 1 game has been run | as before |
+
+Supermodel now declares miniBox's machine spec 3 (Model 1 crashed under spec 2, where llvmpipe's code generator mapped memory over the picture). This fork's miniBox is ba7cbc54 and its host accepts spec 2 and 3 (`source/host/host.c`), so that is not a blocker; the packages themselves are built on miniBox 3a483f31, newer than the submodule.
+
+### What the fork's contract measured
+
+On 2026-11-21 the four packages were fetched to a folder and the four contract classes were run with `CHIMERA_CORES_DIR` pointing at it: 36 tests, 35 passed, 1 skipped, 0 failed. The skip is the split-name check, which has nothing to ask when no installed package names a system whose roster row is split. `InstalledCorePackagesTests` reads all four packages, their factories, settings, slots, language tables and controllers; `MnemonicUniquenessTests` finds no two controls of one controller with the same movie letter; the roster-drift check compares Supermodel's Model 3 row (the only one this fork has) and has nothing to ask of the three cores the roster does not name yet.
+
+### Proposed (the owner's decision)
+
+- **Take the four roster commits**: three rows, Supermodel's two systems, the README's rows (OpenGMK and OpenSurge under game cores, XaviXEmu in the emulation table), and the four packages in the next core set. Roster 77.
+- **#614 on its own**, if wanted: the engine export, the MCP save and TAStudio's branch state. It is not part of a cores batch and it changes what a frontend may ask of the engine.
+- **Two one-evening fixes**: the C# Lua Console's context menu still says "Insert Seperator", and the compile bar could be busy until the first module lands, as upstream made it.
+- **Not taken**: nothing from the Qt window itself.
+
+### Asked for, not built (2026-11-21)
+
+Three open `core-request` issues, all from before the new rule that a request must name the TAS it is for:
+
+| Issue | Request |
+| --- | --- |
+| 617 | Legacy PlayStation cores: pcsx-rr, psxjin, mednafen, nymashock |
+| 601 | Heroes of Might and Magic II and III (II is fheroes2; III remains) |
+| 592 | Unleashed Recompiled and Marathon Recompiled |
+
+### Not proved
+
+No game was played in any of the four here: the contract classes read the packages, and each core's own repository measured gameplay. Model 2 and Model 1 have not run a real game anywhere. OpenSurge's package has not been run at all here, and cannot play in real time in software by its own measurement. The windows the packages carry are ignored by this window, so their Save Data and Registers tools are not exercised.

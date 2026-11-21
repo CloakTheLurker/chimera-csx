@@ -59,6 +59,7 @@ To use a core, download its `.chimeraCore` package (hosted on [this repository](
 | [FBNeo](https://github.com/ToolAssisted-run/chimera-core-fbneo) | Capcom CPS-1 / CPS-2 / CPS-3 (arcade), Neo Geo MVS (arcade), Neo Geo CD, Sega System 16 (arcade) |
 | [MAME](https://github.com/ToolAssisted-run/chimera-core-mame) | Arcade machines |
 | [MAME Home Systems](https://github.com/ToolAssisted-run/chimera-core-mamehome) | Atari 7800, Intellivision, Vectrex, Odyssey 2 / Videopac, Channel F, Amstrad CPC / CPC+ / GX4000, TI-83, BBC Micro |
+| [XaviXEmu](https://github.com/ToolAssisted-run/chimera-core-xavixemu) | XaviX plug-and-play TV games with plain controls (Excite Boxing, MX Dirt Rebel, IDATEN Jump) |
 | [DuckStation](https://github.com/ToolAssisted-run/chimera-core-duckstation) | PlayStation, Namco System 11 (arcade), Konami GQ (arcade) |
 | [Pokket](https://github.com/ToolAssisted-run/chimera-core-pokket) | Sony PocketStation |
 | [PCSX2](https://github.com/ToolAssisted-run/chimera-core-pcsx2) | PlayStation 2 |
@@ -97,7 +98,7 @@ To use a core, download its `.chimeraCore` package (hosted on [this repository](
 | [OpenBOR](https://github.com/ToolAssisted-run/chimera-core-openbor) | OpenBOR (2D beat 'em up games) |
 | [Ikemen GO](https://github.com/ToolAssisted-run/chimera-core-ikemen) | Ikemen GO (fighting games made with it, and M.U.G.E.N characters and stages) |
 | [ScummVM](https://github.com/ToolAssisted-run/chimera-core-scummvm) | ScummVM (adventure games of LucasArts, Sierra and others, run from their own files) |
-| [Supermodel](https://github.com/ToolAssisted-run/chimera-core-supermodel) | Sega Model 3 (arcade) |
+| [Supermodel](https://github.com/ToolAssisted-run/chimera-core-supermodel) | Sega Model 3, Model 2 and Model 1 (arcade) |
 
 ### Game cores
 
@@ -119,6 +120,8 @@ One game each, run from the game's own files ([docs/game-cores.md](docs/game-cor
 | [Open4DBoxing](https://github.com/ToolAssisted-run/chimera-core-open4dboxing) | 4D Sports Boxing (DOS) |
 | [fheroes2](https://github.com/ToolAssisted-run/chimera-core-fheroes2) | Heroes of Might and Magic II (from your own game's data file, or its free demo's) |
 | [TheXTech](https://github.com/ToolAssisted-run/chimera-core-thextech) | Super Mario Bros. X (SMBX 1.3) and its episodes, with an asset pack you bring |
+| [OpenGMK](https://github.com/ToolAssisted-run/chimera-core-opengmk) | GameMaker 8.0 and 8.1 games, from your own game's .exe |
+| [OpenSurge](https://github.com/ToolAssisted-run/chimera-core-opensurge) | Surge the Rabbit (included) and games made with the Open Surge Engine |
 
 SRB2 (Sonic Robo Blast 2) is published by its author, P-AS, from [their own repository](https://github.com/P-AS/chimera-core-srb2), so it is not in the official roster.
 

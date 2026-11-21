@@ -149,6 +149,21 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		/// <summary>
+		/// The compile bar has nothing honest to fill until a module lands: the
+		/// total is what the game needed last time, and a bar sitting at zero
+		/// while one big module compiles looks stalled (upstream #618). The rule
+		/// is the bar's own, so it is checked here rather than through a run.
+		/// </summary>
+		[TestMethod]
+		public void TheCompileBarIsBusyUntilAModuleLands()
+		{
+			Assert.IsTrue(NewProjectWizard.CompileBarIsBusy(95, 0), "a total from last time and nothing landed yet");
+			Assert.IsTrue(NewProjectWizard.CompileBarIsBusy(0, 3), "modules listed but no total to fill against");
+			Assert.IsFalse(NewProjectWizard.CompileBarIsBusy(95, 1), "the first module has landed");
+			Assert.IsFalse(NewProjectWizard.CompileBarIsBusy(95, 95), "all of them have");
+		}
+
+		/// <summary>
 		/// The sessions are CHILD PROCESSES: they read the config off disk, and
 		/// what it remembers is their only source of firmware. So whatever the
 		/// firmware page settled has to be written there BEFORE they start - the

@@ -1667,13 +1667,21 @@ namespace Chimera.Client.GUI
 		}
 
 		/// <summary>
+		/// Whether the compile bar is standing in for work it cannot measure:
+		/// nothing has landed yet, or nothing is known about how much there is.
+		/// A bar at zero looks stalled while one big module compiles (upstream
+		/// #618), so it says "working" instead of pretending to know.
+		/// </summary>
+		public static bool CompileBarIsBusy(uint expected, int compiled) => expected is 0 || compiled is 0;
+
+		/// <summary>
 		/// The bar fills with the modules compiled, out of what this game needed
-		/// last time. A game nobody has compiled yet has no total to fill
-		/// against, and the bar says "working" rather than pretending to know.
+		/// last time. It is busy until the first module lands, and for a game
+		/// nobody has compiled yet, which has no total to fill against.
 		/// </summary>
 		private void UpdatePrecompileBar()
 		{
-			if (_precompileExpected is 0)
+			if (CompileBarIsBusy(_precompileExpected, _precompileList.Items.Count))
 			{
 				_precompileBar.Style = ProgressBarStyle.Marquee;
 				return;

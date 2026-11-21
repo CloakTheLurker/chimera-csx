@@ -157,7 +157,7 @@ namespace Chimera.Client.GUI
 			// 
 			// InsertSeperatorContextItem
 			// 
-			this.InsertSeperatorContextItem.Text = "Insert Seperator";
+			this.InsertSeperatorContextItem.Text = "Insert Separator";
 			this.InsertSeperatorContextItem.Click += new System.EventHandler(this.InsertSeparatorMenuItem_Click);
 			// 
 			// StopAllScriptsContextItem

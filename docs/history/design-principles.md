@@ -3785,3 +3785,11 @@ Upstream's roster grew to 77 with OpenGMK, XaviXEmu and OpenSurge, and the Super
 The four x86_64 packages were fetched here and the four contract classes run on them: `InstalledCorePackagesTests`, `MnemonicUniquenessTests`, `CoreLanguageTableTests` and `RosterNamesTests`, 36 tests, 35 passed, 1 skipped, 0 failed. The skip is the split-name check, which has nothing to ask when no installed package names a system whose roster row is split. The roster is 77 cores and the README has the three rows and Supermodel's two systems; the packages go into the next cores set.
 
 Not proved: no game was played here in any of the four; each core's own repository measured gameplay. Model 1 and Model 2 have not run a real game anywhere, OpenSurge has not been run here, and the windows the packages carry are ignored by this window.
+
+## The Lua Console's separator, and a compile bar that shows work (2026-11-21)
+
+The Lua Console's context menu said "Insert Seperator"; its menu bar and toolbar said "Insert Separator". One word, and upstream's batch corrected the same word in the Qt window (the Lua Console's separator text, #624), so it is corrected here too.
+
+The compile page's bar is busy until the first module lands (upstream #618). This window counts the manifest, so it could never show upstream's "116 of 95", but with a total from the last compile the bar sat at zero while one big module compiled, looking stalled. `NewProjectWizard.CompileBarIsBusy` is the rule now - no total, or nothing landed yet - and the bar is a marquee then. A test holds the four cases; it failed once with the rule reduced to "no total".
+
+Measured: the interface suite is 127 / 72 / 669 / 408 with none failed. Not proved: the bar during a real multi-minute compile, which needs a game that compiles (no PS3 game here).

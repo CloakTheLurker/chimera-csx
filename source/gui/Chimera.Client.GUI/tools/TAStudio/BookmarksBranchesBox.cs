@@ -226,6 +226,23 @@ namespace Chimera.Client.GUI
 		/// <summary>State files no branch names any more - and not the undo's either - are removed: they can be gigabytes each.</summary>
 		private void TidyBranchStates() => Movie.RemoveUnusedBranchStates(_backupBranch?.StateFile);
 
+		/// <summary>
+		/// Writes the state a branch needs after it was reached by replaying,
+		/// because the state it had belonged to another build of the core, and
+		/// gives the branch that state, so the next load comes from it instead of
+		/// replaying again (upstream issue 614). Nothing is written when the state
+		/// cannot be made: the branch then keeps replaying, as it did before.
+		/// </summary>
+		public void SaveStateAfterReplay(TasBranch branch)
+		{
+			if (branch.StateFile is not null) return;
+			var stateFile = SaveBranchState(SavingTitle);
+			if (stateFile is null) return;
+			branch.StateFile = stateFile;
+			Movie.FlagChanges();
+			TidyBranchStates();
+		}
+
 		/// <summary>The window's words while a branch's state is written.</summary>
 		public const string SavingTitle = "Saving the branch";
 

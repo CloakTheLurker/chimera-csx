@@ -3793,3 +3793,17 @@ The Lua Console's context menu said "Insert Seperator"; its menu bar and toolbar
 The compile page's bar is busy until the first module lands (upstream #618). This window counts the manifest, so it could never show upstream's "116 of 95", but with a total from the last compile the bar sat at zero while one big module compiled, looking stalled. `NewProjectWizard.CompileBarIsBusy` is the rule now - no total, or nothing landed yet - and the bar is a marquee then. A test holds the four cases; it failed once with the rule reduced to "no total".
 
 Measured: the interface suite is 127 / 72 / 669 / 408 with none failed. Not proved: the bar during a real multi-minute compile, which needs a game that compiles (no PS3 game here).
+
+## A save names the build it ran on, and a replayed branch keeps its state (2026-11-21, upstream 614)
+
+Upstream found two faults that belong together. A project opened on a newer build of its core, with the old build gone, said "this is not the package the project was made with" at every open, because a save kept the old build's version and hash. And a branch made on the old build was replayed at every load: its state belonged to the old build, and nothing stored a new one.
+
+The window's own save already named the running core - `RunningCoreIdentity` in `TasMovie.Project.cs`, which reads the core that actually ran - so the first fault was not here for a project saved by the window. Two places lacked it.
+
+- **The engine's MCP save** named the core from the project's own file. The session now reads its package's hash and core version once, when the machine starts, and every MCP save names that build; a file put in the package's place while it runs does not change what a save names.
+- **`ce_package_core_version`** is the one place that reads a package's waterbox.config "version", and "" when it has none. It is a new declaration in the engine's interface, added on the owner's word with this batch.
+- **A branch's state** is written again after a replay. TAStudio remembers the branch it is replaying for while the seek runs, and writes the machine's state for it when the seek ends exactly on the branch's frame. A seek that is cancelled, declined at the long-seek question or stops short writes nothing, a new seek forgets the branch, and a branch that already has a state is left alone. The state is the running build's, so the next load reads it instead of replaying.
+
+Measured: the engine's `test_package` reads a package's version and answers "" for one without, and it failed once with the read taken out; `meson test engine_package` passes; the Linux engine and the Windows cross build compile; the interface suite is 127 / 72 / 669 / 408 with none failed.
+
+Not proved: the two parts that need a second build of a core. The MCP save's new pin was not exercised with a project made on one build and saved on another - upstream's `otherBuild` test does that against the Qt window and is not here, and what is ported is the few lines `mcp_local` runs. And no test drives TAStudio's seek to a branch frame: a branch replay and its state write need a running core, a branch and a seek, which the interface tests do not have, so the branch-state paragraph in docs/project.md describes behaviour seen only by reading the code.

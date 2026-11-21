@@ -163,9 +163,19 @@ namespace Chimera.Client.GUI
 		{
 			if (SeekingTo != -1 && Emulator.Frame >= SeekingTo)
 			{
+				var reached = _branchAwaitingState;
+				_branchAwaitingState = null;
 				bool smga = _shouldMoveGreenArrow;
 				StopSeeking();
 				_shouldMoveGreenArrow = smga;
+				// a branch reached by replaying keeps the state it has just run
+				// on: its old one was another build's, and without this every
+				// load replays again (upstream issue 614). A seek that stopped
+				// short of the branch's frame wrote nothing.
+				if (reached is not null && Emulator.Frame == reached.Frame)
+				{
+					BookMarkControl.SaveStateAfterReplay(reached);
+				}
 			}
 			UpdateProgressBar();
 			SaveGreenzoneAtSelectedMarker();

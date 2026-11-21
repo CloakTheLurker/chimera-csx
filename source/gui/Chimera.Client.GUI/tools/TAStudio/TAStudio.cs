@@ -1816,6 +1816,19 @@ namespace Chimera.Client.GUI
 			var from = PriorStateForFramebuffer(branch.Frame);
 			if (from >= 0) LoadStateAt(from);
 			GoToFrame(branch.Frame);
+			// The state this branch had was another build's and has been let go,
+			// so keep the one the running build reaches: the next load reads it
+			// instead of replaying again (upstream issue 614). A replay still on
+			// its way is remembered instead, and a declined or stopped one writes
+			// nothing.
+			if (Emulator.Frame == branch.Frame)
+			{
+				BookMarkControl.SaveStateAfterReplay(branch);
+			}
+			else if (SeekingTo != -1)
+			{
+				_branchAwaitingState = branch;
+			}
 			BranchLoadedCallback?.Invoke(CurrentTasMovie.Branches.IndexOf(branch));
 			RefreshDialog();
 		}

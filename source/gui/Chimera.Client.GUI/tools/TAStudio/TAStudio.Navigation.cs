@@ -13,6 +13,8 @@ namespace Chimera.Client.GUI
 		public void GoToFrame(int frame, bool OnLeftMouseDown = false, bool skipLoadState = false)
 		{
 			_lastRecordAction = -1;
+			// a new target is not the branch the last replay was aiming at
+			_branchAwaitingState = null;
 			if (frame == Emulator.Frame)
 			{
 				StopSeeking();

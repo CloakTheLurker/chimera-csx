@@ -98,6 +98,9 @@ namespace Chimera.Client.GUI
 		private int _seekStartFrame;
 		private bool _pauseAfterSeeking;
 
+		/// <summary>A branch whose state could not be used, waiting for the replay that reaches its frame (upstream issue 614).</summary>
+		private TasBranch _branchAwaitingState;
+
 		private readonly Dictionary<string, bool> _alternateRowColor = new();
 
 		private ControllerDefinition ControllerType => MovieSession.MovieController.Definition;
@@ -106,6 +109,9 @@ namespace Chimera.Client.GUI
 
 		public void StopSeeking(bool skipRecModeCheck = false)
 		{
+			// a seek that ends here did not reach what it was replaying for, or
+			// was cancelled: no branch state is written for a stopped replay
+			_branchAwaitingState = null;
 			_shouldMoveGreenArrow = true;
 			if (SeekingTo == -1) return;
 

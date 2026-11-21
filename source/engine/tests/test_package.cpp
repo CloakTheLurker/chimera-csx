@@ -36,7 +36,7 @@ static std::vector<uint8_t> makeZip(bool waterbox, bool manifest)
 	assert(mz_zip_writer_init_heap(&zip, 0, 0) == MZ_TRUE);
 	if (waterbox)
 	{
-		const char *cfg = "{ \"coreName\": \"testCore\", \"systemId\": \"NES\" }";
+		const char *cfg = "{ \"coreName\": \"testCore\", \"systemId\": \"NES\", \"version\": \"abc123\" }";
 		mz_zip_writer_add_mem(&zip, "core.wbx", "\x7f" "ELF-ish", 8, MZ_BEST_SPEED);
 		mz_zip_writer_add_mem(&zip, "waterbox.config", cfg, std::strlen(cfg), MZ_BEST_SPEED);
 	}
@@ -65,6 +65,7 @@ int main(void)
 		assert(p != nullptr && error == nullptr);
 		assert(ce_package_is_waterbox(p));
 		assert(ce_package_sha1(p) != nullptr && std::strlen(ce_package_sha1(p)) == 40);
+		assert(std::strcmp(ce_package_core_version(p), "abc123") == 0);
 		assert(ce_package_has_entry(p, "build.json"));
 		assert(!ce_package_has_entry(p, "default_keybinds.json"));
 		uint64_t len = 0;
@@ -127,6 +128,7 @@ int main(void)
 		assert(p != nullptr);
 		assert(ce_package_is_waterbox(p));
 		assert(ce_package_sha1(p) == nullptr); // nothing to hash
+		assert(std::strcmp(ce_package_core_version(p), "") == 0); // and no version either
 		uint64_t len = 0;
 		assert(ce_package_entry(p, "waterbox.config", &len) != nullptr && len == 21);
 		ce_package_free(p);

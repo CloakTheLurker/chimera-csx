@@ -692,6 +692,8 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		public long Count => _session.GreenzoneCount;
 
+		public long HeldBytes => checked((long)_session.GreenzoneHeld);
+
 		public int Nearest(int frame) => checked((int)_session.GreenzoneNearest(frame));
 
 		public bool Has(int frame) => _session.GreenzoneNearest(frame) == frame;

@@ -155,6 +155,19 @@ int g_refuseDeltaLoadIn = -1;
  * is expected to survive rather than report. */
 int g_outOfMemoryFor = 0;
 
+/* When set, a capture fails the way a machine does that can hold only so much:
+ * once the history holds this many bytes, and until it holds fewer. This is
+ * what a computer with less memory than the budget does (upstream issue 577). */
+const chimera::StateHistory *g_limitedHistory = nullptr;
+uint64_t g_heldLimit = 0;
+int64_t g_limitFailures = 0;
+void failWhenFull()
+{
+	if (g_limitedHistory == nullptr || g_limitedHistory->bytes() < g_heldLimit) return;
+	g_limitFailures++;
+	throw std::bad_alloc();
+}
+
 /* Every call that captures: a state, an epoch, a delta, a composition. A
  * history that is off must make none of them - the point of turning it off is
  * that the sandbox does no greenzone work at all. And the epochs alone, which
@@ -166,6 +179,7 @@ void fakeSaveState(void *, chimera::WbxWriteCb cb, uintptr_t ud, chimera::WbxRet
 {
 	g_captureCalls++;
 	if (g_outOfMemoryFor > 0) { g_outOfMemoryFor--; throw std::bad_alloc(); }
+	failWhenFull();
 	*r = {};
 	cb(ud, g_machine.cell, Machine::kCells);
 	writePad(cb, ud);
@@ -203,6 +217,7 @@ void fakeSaveDelta(void *, bool forward, chimera::WbxWriteCb cb, uintptr_t ud, c
 {
 	g_captureCalls++;
 	if (g_outOfMemoryFor > 0) { g_outOfMemoryFor--; throw std::bad_alloc(); }
+	failWhenFull();
 	*r = {};
 	if (g_machine.epochBase.empty()) { std::snprintf(r->errorMessage, sizeof r->errorMessage, "no epoch"); return; }
 	Cells changed;
@@ -718,36 +733,36 @@ int main(void)
 		assert(h.nearest(31) == 30);
 	}
 
-	{ // Running out of memory halves the budget instead of ending the session.
+	{ // Running out of memory fits the budget to what the history held instead
+	  // of ending the session, and a clear keeps that fit (upstream issue 577).
 	  //
 	  // The history is the biggest thing Chimera holds that it does not need, so
 	  // it is where the end of memory is met first - and a greenzone that has
-	  // quietly become half as deep is a run that continues, where a throw out of
+	  // become shallower is a run that continues, where a throw out of
 	  // a capture is a session lost.
 		const chimera::HostApi api = fakeHost();
 		g_machine = Machine{};
 
 		chimera::StateHistory h;
-		/* high enough that four halvings still clear the floor */
 		h.configure(&api, nullptr, 1024ull * 1024 * 1024);
 		h.bands(2, 6, 3, 12, 8);
 		h.capture(0);
 		const uint64_t before = h.budget();
 
-		/* four failures in a row: one halving is unlikely to be enough on a
-		 * machine that has actually run out, so it keeps going */
-		g_outOfMemoryFor = 4;
+		/* one failure: the budget goes to what the history held, not to a
+		 * fraction of what was set, and the capture is tried again */
+		g_outOfMemoryFor = 1;
 		h.beforeAdvance();
 		advance(1);
 		h.capture(1);
-		assert(g_outOfMemoryFor == 0);        /* every one of them was answered */
-		assert(h.budget() == before / 16);    /* halved once per failure */
+		assert(g_outOfMemoryFor == 0);        /* it was answered */
+		assert(h.budget() < before);
 		assert(h.budget() != 0);              /* and never off: zero is "no history" */
 
 		/* the frame that provoked it is stored, because the last try succeeded */
 		assert(h.nearest(1) == 1);
 
-		/* and it stops at the floor rather than halving towards nothing */
+		/* and it stops at the floor rather than going towards nothing */
 		g_outOfMemoryFor = 1000;
 		h.beforeAdvance();
 		advance(2);
@@ -756,16 +771,71 @@ int main(void)
 		assert(g_outOfMemoryFor > 0);         /* it gave up rather than spin */
 		g_outOfMemoryFor = 0;
 
-		/* Clear Greenzone gives memory back, and with it the budget that was
-		 * set: a halved budget used to stay halved until the project was
-		 * opened again, so the greenzone kept thinning after a clear
-		 * (upstream issue 577). */
-		assert(h.budget() < before);
+		/* a clear keeps the fit: giving the whole set back let the history
+		 * fill toward it, run out again and collapse again (issue 577) */
+		const uint64_t fitted = h.budget();
 		h.clear();
-		assert(h.budget() == before);
+		assert(h.budget() == fitted);
 		assert(h.budgetSet() == before);
-		h.capture(0);                          /* and it stores again, at that budget */
-		assert(h.nearest(0) == 0);
+	}
+
+	{ // A computer that holds less than the budget: the budget lands near what
+	  // it held, a clear keeps that, a new budget replaces it, and the
+	  // greenzone then keeps states at the period it was set to (issue 577).
+		const chimera::HostApi api = fakeHost();
+		g_machine = Machine{};
+
+		chimera::StateHistory h;
+		const uint64_t kSet = 64ull * 1024 * 1024;   /* far more than the "computer" holds */
+		h.configure(&api, nullptr, kSet);
+		h.smallestBudget(1024);
+		h.bands(2, 6, 3, 12, 8);
+		h.capturePeriod(2);
+		g_limitedHistory = &h;
+		g_heldLimit = 2000;                           /* what this computer can hold */
+		g_limitFailures = 0;
+		for (int64_t f = 0; f < 3000; f++)
+		{
+			h.beforeAdvance();
+			advance(f);
+			h.capture(f);
+		}
+		fprintf(stderr, "[test] limit %llu: failures %lld, budget %llu, held %llu, states %lld\n",
+			(unsigned long long)g_heldLimit, (long long)g_limitFailures,
+			(unsigned long long)h.budget(), (unsigned long long)h.bytes(), (long long)h.count());
+		assert(g_limitFailures > 0);                 /* memory did run out */
+		const uint64_t fit = h.budget();
+		/* near what was held when it failed (the limit), not a fraction of the
+		 * 64 MB set and not the floor. Halving from 64 MB takes the limit
+		 * down by half at a time and lands at 1 KB: this must be above. */
+		assert(fit <= g_heldLimit);
+		assert(fit >= g_heldLimit / 2);
+		assert(h.budgetSet() == kSet);
+		assert(h.bytes() <= g_heldLimit);
+
+		/* a clear keeps the fit; it does not give back the 64 MB */
+		h.clear();
+		assert(h.budget() == fit);
+
+		/* the period is kept: every second frame from here on is stored, and
+		 * the run did not run out again while it filled the fit */
+		const int64_t failures = g_limitFailures;
+		for (int64_t f = 3000; f < 3040; f++)
+		{
+			h.beforeAdvance();
+			advance(f);
+			h.capture(f);
+			if (f % 2 == 0) assert(h.nearest(f) == f);
+			else assert(h.nearest(f) == f - 1);
+		}
+		assert(g_limitFailures == failures);
+		assert(h.budget() == fit);
+
+		/* a new value from the person is taken whole, even above the fit: a
+		 * new session (configure) replaces it */
+		h.configure(&api, nullptr, kSet / 2);
+		assert(h.budget() == kSet / 2);
+		g_limitedHistory = nullptr;
 	}
 
 	{ // The spill file has a budget of its own, and the oldest goes first.

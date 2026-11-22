@@ -653,6 +653,13 @@ namespace Chimera.Client.GUI
 			Config.Movies.GreenzoneMaxNearStride = form.DefaultMaxNearStride;
 			Config.Movies.GreenzonePictureSettleFrames = form.DefaultPictureSettle;
 			if (id.Length is not 0) ProjectCache.RememberBudgets(id, form.ProjectBudgets);
+			// what this computer can hold, now that the budget has changed (upstream issue 577)
+			var budgetBytes = (ulong)form.DefaultMemoryMb * 1024 * 1024;
+			var heldBytes = (ulong)(Emulator.AsStateHistory()?.HeldBytes ?? 0);
+			if (GreenzoneBudget.WarningText(budgetBytes, ChimeraEngine.GreenzoneBudgetAdvice(budgetBytes, heldBytes)) is { } warning)
+			{
+				AddOnScreenMessage(warning, 15);
+			}
 		}
 
 		/// <summary>

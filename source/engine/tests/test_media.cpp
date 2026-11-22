@@ -638,6 +638,101 @@ static void aFailedPackKeepsTheImageThatWasThere()
 	(void)a;
 }
 
+/* A pack is never written inside the folder it packs: it would pack itself,
+ * and on the next run the old image too (upstream #633). Every format, and the
+ * ways of writing the same place. */
+static void anOutputInsideTheFolderIsRefused()
+{
+	const fs::path tree = workRoot() / "inside";
+	fs::remove_all(tree);
+	put(tree / "a.txt", "hello");
+	const fs::path beside = workRoot() / "inside.zip";
+	const fs::path inside[] = { tree / "image.zip", tree / "deep" / "down" / "image.zip",
+		tree / "deep" / ".." / "image.zip", tree / "." / "image.zip" };
+	for (const chimera::MediaFormat format : { chimera::MediaFormat::ZipStored, chimera::MediaFormat::Iso9660,
+			 chimera::MediaFormat::Fat12 })
+	{
+		for (const fs::path &out : inside)
+		{
+			std::string sha, err;
+			assert(!chimera::mediaMake(tree.string(), out.string(), format, nullptr, sha, err));
+			assert(err.find("is inside the folder being packed") != std::string::npos);
+			assert(!fs::exists(out));
+		}
+	}
+	/* the folder's path written another way is the same folder */
+	{
+		std::string sha, err;
+		const std::string roundabout = (workRoot() / "x" / ".." / "inside").string();
+		assert(!chimera::mediaMake(roundabout, (tree / "image.zip").string(), chimera::MediaFormat::ZipStored,
+			nullptr, sha, err));
+		assert(err.find("inside the folder being packed") != std::string::npos);
+	}
+	/* beside it, and in a folder whose name only begins the same, is fine */
+	{
+		std::string sha, err;
+		assert(chimera::mediaMake(tree.string(), beside.string(), chimera::MediaFormat::ZipStored, nullptr, sha, err));
+		const fs::path sibling = workRoot() / "inside2" / "image.zip";
+		fs::create_directories(sibling.parent_path());
+		assert(chimera::mediaMake(tree.string(), sibling.string(), chimera::MediaFormat::ZipStored, nullptr, sha, err));
+	}
+}
+
+/* The 4 GiB refusal names an earlier image saved in the folder as that, and
+ * asks for it to be moved out, rather than advising a zip (upstream #633). */
+static void aBigEarlierImageInTheFolderIsNamedAsOne()
+{
+	const fs::path tree = workRoot() / "big";
+	fs::remove_all(tree);
+	put(tree / "a.txt", "hello");
+	const fs::path big = tree / "Game (Media Maker 2)x.iso";
+	put(big, "");
+	std::error_code ec;
+	fs::resize_file(big, 5ull << 30, ec);
+	if (ec)
+	{
+		std::printf("test_media: a 5 GiB file could not be made here (%s): skipped\n", ec.message().c_str());
+		return;
+	}
+	std::string sha, err;
+	assert(!chimera::mediaMake(tree.string(), (workRoot() / "big.iso").string(), chimera::MediaFormat::Iso9660,
+		nullptr, sha, err));
+	assert(err.find("Game (Media Maker 2)x.iso") != std::string::npos);
+	assert(err.find("move it out of the folder") != std::string::npos);
+	assert(err.find(".zip") == std::string::npos);
+	/* a big file that does not look like an image keeps the old advice */
+	fs::remove(big);
+	const fs::path data = tree / "movie.dat";
+	put(data, "");
+	fs::resize_file(data, 5ull << 30, ec);
+	err.clear();
+	assert(!chimera::mediaMake(tree.string(), (workRoot() / "big.iso").string(), chimera::MediaFormat::Iso9660,
+		nullptr, sha, err));
+	assert(err.find("movie.dat") != std::string::npos && err.find("Pack this dump as a .zip") != std::string::npos);
+	assert(err.find("move it out") == std::string::npos);
+}
+
+/* The files that look like an earlier image are found at any depth, by name
+ * alone, sorted; a .bin is not one (upstream #637). */
+static void earlierImagesAreFoundAtAnyDepth()
+{
+	const fs::path tree = workRoot() / "earlier";
+	fs::remove_all(tree);
+	put(tree / "readme.txt", "hello");
+	put(tree / "data.bin", "bin");
+	assert(chimera::mediaEarlierImages(tree.string()).empty());
+	put(tree / "Old.ISO", "a");
+	put(tree / "deep" / "er" / "saves.zip", "b");
+	put(tree / "deep" / "Game (Media Maker 3).dat", "c");
+	put(tree / "disk.img", "d");
+	put(tree / "pack.7z", "e");
+	put(tree / "pack.rar", "f");
+	const std::vector<std::string> found = chimera::mediaEarlierImages(tree.string());
+	const std::vector<std::string> want = {"Old.ISO", "deep/Game (Media Maker 3).dat", "deep/er/saves.zip", "disk.img", "pack.7z", "pack.rar"};
+	assert(found == want);
+	assert(chimera::mediaEarlierImages((workRoot() / "nothing-here").string()).empty());
+}
+
 int main()
 {
 	fs::remove_all(workRoot());
@@ -659,6 +754,9 @@ int main()
 	namesThatShortenAlikeStayApart();
 	aCounterIsNeverALaterFilesOwnName();
 	pathTablesGoByParent();
+	anOutputInsideTheFolderIsRefused();
+	aBigEarlierImageInTheFolderIsNamedAsOne();
+	earlierImagesAreFoundAtAnyDepth();
 
 	fs::remove_all(workRoot());
 	std::printf("test_media: ok\n");

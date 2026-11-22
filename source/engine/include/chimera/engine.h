@@ -437,6 +437,14 @@ CE_API int32_t ce_media_recipe_format(const char *recipe_json);
 CE_API int32_t ce_media_make_with(const char *folder, const char *out_path, const char *recipe_json,
 	ce_media_progress_fn progress, void *user);
 
+/* The files of `folder`, at any depth, whose names look like a disc image or an
+ * archive made earlier (.iso .zip .img .7z .rar, or "(Media Maker" in the name;
+ * .bin is not on the list), as their relative paths with '/', sorted, one per
+ * line; "" when there are none. Packing the folder would put them inside the
+ * new file, so a window asks first (upstream #637). The text is valid until the
+ * next call on this thread. */
+CE_API const char *ce_media_earlier_images(const char *folder);
+
 /* The SHA1 of what the last successful ce_media_make wrote - what a project
  * would record - or "" if it did not finish. */
 CE_API const char *ce_media_last_sha1(void);
@@ -1719,6 +1727,13 @@ CE_API void ce_session_greenzone_enable(ce_session *s, uint64_t budget_bytes);
  * the one set (upstream issue 577). set_bytes, when not null, receives the one
  * set, read together with it. 0 (and 0 set) while the history is off. */
 CE_API uint64_t ce_session_greenzone_budget_now(const ce_session *s, uint64_t *set_bytes);
+/* The greenzone budget this computer can hold, when the one given is more than
+ * that: 0 when it is fine, or when the computer will not say how much memory
+ * it has. Looks at what the computer can spare now plus held_bytes, what the
+ * greenzone already holds (upstream issue 577). */
+CE_API uint64_t ce_greenzone_budget_advice(uint64_t budget_bytes, uint64_t held_bytes);
+/* What the session's greenzone holds in memory now, bytes. 0 while it is off. */
+CE_API uint64_t ce_session_greenzone_held(const ce_session *s);
 CE_API int64_t ce_session_greenzone_count(const ce_session *s);
 
 /* Anchor spacing, and the density of what is SPILLED to disk, all in FRAMES

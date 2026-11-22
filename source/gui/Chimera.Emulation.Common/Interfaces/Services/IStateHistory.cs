@@ -44,6 +44,9 @@ namespace Chimera.Emulation.Common
 		/// <summary>Frames it can produce - not the number of stored objects.</summary>
 		long Count { get; }
 
+		/// <summary>What it holds in memory now, bytes; 0 while it is off.</summary>
+		long HeldBytes { get; }
+
 		/// <summary>The greatest frame it can produce at or before this one, or -1.</summary>
 		int Nearest(int frame);
 

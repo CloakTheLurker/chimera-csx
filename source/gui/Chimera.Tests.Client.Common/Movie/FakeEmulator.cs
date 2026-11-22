@@ -88,6 +88,8 @@ namespace Chimera.Tests.Client.Common.Movie
 
 		public long Count => _states.Count;
 
+		public long HeldBytes => 0;
+
 		public int Nearest(int frame)
 		{
 			var best = -1;

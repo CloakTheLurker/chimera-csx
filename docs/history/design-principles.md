@@ -3807,3 +3807,27 @@ The window's own save already named the running core - `RunningCoreIdentity` in 
 Measured: the engine's `test_package` reads a package's version and answers "" for one without, and it failed once with the read taken out; `meson test engine_package` passes; the Linux engine and the Windows cross build compile; the interface suite is 127 / 72 / 669 / 408 with none failed.
 
 Not proved: the two parts that need a second build of a core. The MCP save's new pin was not exercised with a project made on one build and saved on another - upstream's `otherBuild` test does that against the Qt window and is not here, and what is ported is the few lines `mcp_local` runs. And no test drives TAStudio's seek to a branch frame: a branch replay and its state write need a running core, a branch and a seek, which the interface tests do not have, so the branch-state paragraph in docs/project.md describes behaviour seen only by reading the code.
+
+## The greenzone fits its budget to what the computer holds (2026-11-22, upstream 577)
+
+Running out of memory used to halve the budget until the capture fit. On a computer holding about 13 GB, a 20 GB budget went to 628 MB inside one capture, and Clear Greenzone gave the whole 20 GB back, so the history filled toward it, ran out again and collapsed again; the project was then saved at the collapsed size. This fork had the earlier budget rules - a clear that gives the budget back and `ce_session_greenzone_budget_now` - but not this one, so the collapse was reachable here.
+
+What changed:
+
+- A capture that runs out sets the budget to what the history held less the size of one state, evicts, and tries again. A second failure goes down by the same rule from what is held then, to the sixteen megabyte floor. Measured, not halved.
+- The fit lasts for the session: a clear keeps it instead of giving the whole budget back, a new budget set by the person replaces it and is taken whole, and opening a project starts without one. It is not written to the settings and not saved.
+- `ce_greenzone_budget_advice` and `ce_session_greenzone_held` are new engine calls. When a project opens, and when the Greenzone budgets window closes, the window asks what this computer can hold - three quarters of what can be spared now plus what the greenzone already holds - and says the suggested size on screen when the budget is above it.
+
+Measured: the engine's state-history test runs out once with a 64 MB budget and a 2000-byte "computer": the budget lands between half of what was held and all of it, a clear keeps it, the capture period is kept afterwards with no more failures, and a new session takes a new value whole. With the halving put back the test aborted: thirteen failures and a budget of 8192 bytes, above the 2000 the "computer" holds. The compile-sessions test checks the advice rule with figures. The Linux engine and the Windows cross build compile, and the interface suite is 127 / 72 / 671 / 409 with none failed, the new GreenzoneBudgetTests among them (its text test failed once with the sentence taken out).
+
+Not proved: the warning on a real machine, whose figures depend on the free memory at the time; the sentence is tested, a person has not seen it.
+
+## The Media Maker refuses to pack itself, and asks about an earlier image (2026-11-22, upstream 633, 637)
+
+A 4 GiB error for a PlayStation 3 folder came from an earlier image the person had saved inside the game folder, and the message advised a zip, which led them astray.
+
+- The engine refuses an output file that lies inside the folder being packed, for every shape, before any file is read. The paths are compared in full after `..` and links are resolved, case ignored on Windows, so `folder/../folder/x.zip` is caught and a sibling `folder2/x.zip` is not.
+- The 4 GiB message names a file that looks like an earlier image or archive (.iso .zip .img .7z .rar, or "(Media Maker" in the name; .bin is not one) and asks for it to be moved out of the folder, instead of advising a zip. `mediaLooksLikeEarlierImage` is the one rule, used by that message and by the question below.
+- `ce_media_earlier_images` lists a folder's such files at any depth, sorted, one per line. Before Make, the window asks with the first five names and how many more; Cancel writes nothing, OK packs everything, and nothing is left out because of its name. The window shows the engine's refusals in its result line already, so the inside-the-folder refusal and the new 4 GiB wording needed nothing there.
+
+Measured: the engine's media tests refuse an output inside the folder for zip, ISO 9660 and FAT12 and through a roundabout path, while a sibling folder is accepted; a 5 GiB image is named as an earlier image with no zip advice, and a 5 GiB .dat keeps the old advice (the file is skipped where the filesystem cannot make one); the earlier-image list is found at any depth, sorted, with .bin left out. The window's question names five and "and N more" (a test that failed once with the count removed). The interface suite is 127 / 72 / 671 / 409 with none failed. Not proved: the dialog answered by a person, and a real folder packed through the window.

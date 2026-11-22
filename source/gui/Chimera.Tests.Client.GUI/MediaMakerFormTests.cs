@@ -16,6 +16,27 @@ namespace Chimera.Tests.Client.GUI
 	[TestClass]
 	public class MediaMakerFormTests
 	{
+		/// <summary>
+		/// A folder that already holds a disc image or archive is packed only
+		/// after the person is told: the question names the first five and how
+		/// many more (upstream #637).
+		/// </summary>
+		[TestMethod]
+		public void TheEarlierImagesQuestionNamesFiveAndHowManyMore()
+		{
+			var names = Enumerable.Range(1, 7).Select(static i => $"save{i}.iso").ToList();
+			var text = MediaMakerForm.EarlierImagesQuestion(names);
+			StringAssert.Contains(text, "save1.iso");
+			StringAssert.Contains(text, "save5.iso");
+			Assert.IsFalse(text.Contains("save6.iso"), "only the first five are named");
+			StringAssert.Contains(text, "and 2 more");
+			StringAssert.Contains(text, "Pack anyway");
+
+			var one = MediaMakerForm.EarlierImagesQuestion([ "the game.zip" ]);
+			StringAssert.Contains(one, "the game.zip");
+			Assert.IsFalse(one.Contains("more"), "one file is named and nothing is counted");
+		}
+
 		[TestMethod]
 		public void ItOpens()
 		{

@@ -72,7 +72,11 @@ namespace Chimera.Client.Common
 			States.PictureSettle(Math.Min(Math.Max(
 				Session.Settings.GreenzonePictureSettleFrames,
 				MovieConfig.MinimumPictureSettle), MovieConfig.MaximumPictureSettle));
-			States.Enable((long)memoryMb * 1024 * 1024);
+			var budgetBytes = (ulong)memoryMb * 1024 * 1024;
+			States.Enable((long)budgetBytes);
+			// what the computer can hold, said once at open rather than at every save
+			GreenzoneBudgetWarning = GreenzoneBudget.WarningText(budgetBytes,
+				ChimeraEngine.GreenzoneBudgetAdvice(budgetBytes, (ulong)States.HeldBytes));
 			// a machine attached while the greenzone is sparse or off stays so
 			if (_greenzonePeriod != 1) States.SetCapturePeriod(_greenzonePeriod);
 			// Read here and not with the rest of the cache, because until the
@@ -124,6 +128,12 @@ namespace Chimera.Client.Common
 		public IStringLog VerificationLog { get; } = StringLogUtil.MakeStringLog(); // For movies that do not begin with power-on, this is the input required to get into the initial state
 		public ITasBranchCollection Branches { get; }
 		public ITasSession TasSession { get; private set; } = new TasSession();
+
+		/// <summary>
+		/// What to say about the greenzone budget, or null when it is fine
+		/// (upstream issue 577): the budget set is more than this computer can hold.
+		/// </summary>
+		public string GreenzoneBudgetWarning { get; private set; }
 
 		public int LastEditedFrame { get; private set; } = -1;
 		public bool LastEditWasRecording { get; private set; }
@@ -183,6 +193,7 @@ namespace Chimera.Client.Common
 			public void PictureSettle(int frames) {}
 			public void SetCapturePeriod(int period) {}
 			public long Count => 0;
+			public long HeldBytes => 0;
 			public int Nearest(int frame) => -1;
 			public bool Has(int frame) => false;
 			public void BeforeAdvance() {}

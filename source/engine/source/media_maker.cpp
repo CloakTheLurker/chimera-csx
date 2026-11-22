@@ -549,10 +549,78 @@ bool mediaRecipeApplies(const MediaRecipe &recipe, const std::string &folder)
 	return false;
 }
 
+namespace {
+
+/* Whether `file` lies inside `folder`. Compared as full paths with the file
+ * system's own view of them (weakly_canonical resolves ".." and links for the
+ * part that exists, and keeps the rest as written), and on Windows with the
+ * case ignored, since that file system does. A pack written inside the folder
+ * it packs would put the old image in the new one (upstream #633). */
+bool lyingInside(const std::string &folder, const std::string &file)
+{
+	std::error_code ec;
+	const std::filesystem::path root = std::filesystem::weakly_canonical(std::filesystem::absolute(std::filesystem::u8path(folder), ec), ec);
+	if (ec) return false;
+	const std::filesystem::path out = std::filesystem::weakly_canonical(std::filesystem::absolute(std::filesystem::u8path(file), ec), ec);
+	if (ec) return false;
+	auto parts = [](const std::filesystem::path &p) {
+		std::vector<std::string> v;
+		for (const std::filesystem::path &part : p.lexically_normal())
+		{
+			std::string name = part.u8string();
+			if (name.empty() || name == "." || name == "/" || name == "\\") continue;
+#if defined(_WIN32)
+			for (char &c : name)
+				if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+#endif
+			v.push_back(std::move(name));
+		}
+		return v;
+	};
+	const std::vector<std::string> a = parts(root), b = parts(out);
+	/* the file's own name is the last part, so it must be longer than the folder's path */
+	if (b.size() <= a.size()) return false;
+	return std::equal(a.begin(), a.end(), b.begin());
+}
+
+} // namespace
+
+bool mediaLooksLikeEarlierImage(const std::string &rel)
+{
+	std::string name = rel.substr(rel.find_last_of('/') == std::string::npos ? 0 : rel.find_last_of('/') + 1);
+	for (char &c : name)
+		if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+	if (name.find("(media") != std::string::npos && name.find("maker") != std::string::npos) return true;
+	const size_t dot = name.rfind('.');
+	const std::string ext = dot == std::string::npos ? "" : name.substr(dot);
+	return ext == ".iso" || ext == ".zip" || ext == ".img" || ext == ".7z" || ext == ".rar";
+}
+
+std::vector<std::string> mediaEarlierImages(const std::string &folder)
+{
+	std::vector<MediaEntry> files;
+	std::string error;
+	std::vector<std::string> found;
+	if (!mediaCollect(folder, files, error)) return found;
+	for (const MediaEntry &e : files)
+		if (mediaLooksLikeEarlierImage(e.rel)) found.push_back(e.rel);
+	std::sort(found.begin(), found.end());
+	return found;
+}
+
 bool mediaMake(const std::string &folder, const std::string &outPath, MediaFormat format,
 	const MediaProgress &progress, std::string &sha1Out, std::string &error,
 	const MediaRecipe *recipe)
 {
+	/* First, before any file is read: the answer is the same for every format
+	 * (upstream #633). A pack written inside the folder it packs would put the
+	 * old image in the new one. */
+	if (lyingInside(folder, outPath))
+	{
+		error = "The file to write (" + outPath + ") is inside the folder being packed ("
+			+ folder + "). Write it outside the folder, or the dump would contain itself.";
+		return false;
+	}
 	std::vector<MediaEntry> files;
 	if (!mediaCollect(folder, files, error)) return false;
 
@@ -679,6 +747,15 @@ CE_API int32_t ce_media_make_with(const char *folder, const char *out_path, cons
 		return 0;
 	}
 	return runMediaMake(folder, out_path, recipe.format, &recipe, progress, user);
+}
+
+CE_API const char *ce_media_earlier_images(const char *folder)
+{
+	static thread_local chimera::ThreadString listed;
+	listed->clear();
+	if (folder == nullptr) return listed->c_str();
+	for (const std::string &name : chimera::mediaEarlierImages(folder)) *listed += (listed->empty() ? "" : "\n") + name;
+	return listed->c_str();
 }
 
 CE_API const char *ce_media_last_sha1(void) { return g_lastSha1->c_str(); }

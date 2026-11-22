@@ -52,6 +52,9 @@ namespace Chimera.Client.Common
 		string LoadedClientSettings { get; }
 		ITasMovieRecord this[int index] { get; }
 		ITasSession TasSession { get; }
+
+		/// <summary>What to say about the greenzone budget, or null when it is fine (upstream issue 577).</summary>
+		string GreenzoneBudgetWarning { get; }
 		TasMovieMarkerList Markers { get; }
 
 		/// <summary>

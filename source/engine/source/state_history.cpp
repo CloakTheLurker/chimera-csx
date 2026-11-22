@@ -161,6 +161,7 @@ void StateHistory::configure(const HostApi *host, void *obj, uint64_t budgetByte
 	m_host = host;
 	m_obj = obj;
 	m_budget = m_budgetSet = budgetBytes;
+	m_fit = 0;
 	/* Everything stored goes, the spill file with it: a history configured
 	 * over one that had spilled kept the file open and its live count, and
 	 * then held the disk budget against stretches that no longer existed. The
@@ -201,17 +202,13 @@ void StateHistory::clear()
 	m_lastCaptureEnded = 0;
 	m_capturesSinceTuned = 0;
 	dropSpillFile();
-	/* A budget halved when the machine ran out of memory stayed halved until
-	 * the project was opened again, so the greenzone went on thinning after a
-	 * clear that had given the memory back (upstream issue 577). The clear
-	 * gives back the budget that was set; if memory runs out again, it is
-	 * halved again. */
-	if (m_budgetSet > m_budget)
+	/* A clear gives the budget back only up to what memory was seen to hold
+	 * (upstream issue 577): giving back the whole budget set let the history
+	 * fill toward it, run out again and collapse again, and what a project
+	 * saved at close was the collapsed size. */
 	{
-		fprintf(stderr, "[history] cleared: the budget goes back from %llu to the %llu set\n",
-			(unsigned long long)m_budget, (unsigned long long)m_budgetSet);
-		fflush(stderr);
-		m_budget = m_budgetSet;
+		const uint64_t ceiling = m_fit != 0 && m_fit < m_budgetSet ? m_fit : m_budgetSet;
+		if (ceiling > m_budget) m_budget = ceiling;
 	}
 }
 
@@ -1445,10 +1442,10 @@ void StateHistory::tuneStride(double captureSeconds, double wallSeconds)
  * meets the end of memory first, because the history is the biggest thing it
  * holds that it does not need.
  *
- * So running out is not fatal here: the budget halves, what that frees is given
- * back, and the capture is tried again. Repeatedly, down to a floor, because
- * one halving of a budget the machine cannot afford is unlikely to be enough.
- * A greenzone that has quietly become half as deep is a run that continues; the
+ * So running out is not fatal here: the budget is set to what the history held
+ * less one state (fitBudget), what that frees is given back, and the capture is
+ * tried again. If it fails again the budget goes down by what is held then, to
+ * a floor. A greenzone that has become shallower is a run that continues; the
  * alternative is a crash that loses the session.
  *
  * The budget is not written back to the settings. What the machine can spare
@@ -1521,7 +1518,7 @@ void StateHistory::capture(int64_t frame, const uint8_t *note, size_t noteLen)
 			bool halved = false;
 			try
 			{
-				halved = halveBudget();
+				halved = fitBudget();
 			}
 			catch (const std::bad_alloc &)
 			{
@@ -1532,14 +1529,23 @@ void StateHistory::capture(int64_t frame, const uint8_t *note, size_t noteLen)
 	}
 }
 
-/* Halves what the history may hold and gives back what that frees. False when
- * it is already at the floor - below which it could not hold one anchor, and
- * would be spending allocations to store nothing. */
-bool StateHistory::halveBudget()
+/* Sets the budget to what the history held when memory ran out, less one
+ * state, and gives back what that frees. Measured, not halved: a halving from
+ * 20 GB took five steps to reach 628 MB on a computer that could hold about
+ * 13 GB (upstream issue 577). False when it is already at the floor - below
+ * which it could not hold one anchor, and would be spending allocations to
+ * store nothing. */
+bool StateHistory::fitBudget()
 {
-	if (m_budget <= kSmallestBudget) return false;
+	if (m_budget <= m_smallestBudget) return false;
 	const uint64_t was = m_budget;
-	m_budget = m_budget / 2 < kSmallestBudget ? kSmallestBudget : m_budget / 2;
+	uint64_t oneState = 0;
+	for (const Segment &seg : m_segments) oneState = std::max<uint64_t>(oneState, seg.anchor.held());
+	uint64_t fit = m_bytes > oneState ? m_bytes - oneState : 0;
+	/* nothing measured to go by (a history with no states): halve */
+	if (fit >= was) fit = was / 2;
+	m_budget = fit < m_smallestBudget ? m_smallestBudget : fit;
+	m_fit = m_budget;
 	fprintf(stderr, "[history] out of memory with %llu bytes held: the budget goes from"
 		" %llu to %llu and the oldest of the run is given up\n",
 		(unsigned long long)m_bytes, (unsigned long long)was, (unsigned long long)m_budget);

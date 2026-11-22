@@ -140,6 +140,14 @@ namespace Chimera.Client.GUI
 					? "Warning: same core version, but a different build of it (rebuilt, or a different toolchain)"
 					: "Warning: Movie's core package hash does not match the loaded core package", 5);
 			}
+
+			// The greenzone budget can be more than this computer holds; the engine
+			// measures that when the history is attached and the movie says it here
+			// (upstream issue 577). Said once at open, not at every save.
+			if (MovieSession.Movie is ITasMovie { GreenzoneBudgetWarning: { } budgetWarning })
+			{
+				AddOnScreenMessage(budgetWarning, 15);
+			}
 		}
 
 		public void SetMainformMovieInfo()

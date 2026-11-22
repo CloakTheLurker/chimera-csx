@@ -277,9 +277,13 @@ bool mediaWriteIso9660(const std::vector<MediaEntry> &files, const std::string &
 	{
 		if (e.size >= k4GiB)
 		{
-			error = e.rel + " is 4 GiB or larger, which an ISO 9660 directory record cannot "
-				"describe in one piece. Pack this dump as a .zip instead, which has no such "
-				"limit.";
+			error = e.rel + (mediaLooksLikeEarlierImage(e.rel)
+				? " is 4 GiB or larger, and its name says it is a disc image or archive saved "
+					"inside the folder being packed. An ISO 9660 directory record cannot describe "
+					"a file that big in one piece: move it out of the folder and pack the folder "
+					"again."
+				: " is 4 GiB or larger, which an ISO 9660 directory record cannot describe in one "
+					"piece. Pack this dump as a .zip instead, which has no such limit.");
 			return false;
 		}
 	}

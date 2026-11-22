@@ -220,13 +220,21 @@ The budget is set in Tools > Cache Manager, and can be set **per project**; a pr
 
 What counts against it (2026-10-18): the bytes of every stored frame, and the bookkeeping each stored frame in memory costs besides - its link, its note, the shared body's block and the allocator's headers, counted as 192 bytes. Leaving that out held a light core, whose frames pack to 1 to 3 KB, 6 to 18% over the budget somebody set. With a capture period of N, a stretch is closed after its spacing in STORED frames, so a sparse greenzone stores deltas; with the period at 600 or more it closed after every delta, and every other stored frame was a whole machine. The history file a project save writes is written under a name of its own and moved over the old one when it is whole, so a save cut off by a crash or a full disk leaves the last good one.
 
-### Running out of memory halves the budget
+### Running out of memory fits the budget to what the computer holds
 
-The history is the biggest thing Chimera holds that it does not need, so it is where the end of memory is met first - and it is the one place that can answer. A capture that throws `std::bad_alloc` halves the budget, gives back what that frees, and tries again; repeatedly, because one halving of a budget the machine cannot afford is unlikely to be enough. Below sixteen megabytes it stops and the frame is simply not stored, which costs replaying to reach it.
+A capture that throws `std::bad_alloc` sets the budget to what the history held at that moment, less the size of one state, gives back what that frees (the oldest frames are thinned or given up), and tries again. If it fails again, the budget goes down by the same rule from what is held then: measured, not halved. Below sixteen megabytes it stops and the frame is simply not stored, which costs replaying to reach it. (It used to halve the budget, over and over within one capture: a 20 GB budget on a computer that held about 13 GB ended at 628 MB, upstream issue 577.)
 
-A greenzone that has quietly become half as deep is a run that continues. The alternative is a throw out of a capture and a session lost.
+A greenzone that has become shallower is a run that continues. The alternative is a throw out of a capture and a session lost.
 
-The halved figure is **not written back to the settings**. What a machine can spare this afternoon is not a decision somebody made, and it must not silently become one.
+The fitted figure is **not written back to the settings**. What a machine can spare this afternoon is not a decision somebody made, and it must not silently become one. It lasts for the session:
+
+- Clear Greenzone keeps the fit. It used to give back the whole budget that was set, so the greenzone filled toward it, ran out again and collapsed again, and the project was saved at the collapsed size.
+- A new budget set by the person, in the cache manager's Greenzone budgets, replaces the fit and is taken whole; if memory runs out again it is measured again.
+- Opening a project starts without a fit.
+
+The fit is said in the core log, and `ce_session_greenzone_budget_now` gives both figures.
+
+When a budget is set, or a project opens, it is also compared with what the computer can hold: three quarters of the memory it can spare now plus what the greenzone already holds (`ce_greenzone_budget_advice`, the same figures the compile sessions read). A budget above that is said on screen with a size that fits, before memory runs out.
 
 While a project's history is being saved in the background, the save holds everything the history gave up since it began, out of the budget's sight; halving then freed nothing and halved again, to the floor, for the rest of the session. So the save is waited for first, once, and the frame tried again (2026-10-18). Running out while miniBox writes a state is told to miniBox as a failed write and raised again once its call returns, not thrown through its C code; and running out just after an anchor was planned finishes the plan before its buffer can go.
 
@@ -744,7 +752,7 @@ The answer is not a bigger lock. It is that **only one thread owns anything, and
 | switches a branch | a state load plus a different input log: generation bumps, everything speculative dies, the prefix is rebuilt from the new timeline |
 | scrubs the piano roll for ten seconds | a seek per position, each cancelling the last prefetch before it started - which costs nothing, because a cancelled speculation has by definition produced nothing anybody wanted |
 | saves the project | the writer takes a metadata snapshot and streams bodies; the loop continues; closing the project is the barrier that must finish |
-| runs out of memory | the drainer's pending bytes are counted in `m_bytes`, so the budget sees them; speculation is cancelled first, owed work is finished, and only then does `halveBudget` do what it does today |
+| runs out of memory | the drainer's pending bytes are counted in `m_bytes`, so the budget sees them; speculation is cancelled first, owed work is finished, and only then does `fitBudget` do what it does today |
 
 #### Why this cannot deadlock
 

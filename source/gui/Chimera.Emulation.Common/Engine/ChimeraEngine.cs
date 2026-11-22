@@ -613,6 +613,9 @@ namespace Chimera.Emulation.Common.Engine
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_media_last_error();
 
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_media_earlier_images(string folder);
+
 		/// <summary>The core log: a UTF-8 path turns it on (1, or 0 with ce_core_log_error), "" turns it off.</summary>
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_core_log(string path);
@@ -916,6 +919,12 @@ namespace Chimera.Emulation.Common.Engine
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_session_greenzone_count(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract ulong ce_session_greenzone_held(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract ulong ce_greenzone_budget_advice(ulong budgetBytes, ulong heldBytes);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_session_frame(IntPtr session);
@@ -1240,6 +1249,15 @@ namespace Chimera.Emulation.Common.Engine
 
 		public static LibChimera Instance => _instance.Value;
 
+		/// <summary>
+		/// The greenzone budget this computer can hold, when <paramref name="budgetBytes"/>
+		/// is more than that; 0 when it is fine or the computer will not say what it has
+		/// (upstream issue 577). <paramref name="heldBytes"/> is what the greenzone already
+		/// holds: that memory is the computer's too, but it is no longer free.
+		/// </summary>
+		public static ulong GreenzoneBudgetAdvice(ulong budgetBytes, ulong heldBytes)
+			=> ChimeraEngine.Instance.ce_greenzone_budget_advice(budgetBytes, heldBytes);
+
 		private static LibChimera Load()
 		{
 			DynamicLibraryImportResolver resolver;
@@ -1436,6 +1454,17 @@ namespace Chimera.Emulation.Common.Engine
 		/// <summary>The same for an axis: a short header.</summary>
 		public static string ControlAxisHeader(string name)
 			=> PtrToStringUtf8(Instance.ce_control_axis_header(name)) ?? name;
+
+		/// <summary>
+		/// The files of a folder, at any depth, whose names look like a disc image or
+		/// archive made earlier (upstream #637), as relative paths with '/' and sorted;
+		/// empty when there are none.
+		/// </summary>
+		public static IReadOnlyList<string> EarlierMediaImages(string folder)
+		{
+			var text = PtrToStringUtf8(Instance.ce_media_earlier_images(folder)) ?? "";
+			return text.Length is 0 ? [] : text.Split('\n');
+		}
 
 		public static bool MakeMedia(string folder, string outPath, int format,
 			Func<string, ulong, ulong, ulong, ulong, bool>? progress,
@@ -2913,6 +2942,9 @@ namespace Chimera.Emulation.Common.Engine
 		public void GreenzoneUnpinAll() => E.ce_session_greenzone_unpin_all(Live);
 
 		public long GreenzoneCount => Disposed ? 0 : E.ce_session_greenzone_count(Live);
+
+		/// <summary>What the greenzone holds in memory now, bytes; 0 while it is off.</summary>
+		public ulong GreenzoneHeld => Disposed ? 0 : E.ce_session_greenzone_held(Live);
 
 		/// <summary>
 		/// Which frame the engine believes the machine is on. Normally the

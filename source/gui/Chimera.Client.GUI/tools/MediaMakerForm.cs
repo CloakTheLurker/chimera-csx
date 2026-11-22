@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -298,6 +299,25 @@ namespace Chimera.Client.GUI
 			Recognise();
 		}
 
+		/// <summary>
+		/// What the window says when the folder already holds files that look
+		/// like a disc image or an archive: the first five, and how many more
+		/// (upstream #637).
+		/// </summary>
+		public static string EarlierImagesQuestion(IReadOnlyList<string> names)
+		{
+			var shown = string.Join("\n", names.Take(5));
+			var more = names.Count > 5 ? $"\nand {names.Count - 5} more" : "";
+			return "This folder already holds files that look like a disc image or an archive:\n\n"
+				+ shown + more
+				+ "\n\nPacking it would put them inside the new file. Pack anyway?";
+		}
+
+		/// <summary>False when the person chose not to pack (upstream #637).</summary>
+		private bool ConfirmPackingEarlierImages(IReadOnlyList<string> names)
+			=> MessageBox.Show(this, EarlierImagesQuestion(names), "Pack the folder?",
+				MessageBoxButtons.OKCancel, MessageBoxIcon.Question) == DialogResult.OK;
+
 		private void PickFolder()
 		{
 			using FolderBrowserEx dialog = new()
@@ -342,6 +362,12 @@ namespace Chimera.Client.GUI
 
 		private async Task MakeAsync()
 		{
+			// The folder may already hold a disc image or an archive from an earlier
+			// pack; the new file would contain it, and the next one would contain both
+			// (upstream #637). Asked before anything is read or written.
+			var earlier = ChimeraEngine.EarlierMediaImages(_folder.Text);
+			if (earlier.Count != 0 && !ConfirmPackingEarlierImages(earlier)) return;
+
 			_running = true;
 			_cancel = new CancellationTokenSource();
 			_result.Text = "";

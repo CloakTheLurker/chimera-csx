@@ -252,3 +252,28 @@ Three open `core-request` issues, all from before the new rule that a request mu
 ### Not proved
 
 No game was played in any of the four here: the contract classes read the packages, and each core's own repository measured gameplay. Model 2 and Model 1 have not run a real game anywhere. OpenSurge's package has not been run at all here, and cannot play in real time in software by its own measurement. The windows the packages carry are ignored by this window, so their Save Data and Registers tools are not exercised.
+
+## The fourth batch: upstream after 1.5.3 (2026-11-22)
+
+Upstream main is 0bad0112 (2026-11-22), six commits after 9d65d5d5, the tip the third batch judged; main was not rebased. The roster is unchanged at 77, so there is no core to fetch or contract-test.
+
+### The short answer
+
+- **Engine candidate: the greenzone budget (#577), one commit.** Running out of memory used to halve the budget until the capture fit - a 20 GB budget became 628 MB in one capture on a computer holding about 13 GB - and Clear Greenzone gave the whole 20 GB back, so it collapsed again. It now fits the budget to what the history held when the allocation failed, keeps that fit for the session (a clear keeps it; setting a different budget replaces it) and warns, when a budget is set or a project opens, if it is above three quarters of the memory the computer can spare. This fork has the earlier budget fixes (`budget_now`, the clear that gives back a halved budget) but not this one, so the collapse is still reachable here. Porting means the engine's fit and the two new calls (`ce_greenzone_budget_advice`, `ce_session_greenzone_held`), plus a C# binding and a status-line warning; the engine's part is the fix.
+- **Portable: two Media Maker commits (#633, #637), engine and window.** The engine now refuses an output file that lies inside the folder being packed, before reading anything, and the 4 GiB message names a file that looks like an earlier image and asks for it to be moved out. `ce_media_earlier_images` lists the files of a folder that look like an earlier disc image or archive (.iso .zip .img .7z .rar, or "(Media Maker" in the name; .bin is not on the list), and the window asks before packing when there are any. This window calls `ce_media_make_with` and shows the engine's refusal already; it needs the binding, the question and the new texts.
+- **Skip: #635 and the two tests.** Controls of a device that is not plugged in get no column is the Qt roll's model: this window's roll has every player's column and no notion of an unplugged device. That is a behaviour choice rather than a port. The other two commits are Qt tests (a fast-forward timing test and a 5 GiB file test that skips where the filesystem cannot make one).
+
+### The six commits
+
+| Commit | Subject | Verdict |
+| --- | --- | --- |
+| 0bad0112 | feat(media-maker): ask before packing a folder that already holds a packed game (#637) | portable (engine call and the C# question) |
+| 7cbd9da7 | test(vm): the fast forward speed check measures the time that passed, and tries three times | skip (Qt test) |
+| 41e2641f | test(media): the 5 GiB file test skips where resize_file cannot make one (#633) | skip (Qt test) |
+| bcb8e9d3 | feat(tastudio): controls of a device that is not plugged in get no column (#635) | skip (Qt view model; a behaviour choice here) |
+| 4bfc3b17 | fix(media-maker): an old image saved in the folder is named as one, and the file is never written inside the folder (#633) | portable (engine, and the window shows its text) |
+| 8c0cdbb9 | fix(greenzone): when memory runs out, fit the budget to what was held, and warn when it is too big (#577) | engine candidate |
+
+### Not proved
+
+Nothing was fetched or run: no package changed, so the 1.5.3 set's contract result stands, and the three engine commits were read rather than built here. Their tests are upstream's (the greenzone fit test, the media maker tests and the 4 GiB message), and the window halves - the greenzone warning and the Media Maker question - do not exist in this fork yet.

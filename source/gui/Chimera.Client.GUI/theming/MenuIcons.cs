@@ -21,10 +21,11 @@ namespace Chimera.Client.GUI
 	/// every theme's menu colour, so an icon that cannot be seen is a failing
 	/// test rather than a bug report.
 	///
-	/// Most are the images the frontend already had. The handful that had no
-	/// sensible match are drawn here, the way CacheManagerForm draws its padlocks
-	/// and FirmwareSurveyForm its ticks - flat, mid-toned and without a dark
-	/// outline, because a dark outline is exactly what disappears on a dark menu.
+	/// They are Feather's line drawings (theming/FeatherIcons.cs), rendered at the
+	/// size a menu wants and in one mid tone: that tone is what keeps a glyph
+	/// visible on a white menu and on a near-black one, where a dark outline
+	/// vanishes on one of the two. The exceptions are Chimera's own logo and the
+	/// coloured status pictures, which are not commands.
 	///
 	/// Not everything gets one, on purpose:
 	/// <list type="bullet">
@@ -81,7 +82,7 @@ namespace Chimera.Client.GUI
 
 		public static Image HexEditor => Resources.Poke;
 
-		public static Image Debugger => Resources.Bug;
+		public static Image Debugger => FeatherIcons.Image("code");
 
 		public static Image OnlineHelp => Resources.Help;
 
@@ -89,7 +90,7 @@ namespace Chimera.Client.GUI
 
 		public static Image CopyVersionInfo => Resources.Duplicate;
 
-		public static Image ReportIssue => Resources.Bug;
+		public static Image ReportIssue => FeatherIcons.Image("alert-circle");
 
 		// ---- the gaps, filled with something the frontend already had ------
 
@@ -122,155 +123,46 @@ namespace Chimera.Client.GUI
 		/// <summary>A macro is a recorded run of inputs.</summary>
 		public static Image MacroTool => Resources.Record;
 
-		// ---- the gaps nothing already had, drawn here ----------------------
+		// ---- icons that had no picture of their own ------------------------
 		//
-		// Three of these had a picture in the frontend already and it was measured
-		// and rejected: the monitor is 128 pixels square, which is a photograph in
-		// a menu; the play triangle is twenty solid pixels of near-black; the
-		// pencil is drawn almost entirely in outline. All three vanish on a dark
-		// menu, which is the thing this whole exercise is about.
+		// These had a picture in the frontend already, or were drawn by hand, and
+		// are Feather glyphs now (theming/FeatherIcons.cs), so the menu reads as
+		// one set. The green dot on McpServerStarted is the one thing Feather has
+		// no glyph for: it says the server is running.
 
 		/// <summary>Window size: a screen with a corner being pulled.</summary>
-		public static Image WindowSize { get; } = Draw(static g =>
-		{
-			using SolidBrush frame = new(Color.FromArgb(0x7E, 0x8A, 0x9A));
-			using SolidBrush screen = new(Color.FromArgb(0xBC, 0xD4, 0xE8));
-			using SolidBrush grip = new(Color.FromArgb(0xD8, 0xA8, 0x50));
-			g.FillRectangle(frame, 4, 8, 56, 42);
-			g.FillRectangle(screen, 9, 13, 46, 32);
-			g.FillRectangle(frame, 24, 50, 16, 6);
-			Point[] corner = [ new(38, 46), new(58, 46), new(58, 26) ];
-			g.FillPolygon(grip, corner);
-		});
+		public static Image WindowSize => FeatherIcons.Image("maximize-2");
 
 		/// <summary>Customize: the sliders of a settings panel.</summary>
-		public static Image Customize { get; } = Draw(static g =>
-		{
-			using SolidBrush rail = new(Color.FromArgb(0x8A, 0x94, 0xA0));
-			using SolidBrush knob = new(Color.FromArgb(0x60, 0xA8, 0xD8));
-			int[] rows = [ 14, 32, 50 ];
-			int[] knobs = [ 40, 18, 32 ];
-			for (var i = 0; i < 3; i++)
-			{
-				g.FillRectangle(rail, 4, rows[i] - 3, 56, 6);
-				g.FillRectangle(knob, knobs[i], rows[i] - 9, 10, 18);
-			}
-		});
+		public static Image Customize => FeatherIcons.Image("sliders");
 
 		/// <summary>The batch runner: a list of runs, played through.</summary>
-		public static Image BatchRunner { get; } = Draw(static g =>
-		{
-			using SolidBrush line = new(Color.FromArgb(0x9A, 0xA4, 0xB0));
-			using SolidBrush go = new(Color.FromArgb(0x5C, 0xB8, 0x6C));
-			for (var i = 0; i < 3; i++)
-			{
-				g.FillRectangle(line, 4, 10 + (i * 14), 34, 7);
-			}
-			Point[] play = [ new(30, 34), new(58, 47), new(30, 60) ];
-			g.FillPolygon(go, play);
-		});
+		public static Image BatchRunner => FeatherIcons.Image("play-circle");
 
 
 		/// <summary>Firmware: a chip.</summary>
-		public static Image Firmware { get; } = Draw(static g =>
-		{
-			using SolidBrush body = new(Color.FromArgb(0x5A, 0x8C, 0xC8));
-			using SolidBrush pins = new(Color.FromArgb(0xC8, 0xC0, 0x78));
-			for (var i = 0; i < 3; i++)
-			{
-				var y = 16 + (i * 16);
-				g.FillRectangle(pins, 2, y, 12, 6);
-				g.FillRectangle(pins, 50, y, 12, 6);
-			}
-			g.FillRectangle(body, 12, 12, 40, 40);
-			using SolidBrush dot = new(Color.FromArgb(0xB8, 0xD8, 0xF8));
-			g.FillEllipse(dot, 18, 18, 8, 8);
-		});
+		public static Image Firmware => FeatherIcons.Image("cpu");
 
 		/// <summary>The data directory: a disk platter.</summary>
-		public static Image DataDirectory { get; } = Draw(static g =>
-		{
-			using SolidBrush body = new(Color.FromArgb(0x8A, 0x92, 0x9E));
-			using SolidBrush face = new(Color.FromArgb(0xD2, 0xD8, 0xE0));
-			using SolidBrush hole = new(Color.FromArgb(0x50, 0x58, 0x64));
-			g.FillEllipse(body, 2, 6, 60, 52);
-			g.FillEllipse(face, 8, 12, 48, 40);
-			g.FillEllipse(hole, 26, 26, 12, 12);
-		});
+		public static Image DataDirectory => FeatherIcons.Image("hard-drive");
 
 		/// <summary>The theme: a paint palette.</summary>
-		public static Image ThemePalette { get; } = Draw(static g =>
-		{
-			using SolidBrush body = new(Color.FromArgb(0xC8, 0xA0, 0x60));
-			g.FillEllipse(body, 2, 6, 60, 52);
-			using SolidBrush thumb = new(Color.FromArgb(0x30, 0x30, 0x30));
-			g.FillEllipse(thumb, 40, 34, 16, 16);
-			Color[] blobs = [ Color.FromArgb(0xD0, 0x50, 0x50), Color.FromArgb(0x50, 0xB0, 0x60), Color.FromArgb(0x60, 0x90, 0xD8) ];
-			int[] xs = [ 10, 22, 36 ];
-			int[] ys = [ 26, 14, 14 ];
-			for (var i = 0; i < 3; i++)
-			{
-				using SolidBrush blob = new(blobs[i]);
-				g.FillEllipse(blob, xs[i], ys[i], 14, 14);
-			}
-		});
+		public static Image ThemePalette => FeatherIcons.Image("droplet");
 
 		/// <summary>The core manager: a package.</summary>
-		public static Image CoreManager { get; } = Draw(static g =>
-		{
-			using SolidBrush body = new(Color.FromArgb(0xC0, 0x96, 0x5A));
-			using SolidBrush lid = new(Color.FromArgb(0xD8, 0xB4, 0x80));
-			using SolidBrush tape = new(Color.FromArgb(0x8A, 0x66, 0x38));
-			g.FillRectangle(body, 6, 20, 52, 38);
-			g.FillRectangle(lid, 4, 10, 56, 12);
-			g.FillRectangle(tape, 28, 10, 8, 48);
-		});
+		public static Image CoreManager => FeatherIcons.Image("package");
 
 		/// <summary>The cache manager: a stack of what is being kept.</summary>
-		public static Image CacheManager { get; } = Draw(static g =>
-		{
-			using SolidBrush top = new(Color.FromArgb(0x7C, 0xB0, 0x88));
-			using SolidBrush side = new(Color.FromArgb(0x4E, 0x80, 0x5C));
-			for (var i = 2; i >= 0; i--)
-			{
-				var y = 8 + (i * 17);
-				g.FillEllipse(side, 4, y + 6, 56, 18);
-				g.FillRectangle(side, 4, y + 6, 56, 9);
-				g.FillEllipse(top, 4, y, 56, 18);
-			}
-		});
+		public static Image CacheManager => FeatherIcons.Image("database");
 
 		/// <summary>The media maker: a disc.</summary>
-		public static Image MediaMaker { get; } = Draw(static g =>
-		{
-			using SolidBrush body = new(Color.FromArgb(0x9E, 0xAE, 0xC4));
-			using SolidBrush sheen = new(Color.FromArgb(0xE0, 0xE8, 0xF4));
-			using SolidBrush hole = new(Color.FromArgb(0x40, 0x46, 0x50));
-			g.FillEllipse(body, 2, 2, 60, 60);
-			g.FillPie(sheen, 2, 2, 60, 60, 200, 80);
-			g.FillEllipse(hole, 24, 24, 16, 16);
-		});
+		public static Image MediaMaker => FeatherIcons.Image("disc");
 
-		/// <summary>Pre-compiled modules: a cog, for work already done.</summary>
-		public static Image PrecompiledModules { get; } = Draw(static g =>
-		{
-			using SolidBrush teeth = new(Color.FromArgb(0x92, 0x9C, 0xA8));
-			using SolidBrush body = new(Color.FromArgb(0xC4, 0xCC, 0xD6));
-			using SolidBrush hole = new(Color.FromArgb(0x4A, 0x52, 0x5C));
-			for (var i = 0; i < 8; i++)
-			{
-				var state = g.Save();
-				g.TranslateTransform(32, 32);
-				g.RotateTransform(i * 45f);
-				g.FillRectangle(teeth, -7, -32, 14, 20);
-				g.Restore(state);
-			}
-			g.FillEllipse(body, 8, 8, 48, 48);
-			g.FillEllipse(hole, 24, 24, 16, 16);
-		});
+		/// <summary>Pre-compiled modules: a box, for work already done.</summary>
+		public static Image PrecompiledModules => FeatherIcons.Image("box");
 
-		/// <summary>The MCP server (Tools &gt; MCP Server...): the sparkles an AI agent is usually marked with.</summary>
-		public static Image McpServer { get; } = Draw(static g => McpSparkles(g));
+		/// <summary>The MCP server (Tools &gt; MCP Server...): a star.</summary>
+		public static Image McpServer => FeatherIcons.Image("star");
 
 		/// <summary>
 		/// The same with a green dot: the server is started. The menu item is not ticked to say so,
@@ -278,26 +170,11 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		public static Image McpServerStarted { get; } = Draw(static g =>
 		{
-			McpSparkles(g);
+			var star = FeatherIcons.Image("star", 64);
+			g.DrawImage(star, 0, 0, 64, 64);
 			using SolidBrush started = new(Color.FromArgb(0x4C, 0xB8, 0x6C));
 			g.FillEllipse(started, 40, 40, 22, 22);
 		});
-
-		/// <summary>A large four-pointed sparkle and a small one above and to its right.</summary>
-		private static void McpSparkles(Graphics g)
-		{
-			using SolidBrush large = new(Color.FromArgb(0x8E, 0x6C, 0xE0));
-			using SolidBrush small = new(Color.FromArgb(0x60, 0xA8, 0xD8));
-			g.FillPolygon(large, Sparkle(26, 38, 26, 7));
-			g.FillPolygon(small, Sparkle(50, 13, 13, 4));
-		}
-
-		/// <summary>A four-pointed star: its points on the axes, its waist on the diagonals.</summary>
-		private static Point[] Sparkle(int x, int y, int reach, int waist) =>
-		[
-			new(x, y - reach), new(x + waist, y - waist), new(x + reach, y), new(x + waist, y + waist),
-			new(x, y + reach), new(x - waist, y + waist), new(x - reach, y), new(x - waist, y - waist),
-		];
 
 		/// <summary>Every icon above, by name, for the test that measures them.</summary>
 		public static IReadOnlyList<(string Name, Image Image)> All()

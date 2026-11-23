@@ -11,6 +11,10 @@ Emulation cores are separate projects with their own authors and licenses; each 
 
 The sixty colour themes in [Themes](Themes) were made by **Nelson/Geferulf**, who gave them to the project to ship with Chimera.
 
+## Icons
+
+The interface's command icons are [Feather](https://feathericons.com), by Cole Bemis and the Feather contributors, under the MIT license. The SVG files the window uses are in `source/gui/Chimera.Client.GUI/images/feather`, with the license beside them; `theming/FeatherIcons.cs` draws them. The Chimera logo, the coloured status lights and arrows, and the controller picture are the project's own.
+
 ## BizHawk
 
 Chimera is a derivative fork of [BizHawk](https://github.com/TASEmulators/BizHawk). The frontend architecture, the TAS toolchain, the emulation service interfaces, and years of accumulated correctness are the work of the BizHawk team, and this project would not exist without them.

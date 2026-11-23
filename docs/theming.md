@@ -114,6 +114,8 @@ Off Windows it does nothing: there is no dwmapi, and a Unix window manager owns 
 
 Every image beside a menu item comes from `MenuIcons`, which is one place so that the gaps are visible as gaps. `MenuIconTests` walks it by reflection and measures each icon against every theme's menu colour, because an icon has to read on a white menu and on a near-black one and nobody will re-check that by eye.
 
+The glyphs are Feather's line drawings (https://feathericons.com, MIT), drawn by `FeatherIcons` from the SVG files under `images/feather`: one renderer gives a menu's 16 pixels and a form's 32 the same stroke, in one mid tone. The logo, the coloured status lights and arrows, and the controller picture stay Chimera's own, because Feather has no glyph for them.
+
 Three kinds of item are bare on purpose:
 
 - **Anything that can be ticked.** A ticked menu item draws its tick in the image margin, so an image there fights the tick. Every Display-this toggle, every throttle mode, every window scale.

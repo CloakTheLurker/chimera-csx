@@ -13,7 +13,7 @@ The sixty colour themes in [Themes](Themes) were made by **Nelson/Geferulf**, wh
 
 ## Icons
 
-The interface's command icons are [Feather](https://feathericons.com), by Cole Bemis and the Feather contributors, under the MIT license. The SVG files the window uses are in `source/gui/Chimera.Client.GUI/images/feather`, with the license beside them; `theming/FeatherIcons.cs` draws them. The Chimera logo, the coloured status lights and arrows, and the controller picture are the project's own.
+The interface's command icons are [Feather](https://feathericons.com), by Cole Bemis and the Feather contributors, under the MIT license. The SVG files the window uses are in `source/gui/Chimera.Client.GUI/images/feather`, with the license beside them; `theming/FeatherIcons.cs` draws them. The gamepad is [Gamepadicon.svg](https://commons.wikimedia.org/wiki/File:Gamepadicon.svg) from Wikimedia Commons, public domain, in `images/glyphs` because Feather has no gamepad. The Chimera logo and the coloured status lights and arrows are the project's own.
 
 ## BizHawk
 

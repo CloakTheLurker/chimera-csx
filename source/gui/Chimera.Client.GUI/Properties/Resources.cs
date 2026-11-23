@@ -67,8 +67,8 @@ namespace Chimera.Client.GUI.Properties
 		internal static readonly Bitmap Forward = FeatherIcons.Image("arrow-right");
 		internal static readonly Bitmap Freeze = FeatherIcons.Image("lock");
 		internal static readonly Bitmap Fullscreen = FeatherIcons.Image("maximize");
-		internal static readonly Icon GameControllerIcon = ReadEmbeddedIcon("GameController");
-		internal static readonly Bitmap GameController = ReadEmbeddedBitmap("GameController");
+		internal static readonly Icon GameControllerIcon = FeatherIcons.Icon("gamepad");
+		internal static readonly Bitmap GameController = FeatherIcons.Image("gamepad");
 		internal static readonly Bitmap GreenCheck = FeatherIcons.Image("check-circle", 16, Color.FromArgb(0x2E, 0x7D, 0x32));
 		internal static readonly Bitmap Help = FeatherIcons.Image("help-circle");
 		internal static readonly Icon HotKeysIcon = FeatherIcons.Icon("command");
@@ -113,7 +113,7 @@ namespace Chimera.Client.GUI.Properties
 		internal static readonly Bitmap ReadOnly = FeatherIcons.Image("lock");
 		internal static readonly Bitmap Reboot = FeatherIcons.Image("refresh-cw");
 		internal static readonly Bitmap Recent = FeatherIcons.Image("clock");
-		internal static readonly Bitmap Record = FeatherIcons.Image("disc");
+		internal static readonly Bitmap Record = FeatherIcons.Image("arrow-down-circle");
 		internal static readonly Bitmap Redo = FeatherIcons.Image("rotate-cw");
 		internal static readonly Bitmap Refresh = FeatherIcons.Image("refresh-cw");
 		internal static readonly Bitmap Restart = FeatherIcons.Image("rotate-ccw");

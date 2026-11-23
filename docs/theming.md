@@ -114,7 +114,7 @@ Off Windows it does nothing: there is no dwmapi, and a Unix window manager owns 
 
 Every image beside a menu item comes from `MenuIcons`, which is one place so that the gaps are visible as gaps. `MenuIconTests` walks it by reflection and measures each icon against every theme's menu colour, because an icon has to read on a white menu and on a near-black one and nobody will re-check that by eye.
 
-The glyphs are Feather's line drawings (https://feathericons.com, MIT), drawn by `FeatherIcons` from the SVG files under `images/feather`: one renderer gives a menu's 16 pixels and a form's 32 the same stroke, in one mid tone. The logo, the coloured status lights and arrows, and the controller picture stay Chimera's own, because Feather has no glyph for them.
+The glyphs are Feather's line drawings (https://feathericons.com, MIT), drawn by `FeatherIcons` from the SVG files under `images/feather`: one renderer gives a menu's 16 pixels and a form's 32 the same stroke, in one mid tone. The gamepad is a filled public-domain drawing from Wikimedia Commons, under `images/glyphs`, because Feather has no gamepad. The logo and the coloured status lights and arrows stay Chimera's own, because Feather has no glyph for a brand or a state colour.
 
 Three kinds of item are bare on purpose:
 

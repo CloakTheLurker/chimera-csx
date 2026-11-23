@@ -15,7 +15,8 @@ namespace Chimera.Client.GUI
 {
 	/// <summary>
 	/// The Feather icon set (https://feathericons.com, MIT), drawn from the SVG
-	/// files under <c>images/feather</c>.
+	/// files under <c>images/feather</c>, and the few drawings the project adds
+	/// where Feather has no glyph (the gamepad), under <c>images/glyphs</c>.
 	///
 	/// Feather's icons are 24-unit line drawings, so they are drawn here rather
 	/// than shipped as pictures: one renderer gives every size the window asks
@@ -31,6 +32,7 @@ namespace Chimera.Client.GUI
 	public static class FeatherIcons
 	{
 		private const string ResourcePrefix = "Chimera.Client.GUI.images.feather.";
+		private const string GlyphPrefix = "Chimera.Client.GUI.images.glyphs.";
 		private const float DesignSize = 24f;
 		private const int Supersample = 4;
 
@@ -81,7 +83,15 @@ namespace Chimera.Client.GUI
 			{
 				if (Documents.TryGetValue(name, out var cached)) return cached;
 			}
-			var stream = typeof(FeatherIcons).Assembly.EmbeddedResourceStream(ResourcePrefix + name + ".svg");
+			Stream stream;
+			try
+			{
+				stream = typeof(FeatherIcons).Assembly.EmbeddedResourceStream(ResourcePrefix + name + ".svg");
+			}
+			catch (ArgumentException)
+			{
+				stream = typeof(FeatherIcons).Assembly.EmbeddedResourceStream(GlyphPrefix + name + ".svg");
+			}
 			using (stream)
 			{
 				var document = XDocument.Load(stream);
@@ -95,6 +105,9 @@ namespace Chimera.Client.GUI
 
 		private static Bitmap Render(XDocument document, int size, Color ink)
 		{
+			var root = document.Root!;
+			var (designWidth, designHeight) = DesignSizeOf(root);
+			var filled = root.Attribute("stroke") is null || root.Attribute("stroke")!.Value == "none";
 			var big = size * Supersample;
 			using var large = new Bitmap(big, big);
 			using (var g = Graphics.FromImage(large))
@@ -102,17 +115,20 @@ namespace Chimera.Client.GUI
 				g.SmoothingMode = SmoothingMode.AntiAlias;
 				g.PixelOffsetMode = PixelOffsetMode.HighQuality;
 				g.Clear(Color.Transparent);
-				float scale = big / DesignSize;
+				var scale = Math.Min(big / designWidth, big / designHeight);
 				using var pen = new Pen(ink, Math.Max(1f, 2.4f * scale))
 				{
 					StartCap = LineCap.Round,
 					EndCap = LineCap.Round,
 					LineJoin = LineJoin.Round,
 				};
-				foreach (var element in document.Root!.Elements())
+				using var brush = new SolidBrush(ink);
+				foreach (var element in root.Elements())
 				{
 					using var shape = Shape(element, scale);
-					if (shape is not null) g.DrawPath(pen, shape);
+					if (shape is null) continue;
+					if (filled) g.FillPath(brush, shape);
+					else g.DrawPath(pen, shape);
 				}
 			}
 
@@ -139,6 +155,34 @@ namespace Chimera.Client.GUI
 				}
 			}
 			return icon;
+		}
+
+		private static (float Width, float Height) DesignSizeOf(XElement root)
+		{
+			var viewBox = root.Attribute("viewBox")?.Value;
+			if (!string.IsNullOrWhiteSpace(viewBox))
+			{
+				var parts = viewBox.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+				if (parts.Length == 4
+					&& float.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var w)
+					&& float.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var h)
+					&& w > 0 && h > 0)
+				{
+					return (w, h);
+				}
+			}
+			var width = Length(root.Attribute("width")?.Value) ?? DesignSize;
+			var height = Length(root.Attribute("height")?.Value) ?? width;
+			return (width, height);
+		}
+
+		private static float? Length(string? text)
+		{
+			if (string.IsNullOrWhiteSpace(text)) return null;
+			var cleaned = text!.Trim().TrimEnd('p', 'x', 'X', 'P');
+			return float.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && value > 0
+				? value
+				: (float?) null;
 		}
 
 		private static GraphicsPath? Shape(XElement element, float scale)

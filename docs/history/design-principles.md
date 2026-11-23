@@ -3864,3 +3864,16 @@ Measured: before, 749 pairs below the floor in 49 themes; after, none, and the t
 
 Not proved: a person looking through all forty-nine in the real window, and the controls the chooser's drawing does not show - a disabled arrow at a glyph's size, a status bar at a window's edge, the menus. The drawing is the only place the colours were seen together.
 
+
+## The lag rows are red, orange or violet, whichever the theme is near (user-decided, 2026-11-23)
+
+A lag frame in the piano roll is drawn on `TasLagZone` and its input on `TasLagZoneInput`, and the shipped themes had painted them in whatever the theme's own hue was: a blue lag row in a blue theme, a brown one in a brown theme. The owner asked for those two to look like a warning - red, orange or violet - with which one depending on the theme's hue, in the forty-nine themes that were not kept as authored.
+
+The hue is the theme's, taken from the first of `WindowBackground`, `Selection` and `AccentError` that has any saturation at all, so a grey theme answers with its selection or its error colour rather than with grey. That hue is compared with red at 358 degrees, orange at 28 and violet at 274, and the nearest wins. The row then takes the green zone's saturation, floored at 45 so a muted theme still reads the colour, and its lightness, so the two state rows carry the same weight; `RollText`'s 4.5:1 moves the lightness only as far as it must. `TasLagZoneInput` keeps the lightness and saturation step it already had from the row, and `TasLagZoneInputStated` and `TasLagZoneInputInvalidated` keep theirs from the input and the row. Those two shades were not named in the request, but they are the same ladder: leaving them behind would have put the old hue beside the new one on rows drawn next to each other.
+
+Kept as they were, on the owner's word: Dark (compiled in), Argos, Earl Grey, Engage, Espresso, Evergreen, Hedgehog, MARPAT, Nebula, Pint of Bitter, Spring Leaves and Tie-Dye.
+
+Measured: 196 colour values moved in the 49 themes, four per theme. The contrast rule is untouched and still passes: 0 pairs below the floor in `tools/theme-contrast.py`, and the interface suite is 127 / 72 / 679 / 411 with none failed. The theme chooser's drawing was rendered before and after for Aizome (blue to violet), Halloweentown and Win98 (to orange and violet), Pikablu (bright blue to violet), Skellington (grey to red) and Witches Brew (to its own violet) and looked at: every lag row now stands apart from the green zone and the default rows.
+
+Not proved: a person looking through all forty-nine in the real window, and the rows the chooser's drawing does not show - the stated and invalidated variants are drawn there, but only at the row height of the drawing.
+

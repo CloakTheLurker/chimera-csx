@@ -11,12 +11,13 @@ namespace Chimera.Tests.Client.Common
 	/// The themes Chimera ships, in the repository's Themes folder, and where the
 	/// frontend looks for themes (docs/theming.md).
 	///
-	/// A shipped theme is taken as its author made it: the readability floor in
-	/// <see cref="ThemeContrastTests"/> holds for Light and Dark, which are
-	/// Chimera's own, and not for these (user-decided, 2026-10-19). What IS held
-	/// here is that every one of them loads - a file the frontend refused would be
-	/// a theme in the folder that the window never offers, which nobody would
-	/// report because nobody would know it was missing.
+	/// Every one of them loads - a file the frontend refused would be a theme in
+	/// the folder that the window never offers, which nobody would report because
+	/// nobody would know it was missing - and every one of them that is not on the
+	/// owner's keep list puts readable text on every background, measured as
+	/// <see cref="ThemeContrastTests"/> measures Dark, with the WCAG AA floor of
+	/// 4.5:1 for text. The twelve kept as their author made them are listed in
+	/// <see cref="KeptAsTheyAre"/> (user-decided, 2026-11-23).
 	/// </summary>
 	[TestClass]
 	// CHIMERA_DATA_HOME is process-wide and these tests point it at their own folder; a
@@ -25,6 +26,18 @@ namespace Chimera.Tests.Client.Common
 	[DoNotParallelize]
 	public class ShippedThemesTests
 	{
+		/// <summary>
+		/// The themes left exactly as their author made them, on the owner's word
+		/// (user-decided, 2026-11-23). Dark is compiled in, not a file; the other
+		/// eleven are in the folder. A theme here is not measured, so a new one
+		/// belongs in this list only if the owner says so.
+		/// </summary>
+		private static readonly string[] KeptAsTheyAre =
+		{
+			"Dark", "Argos", "Earl Grey", "Engage", "Espresso", "Evergreen", "Hedgehog",
+			"MARPAT", "Nebula", "Pint of Bitter", "Spring Leaves", "Tie-Dye",
+		};
+
 		/// <summary>The repository's Themes folder, found by walking up for the file only the repository root has.</summary>
 		private static string? ShippedFolder()
 		{
@@ -66,6 +79,54 @@ namespace Chimera.Tests.Client.Common
 				if (string.IsNullOrWhiteSpace(theme.Author)) wrong.Add($"{theme.Name}: a theme Chimera ships says who made it");
 			}
 			Assert.AreEqual(0, wrong.Count, string.Join("\n", wrong));
+		}
+
+		/// <summary>
+		/// Every shipped theme the owner did not keep as it was puts readable text
+		/// on every background. The pairs and the arithmetic are the ones Dark is
+		/// held to; what is added is the 4.5:1 that text needs where an icon can
+		/// live with 3:1.
+		/// </summary>
+		[TestMethod]
+		public void EveryShippedThemePutsReadableTextOnEveryBackground()
+		{
+			var folder = ShippedFolder();
+			if (folder is null || !Directory.Exists(folder))
+			{
+				Assert.Inconclusive("the repository is not beside this assembly, so its Themes folder cannot be read");
+				return;
+			}
+
+			var (themes, failures) = ThemeLibrary.Read(folder);
+			Assert.AreEqual(0, failures.Count, string.Join("\n", failures.Select(static f => f.Message)));
+			var shipped = themes.Where(static t => !ThemeLibrary.IsBuiltIn(t)).ToList();
+			CollectionAssert.IsSubsetOf(
+				KeptAsTheyAre.Where(static n => n != "Dark").ToList(),
+				shipped.Select(static t => t.Name).ToList(),
+				"a theme kept as it is has gone from the folder");
+
+			var pairs = ThemeContrastTests.Pairs().ToList();
+			List<string> bad = new();
+			var looked = 0;
+			foreach (var theme in shipped)
+			{
+				if (KeptAsTheyAre.Contains(theme.Name, StringComparer.Ordinal)) continue;
+				looked++;
+				foreach (var (ink, ground) in pairs)
+				{
+					var ratio = ThemeContrastTests.Ratio(theme[ink], theme[ground]);
+					var floor = ThemeContrastTests.FloorFor(ink);
+					if (ratio < floor)
+					{
+						bad.Add($"{theme.Name}: {ink} on {ground} is {ratio:0.0}:1, needs {floor:0.0}:1 "
+							+ $"({ThemeFile.FormatColor(theme[ink])} on {ThemeFile.FormatColor(theme[ground])})");
+					}
+				}
+			}
+
+			Assert.AreEqual(shipped.Count - (KeptAsTheyAre.Length - 1), looked,
+				"every shipped theme not kept as it is is measured");
+			Assert.AreEqual(0, bad.Count, "text that cannot be read off its background:\n" + string.Join("\n", bad));
 		}
 
 		/// <summary>

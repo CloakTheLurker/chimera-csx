@@ -16,20 +16,34 @@ namespace Chimera.Tests.Client.Common
 	/// Measured as the WCAG contrast ratio, which is what the accessibility world
 	/// settled on and is the only one with agreed numbers behind it: 1 is the same
 	/// colour, 21 is black on white, 3 is the floor for anything a person has to
-	/// be able to pick out.
+	/// be able to pick out and 4.5 is the floor for text.
 	///
 	/// The theme that follows the desktop is exempt, and deliberately: those are
 	/// the desktop's colours, they are what Chimera has always had, and they are
-	/// not ours to refuse. So the theme held to it is Dark, the one Chimera itself
-	/// makes. The themes in the Themes folder are taken as their author made them
-	/// and are not measured here (user-decided, 2026-10-19); ShippedThemesTests
-	/// holds only that each of them loads.
+	/// not ours to refuse. So the theme held to the floor here is Dark, the one
+	/// Chimera itself makes. The themes in the Themes folder are measured too -
+	/// at 4.5 for text, the WCAG AA floor, since 2026-11-23 - and the twelve the
+	/// owner named are left as their author made them (user-decided, 2026-11-23);
+	/// <see cref="ShippedThemesTests"/> holds that.
 	/// </summary>
 	[TestClass]
 	public class ThemeContrastTests
 	{
-		/// <summary>The floor. Below this, text stops being something a person can pick out of its background.</summary>
+		/// <summary>The floor for Dark, which is text and icons alike.</summary>
 		private const double Floor = 3.0;
+
+		/// <summary>The floor for text a person reads, where a theme is measured as a shipped one is.</summary>
+		internal const double TextFloor = 4.5;
+
+		/// <summary>
+		/// The floor a shipped theme is held to: WCAG AA for text, and the same
+		/// 3:1 for an icon and for text that says it cannot be used.
+		/// </summary>
+		internal static double FloorFor(ThemeColorRole ink)
+			=> ink is ThemeColorRole.DisabledText or ThemeColorRole.GlyphForeground
+				or ThemeColorRole.GlyphShadow or ThemeColorRole.GlyphWarningInk
+				? Floor
+				: TextFloor;
 
 		private static double Channel(int v)
 		{
@@ -46,7 +60,7 @@ namespace Chimera.Tests.Client.Common
 		/// is composited before being measured rather than compared as if it were
 		/// opaque.
 		/// </summary>
-		private static double Ratio(Color ink, Color ground)
+		internal static double Ratio(Color ink, Color ground)
 		{
 			var over = Over(ink, ground);
 			var a = Luminance(over);
@@ -70,7 +84,7 @@ namespace Chimera.Tests.Client.Common
 		/// background role it lands on. Adding a role that carries text means
 		/// adding it here, or nothing is checking that it can be read.
 		/// </summary>
-		private static IEnumerable<(ThemeColorRole Ink, ThemeColorRole Ground)> Pairs()
+		internal static IEnumerable<(ThemeColorRole Ink, ThemeColorRole Ground)> Pairs()
 		{
 			// window chrome
 			yield return (ThemeColorRole.WindowText, ThemeColorRole.WindowBackground);

@@ -1,8 +1,9 @@
-#nullable enable
+﻿#nullable enable
 
 using System;
 using System.IO;
 using System.Linq;
+using System.Windows.Forms;
 
 using Chimera.Client.Common;
 using Chimera.Client.GUI;
@@ -56,6 +57,40 @@ namespace Chimera.Tests.Client.GUI
 			Assert.IsTrue(form.Visible);
 			Assert.IsFalse(string.IsNullOrWhiteSpace(form.Viewer.Rtf), "the first document is on screen");
 			form.Close();
+		}
+
+		/// <summary>
+		/// The reader wraps: a paragraph is read, not scrolled sideways. A table
+		/// and a code block used to keep their lines and force a horizontal bar on
+		/// every document that had one.
+		/// </summary>
+		[TestMethod]
+		public void TheReaderWrapsItsText()
+		{
+			using DocumentationForm form = new();
+			Assert.IsTrue(form.Viewer.WordWrap, "the reader must wrap a paragraph rather than scroll it sideways");
+			Assert.AreEqual(RichTextBoxScrollBars.Vertical, form.Viewer.ScrollBars);
+		}
+
+		/// <summary>
+		/// The standalone viewer (tools/DocumentationViewer) puts a file from disk
+		/// into this window: it is listed under its heading and draws like one of
+		/// the shipped documents, so what the viewer shows is what Help shows.
+		/// </summary>
+		[TestMethod]
+		public void ADocumentFromDiskIsListedAndDrawn()
+		{
+			using DocumentationForm form = new(loadShipped: false);
+			var before = form.Topics.Count;
+			Assert.AreEqual(0, before, "the viewer starts with no documents of its own");
+			form.LoadMarkdown("sample.md", "# A sample\n\nSome text with a [link](https://example.com).\n");
+			Assert.AreEqual(before + 1, form.Topics.Count);
+			Assert.AreEqual("A sample", form.Topics[before]);
+			form.ShowTopic(before);
+			Assert.IsFalse(string.IsNullOrWhiteSpace(form.Viewer.Text), "the document from disk is drawn");
+			// the words after a blank line must all be there: a paragraph mark
+			// without its delimiter used to swallow the next word
+			StringAssert.Contains(form.Viewer.Text, "Some text with a link");
 		}
 
 		[TestMethod]

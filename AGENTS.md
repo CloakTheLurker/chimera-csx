@@ -26,7 +26,7 @@ A core is built in ITS OWN repository, a checkout beside this one. This reposito
 - `source/gui/` - the C# solution (`Chimera.sln`): interface only.
 - `extern/chimera-common-minibox/` - miniBox, a submodule: the sandbox host, the guest toolchain (`source/guest`), the GPU bridge (`source/gl`).
 - `tests/synth/` - a synthetic core and the witness gate that drives the whole product with it; `tests/ui/` - the interface tests; `tests/engine/`.
-- `tools/` - bundles, publishing (`publish-core.sh`, `write-core-index.sh`), `fetch-cores.sh`.
+- `tools/` - bundles, publishing (`publish-core.sh`, `write-core-index.sh`), `fetch-cores.sh`, and `DocumentationViewer/`, the docs reader as an app of its own for working on it without starting Chimera.
 - `official-cores.json` - the roster CI goes by. The frontend does not read it.
 - `docs/` - one document per subject; the index is `docs/README.md`, and the design log is `docs/history/design-principles.md`.
 - `build/` - every output. Ignored by git. `build/Cores` is where a core's `build-package.sh -r <this checkout>` installs its package.

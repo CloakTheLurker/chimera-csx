@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<!--
+		The documentation reader as an app of its own, for working on it without
+		starting Chimera (tools/DocumentationViewer/Program.cs). It hosts the same
+		DocumentationForm, so what it shows is what Help > Open Documentation
+		shows. A development tool: it is not part of a bundle and the solution
+		does not build it.
+	-->
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net48</TargetFramework>
+		<UseWindowsForms>true</UseWindowsForms>
+		<LangVersion>latest</LangVersion>
+		<Nullable>enable</Nullable>
+		<AssemblyName>DocumentationViewer</AssemblyName>
+		<RootNamespace>Chimera.DocumentationViewer</RootNamespace>
+	</PropertyGroup>
+	<ItemGroup>
+		<ProjectReference Include="../../source/gui/Chimera.Client.GUI/Chimera.Client.GUI.csproj" />
+	</ItemGroup>
+	<!--
+		The frontend's build moves its assembly to build/Chimera.exe, while the
+		reference expects it under the assembly's own name, which is what the
+		runtime probes for: put a correctly named copy beside this app.
+	-->
+	<Target Name="CopyFrontendForProbing" AfterTargets="Build">
+		<Copy
+			SourceFiles="$(ProjectDir)../../build/Chimera.exe"
+			DestinationFiles="$(OutputPath)Chimera.Client.GUI.exe"
+			SkipUnchangedFiles="true"
+			Condition="Exists('$(ProjectDir)../../build/Chimera.exe')" />
+	</Target>
+</Project>

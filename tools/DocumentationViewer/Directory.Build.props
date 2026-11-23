@@ -1,0 +1,11 @@
+<Project>
+	<!--
+		The repository keeps every build output under build/, which git ignores;
+		this project is not part of the solution, so without this its own bin/ and
+		obj/ would land beside its source and show up as untracked files.
+	-->
+	<PropertyGroup>
+		<BaseOutputPath>$(MSBuildThisFileDirectory)..\..\build\DocumentationViewer\bin\</BaseOutputPath>
+		<BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)..\..\build\DocumentationViewer\obj\</BaseIntermediateOutputPath>
+	</PropertyGroup>
+</Project>

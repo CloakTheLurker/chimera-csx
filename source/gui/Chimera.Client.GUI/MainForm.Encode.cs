@@ -160,35 +160,81 @@ namespace Chimera.Client.GUI
 				return $"The encode cannot start: the emulator's state could not be kept to come back to ({e.Message}).";
 			}
 
+			// Frame 0 is the machine POWERED ON, not the state stored for it: a
+			// core whose saved states keep no picture (RPCS3's "Pictures in
+			// States") would record the screen from before the encode for its
+			// first frames. Powering on means closing the machine, which takes
+			// its greenzone with it, so the greenzone is kept in a file of its
+			// own and put back when the encode is over (upstream 639).
+			//
+			// Not while a script is running: its call is on the stack, and
+			// closing the machine under it crashes the Lua host (seen here).
+			// Frame 0 then loads its state as every other frame does, which is
+			// what upstream does while a core's own window holds a frame (610).
+			var scriptHeld = Tools.Has<LuaConsole>() && Tools.LuaConsole.AnyScriptRunning;
+			var fresh = request.StartFrame == 0 && !scriptHeld;
+			string? restoreHistory = null;
+			if (fresh)
+			{
+				restoreHistory = Path.ChangeExtension(movie.NewScratchStatePath("encode-history"), ".history");
+				if (movie.States.HeldBytes > 0 && !movie.SaveGreenzoneTo(restoreHistory))
+				{
+					TryDeleteFile(restoreHistory);
+					TryDeleteFile(restore);
+					return "The encode cannot start: the green zone could not be kept to come back to.";
+				}
+
+				// The machine is opened again from the project in memory, as Restart
+				// does but with the window told nothing it does not need: the same
+				// movie, markers, branches and settings, from frame 0. It is done
+				// before there is a job, so nothing that asks the window what it is
+				// doing during the boot sees a half-started encode. A machine that
+				// will not open is tried once more; if it will not open then either,
+				// the work is saved and the project closed rather than left on a
+				// machine that is gone.
+				if (!RebootProject(movie) && !RebootProject(movie))
+				{
+					var detail = SaveWorkAndClose(movie);
+					TryDeleteFile(restoreHistory);
+					TryDeleteFile(restore);
+					return "The encode stopped: the machine could not be powered on again." + detail;
+				}
+			}
+
 			// Whether it was RECORDING is taken here, before the switch below turns
 			// it off: it is one of the things the encode borrows and has to give
 			// back.
-			_encode = new(request, restore, MovieSession.ReadOnly, EmulatorPaused, movie.IsRecording());
+			_encode = new(request, restore, restoreHistory, MovieSession.ReadOnly, EmulatorPaused, movie.IsRecording());
 
 			// A reproduction, not an authoring session: the movie plays, nothing is
 			// recorded over it, and no state is kept from the frames that go by.
+			// A reboot opens the project as a fresh one, so these are set after it.
 			MovieSession.ReadOnly = true;
 			MovieSession.SuppressStateCapture = true;
 			if (movie.IsRecording()) movie.SwitchToPlay();
 
-			// Wind to the first frame. Frame zero always has a state, so this never
-			// needs to reboot the core - the worst case is replaying from the start.
-			try
+			if (!fresh)
 			{
-				var landed = movie.States.Nearest(request.StartFrame);
-				if (landed < 0 || !movie.States.RestoreTo(landed))
+				// Wind to the first frame. Frame zero is the one case that must not
+				// load a state (above); every other frame loads the nearest state
+				// and plays on, which is exact enough by the core's own setting.
+				try
 				{
-					throw new InvalidOperationException("the state history has no frame at or before it");
+					var landed = movie.States.Nearest(request.StartFrame);
+					if (landed < 0 || !movie.States.RestoreTo(landed))
+					{
+						throw new InvalidOperationException("the state history has no frame at or before it");
+					}
+					if (landed is 0 && movie.StartsFromSavestate) Emulator.ResetCounters();
 				}
-				if (landed is 0 && movie.StartsFromSavestate) Emulator.ResetCounters();
-			}
-			catch (Exception e)
-			{
-				// the reason is kept here: FinishVideoEncode ends the job, and _encode with it, so reading the message
-				// back from it always gave the generic one
-				var reason = $"Could not wind the run to frame {request.StartFrame}: {e.Message}";
-				FinishVideoEncode(VideoEncodePhase.Failed, reason);
-				return reason;
+				catch (Exception e)
+				{
+					// the reason is kept here: FinishVideoEncode ends the job, and _encode with it, so reading the message
+					// back from it always gave the generic one
+					var reason = $"Could not wind the run to frame {request.StartFrame}: {e.Message}";
+					FinishVideoEncode(VideoEncodePhase.Failed, reason);
+					return reason;
+				}
 			}
 
 			UnpauseEmulator();
@@ -323,6 +369,19 @@ namespace Chimera.Client.GUI
 			MovieSession.SuppressStateCapture = false;
 			MovieSession.ReadOnly = job.WasReadOnly;
 
+			// The greenzone belongs to the machine that was closed for an encode
+			// from frame 0, and goes back before the state does: the state load
+			// would otherwise leave the project with the reboot's empty history
+			// (upstream 639).
+			if (job.RestoreHistoryPath is not null)
+			{
+				if (MovieSession.Movie is ITasMovie withHistory && !withHistory.LoadGreenzoneFrom(job.RestoreHistoryPath))
+				{
+					message = $"{message} The green zone could not be put back.";
+				}
+				TryDeleteFile(job.RestoreHistoryPath);
+			}
+
 			try
 			{
 				Emulator.AsStatable().LoadStateFromFile(job.RestoreStatePath);
@@ -369,6 +428,45 @@ namespace Chimera.Client.GUI
 		/// went after the run loop has let go of it.
 		/// </summary>
 		private VideoEncodeJob? _lastEncode;
+
+		/// <summary>
+		/// The machine could not be powered on again, twice: the work goes to a
+		/// project file of its own, and the project is closed rather than left on a
+		/// machine that is gone (upstream 639). The sentence returned says where it
+		/// went, or why it did not go anywhere.
+		/// </summary>
+		private string SaveWorkAndClose(ITasMovie movie)
+		{
+			string path;
+			try
+			{
+				if (_openProject is null) return " The project is still open.";
+				var folder = ProjectCache.DirectoryFor(_openProject.Id);
+				Directory.CreateDirectory(folder);
+				path = Path.Combine(folder, "inputs-after-failed-encode.chimeraProject");
+			}
+			catch (Exception e)
+			{
+				return $" The inputs could not be saved ({e.Message}).";
+			}
+
+			FileWriteResult saved;
+			try
+			{
+				saved = movie.SaveWorkTo(path);
+			}
+			catch (Exception e)
+			{
+				return $" The inputs could not be saved ({e.Message}).";
+			}
+
+			if (saved.IsError)
+				return $" The inputs could not be saved ({saved.UserFriendlyErrorMessage()}); the project is still open.";
+
+			movie.ClearChanges();
+			CloseProject();
+			return $" The inputs were saved to {path} and the project was closed.";
+		}
 
 		/// <summary>Removes a file the encode made for itself; one that cannot go is left.</summary>
 		private static void TryDeleteFile(string path)

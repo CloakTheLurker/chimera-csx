@@ -80,6 +80,25 @@ namespace Chimera.Client.Common
 		/// exists, and never among the branches' states, which are tidied by name.
 		/// </summary>
 		string NewScratchStatePath(string purpose);
+
+		/// <summary>
+		/// The greenzone as a file of its own, under this movie's machine identity:
+		/// what an encode keeps while it powers the machine on again (upstream 639).
+		/// </summary>
+		bool SaveGreenzoneTo(string path);
+
+		/// <summary>
+		/// A greenzone written for this machine, put back. False when the file cannot be
+		/// read; a history of another machine is dropped, which is not a failure.
+		/// </summary>
+		bool LoadGreenzoneFrom(string path);
+
+		/// <summary>
+		/// The movie's work - inputs, markers, branches, settings - as a project file at
+		/// this path, with no greenzone: what an encode keeps when the machine cannot be
+		/// given back.
+		/// </summary>
+		FileWriteResult SaveWorkTo(string path);
 		TasLagLog LagLog { get; }
 		IStringLog VerificationLog { get; }
 

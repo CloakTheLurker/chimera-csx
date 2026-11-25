@@ -688,6 +688,14 @@ namespace Chimera.Client.GUI
 			=> _openedFiles.Find(f => !f.IsSeparator && f.Path == Path.GetFullPath(path)) is { Enabled: true };
 
 		/// <summary>
+		/// Whether any script is running here. The machine cannot be closed under
+		/// one: its call is on the stack that the close would tear down (upstream
+		/// 639 keeps the frame 0 state loaded where a frame is held, for the same
+		/// reason).
+		/// </summary>
+		public bool AnyScriptRunning => _openedFiles.Any(static f => !f.IsSeparator && f.Enabled);
+
+		/// <summary>
 		/// lua_console's numbered lines (issue 571): what was written is split at line ends, a part-line is joined to
 		/// the next message, and the last <see cref="MostLogLines"/> lines are kept.
 		/// </summary>

@@ -48,6 +48,19 @@ end
 
 pcall(function() client.invisibleemulation(true) end)
 
+-- The picture frame 0 has when the machine is powered on, before anything is
+-- loaded, is what an encode from frame 0 must put in the video (upstream 639).
+-- A script holds the machine, though, and it cannot be closed under the
+-- script's own call, so an encode started from a script loads state 0 as
+-- before; warming the run first puts a state with a picture there for the
+-- witness to exercise that fallback.
+if job.poweron == "1" then
+	local warm = tonumber(job.warm or "30")
+	while emu.framecount() < warm do
+		emu.frameadvance()
+	end
+end
+
 -- Where the person was. An encode borrows the emulator and has to give it back.
 meta.before = emu.framecount()
 

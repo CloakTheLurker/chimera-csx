@@ -285,6 +285,33 @@ namespace Chimera.Client.Common
 			}
 		}
 
+		/// <summary>
+		/// The work as a project file at this path, with no greenzone: what an encode
+		/// keeps when the machine cannot be given back (upstream 639). It is written
+		/// where asked even when the project has a file of its own, so the project's
+		/// own file is left as the person last saved it.
+		/// </summary>
+		public FileWriteResult SaveWorkTo(string path)
+		{
+			_savingWithoutGreenzone = true;
+			try
+			{
+				return Write(path);
+			}
+			finally
+			{
+				_savingWithoutGreenzone = false;
+			}
+		}
+
+		/// <summary>The greenzone to a file, under this machine's identity, for a machine about to be closed.</summary>
+		public bool SaveGreenzoneTo(string path)
+			=> States is not null && States.Save(path, MachineIdentityOf(Project));
+
+		/// <summary>A greenzone written for this machine, put back over the new session's own.</summary>
+		public bool LoadGreenzoneFrom(string path)
+			=> States is not null && States.Load(path, MachineIdentityOf(Project));
+
 		/// <summary>Raised when the input log is replaced by another object (a branch load), so a journal can follow it.</summary>
 		public event Action InputLogReplaced;
 

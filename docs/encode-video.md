@@ -39,6 +39,14 @@ Where the emulator was when the encode borrowed it is kept as a state file in th
 
 The frames that go into the file are the frames the emulator produced, not a second rendering of them: the job does not emulate anything itself. It only makes the main run loop run a frame every iteration, unthrottled, and decides when to stop. `AvFrameAdvance` writes them out exactly as it always has.
 
+## Frame 0
+
+An encode whose first frame is 0 powers the machine on again instead of loading the state kept for frame 0 (upstream 639). A core can be set to keep no picture in its saved states (RPCS3's "Pictures in States"), and the first frames of the video then held whatever was on screen before the encode began - the screen at the frame the encode borrowed the machine from, not frame 0. Frame 0 is exact for every core this way; an encode that starts after frame 0 is unchanged and still loads the nearest state.
+
+Powering on means closing the machine, which takes its greenzone with it. The greenzone is therefore written to a file beside the one kept to come back to (`encode-history-<id>.history`), and read back before that state is restored, so the project is left with the greenzone it had. The project, its movie, markers, branches, rerecords and settings are the ones that were open. RAM Search keeps its addresses here: they are addresses, not a borrow of the machine's memory. If the machine cannot be opened again it is tried once more; if it still cannot, the inputs are saved to `inputs-after-failed-encode.chimeraProject` in the project's cache and the project is closed, and the window says where they went.
+
+An encode started while a Lua script is running loads the state at frame 0 as every other frame does: the script's own call is on the stack that closing the machine would tear down. Upstream does the same while a core's own window holds a frame (issue 610).
+
 ## ffmpeg
 
 ffmpeg ships in the bundle, in `dll/`, put there at build time by `tools/fetch-ffmpeg.sh`. Chimera used to name a version, a URL and a checksum and ask the person to go and fetch it the first time they wanted a video; there is nothing to ask any more.
@@ -57,6 +65,6 @@ if err ~= nil then error(err) end
 while client.encodingvideo() do emu.frameadvance() end
 ```
 
-That is what `tests/synth/run-witness.sh` uses to prove the whole path on every run: it encodes a stretch of a real project with the synthetic core and checks that the file holds exactly the frames that were asked for, both ends included, and that the emulator was handed back on the frame it was borrowed from. It counts them with the ffmpeg the build ships, not a system ffprobe: a gate must not depend on a tool the machine happens to have, and a CI runner has none.
+That is what `tests/synth/run-witness.sh` uses to prove the whole path on every run: it encodes a stretch of a real project with the synthetic core and checks that the file holds exactly the frames that were asked for, both ends included, and that the emulator was handed back on the frame it was borrowed from. It counts them with the ffmpeg the build ships, not a system ffprobe: a gate must not depend on a tool the machine happens to have, and a CI runner has none. An encode from frame 0 started this way takes the state load rather than the power-on (see "Frame 0"); a second leg checks that it runs and hands the machine back.
 
 The command line's `--dump-type` / `--dump-name` / `--dump-length` still exist and still work; that is a different thing, for a build machine dumping a run nobody is watching.

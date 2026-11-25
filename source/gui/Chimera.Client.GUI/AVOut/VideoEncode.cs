@@ -119,12 +119,14 @@ namespace Chimera.Client.GUI
 		internal VideoEncodeJob(
 			VideoEncodeRequest request,
 			string restoreStatePath,
+			string? restoreHistoryPath,
 			bool wasReadOnly,
 			bool wasPaused,
 			bool wasRecording)
 		{
 			Request = request;
 			RestoreStatePath = restoreStatePath;
+			RestoreHistoryPath = restoreHistoryPath;
 			WasReadOnly = wasReadOnly;
 			WasPaused = wasPaused;
 			WasRecording = wasRecording;
@@ -139,6 +141,12 @@ namespace Chimera.Client.GUI
 		/// state can be bigger than a byte array (a PlayStation 3's is gigabytes, chimera issue 282)
 		/// </summary>
 		internal string RestoreStatePath { get; }
+
+		/// <summary>
+		/// The greenzone kept while the machine was powered on again for an encode
+		/// from frame 0 (upstream 639), or null when the machine was not closed.
+		/// </summary>
+		internal string? RestoreHistoryPath { get; }
 
 		internal bool WasReadOnly { get; }
 

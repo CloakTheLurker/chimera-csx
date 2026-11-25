@@ -2206,6 +2206,64 @@ ENCPY
 				report "V:box:encode" PASS "$eframes frames written, emulator handed back on frame $eafter from a state file, which was then removed"
 			fi
 		fi
+
+		# --- an encode from frame 0, started from a script ---
+		# Frame 0 is the machine powered on rather than its stored state, so a
+		# core that keeps no picture in a state cannot record the stale screen
+		# (upstream 639). The power-on is a close and an open of the machine, and
+		# that cannot happen while a script holds it: the script's own call is on
+		# the stack. So this run checks the fallback - the script's encode still
+		# starts, still gives the machine back, and leaves no scratch files - and
+		# the picture it would have to show is not checked here, because this path
+		# legitimately loads state 0 instead.
+		if [ "$record" -eq 0 ]; then
+			zdir="$work/encode-zero-leg"
+			rm -rf "$zdir" && mkdir -p "$zdir"
+			cp "$here/roms/gridWalker.testrom" "$zdir/gridWalker.testrom"
+			python3 - "$here/movies/gridWalker.win.txt" "$zdir/gridWalker.testrom" "$zdir/gridWalker.chimeraProject" <<'ZEROPY'
+import hashlib, json, sys
+entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
+logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
+sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
+json.dump({
+    "title": "gridWalker.zero",
+    "core": {"name": "Synth", "version": "", "sha1": ""},
+    "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
+    "settings": {"garbleAfterLoad": 8},
+    "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
+    "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
+}, open(sys.argv[3], "w"))
+ZEROPY
+			zjob="$work/job.encode-zero.txt"
+			{
+				echo "out=$work/encode-zero.mkv"
+				echo "meta=$work/encode-zero.meta.txt"
+				echo "poweron=1"
+				echo "warm=30"
+				echo "from=0"
+				echo "to=5"
+				echo "command=-c:a pcm_s16le -c:v ffv1 -pix_fmt bgr0 -level 1 -g 1 -f matroska"
+			} > "$zjob"
+			rm -f "$work/encode-zero.mkv" "$work/encode-zero.meta.txt" "$work/encode-zero.png"
+			cp "$config" "$work/config.encode-zero.ini"
+			( cd "$repo_root" && CHIMERA_JOB="$zjob" timeout 300 mono "$emu_exe" --headless \
+				"--config=$work/config.encode-zero.ini" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
+				"--project=$zdir/gridWalker.chimeraProject" "--lua=$here/synth-encode.lua" ) > "$work/encode-zero.log" 2>&1
+			zbefore="$(sed -n "s/^before=//p" "$work/encode-zero.meta.txt" 2>/dev/null)"
+			zafter="$(sed -n "s/^after=//p" "$work/encode-zero.meta.txt" 2>/dev/null)"
+			zleft="$(find "$work" "$repo_root/build" -name 'encode-restore-*.state' -o -name 'encode-history-*.history' -o -name 'encode-restore-*.history' 2>/dev/null | head -1)"
+			if [ ! -f "$work/encode-zero.meta.txt" ] || ! grep -q "^status=OK" "$work/encode-zero.meta.txt"; then
+				report "V:box:encode:from-zero" FAIL "$(sed -n "s/^detail=//p" "$work/encode-zero.meta.txt" 2>/dev/null || echo "run failed") (see work/encode-zero.log)"
+			elif [ ! -s "$work/encode-zero.mkv" ]; then
+				report "V:box:encode:from-zero" FAIL "no video was written (see work/encode-zero.log)"
+			elif [ "$zbefore" != "30" ] || [ "$zafter" != "$zbefore" ]; then
+				report "V:box:encode:from-zero" FAIL "emulator was left on frame $zafter, not the $zbefore (30) it was borrowed from"
+			elif [ -n "$zleft" ]; then
+				report "V:box:encode:from-zero" FAIL "a file the encode kept to itself was left behind: $zleft"
+			else
+				report "V:box:encode:from-zero" PASS "an encode from frame 0 started under a script runs, hands the machine back on frame $zafter, and leaves no scratch files; the picture is not checked here because a script holds the machine, so frame 0 loads its state"
+			fi
+		fi
 	fi
 
 	# --- a second project, over a running one ---

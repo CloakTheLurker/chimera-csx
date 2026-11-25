@@ -277,3 +277,28 @@ Upstream main is 0bad0112 (2026-11-22), six commits after 9d65d5d5, the tip the 
 ### Not proved
 
 Nothing was fetched or run: no package changed, so the 1.5.3 set's contract result stands, and the three engine commits were read rather than built here. Their tests are upstream's (the greenzone fit test, the media maker tests and the 4 GiB message), and the window halves - the greenzone warning and the Media Maker question - do not exist in this fork yet.
+
+## The fifth batch: upstream after 1.6.0 (2026-11-25)
+
+Upstream main is f3aef488 (2026-11-25), five commits after 0bad0112, the tip the fourth batch judged; main was not rebased. The roster is unchanged at 77, so there is no core to fetch or contract-test.
+
+### The short answer
+
+- **Portable: the encode from frame 0 (#639), one fix and its test.** An encode whose first frame is 0 winds the machine by loading the state stored for frame 0. A core whose saved states keep no picture (RPCS3's "Pictures in States") then records the screen that was there before the encode for the first frames. This fork does exactly that: `MainForm.Encode.cs` loads `movie.States.Nearest(0)`, and its comment says "Frame zero always has a state, so this never needs to reboot the core". Upstream now powers the machine on again for frame 0, as Restart does: the project, movie, rerecord count, markers, frozen addresses and settings are given to the new session, the greenzone is written to `encode-restore-<id>.history` and read back, RAM Search's list alone is cleared, and a machine that will not open is retried; if that fails the inputs are saved and the project closed. Porting means a reboot in `BeginVideoEncode` - this fork's `RebootProject` is that act and already says the greenzone does not survive it, and the bindings have `HistorySave` and `HistoryLoad` - the history saved before and read back in `FinishVideoEncode`, before the position state, and the failure sentences. The synthetic core can show a wrong picture for a few frames after a state load (`synth_wbx.c`, chimera#190), so a test can reproduce the fault here. Three upstream details do not map: this fork has no `ce_session_held`, so there is no core-window guard to keep (its tool windows do not hold a frame across calls); its texts are English literals, not 26 language tables; and `RebootProject` tells TAStudio the project was rebooted, where upstream closes the engine silently.
+- **Already here: the firmware "sha1s" (f3aef488).** This fork made that declaration in 1.5.3 (`ee0f01a8`) for the ares core's pull request 3, before upstream carried it: `"sha1"` is the dump the core was verified with, `"sha1s"` the others of the same file, any of them is the core's file, and a project pins the exact file it used. Upstream's shape and wording agree; nothing to port, and a package written for either frontend reads in the other.
+- **Skip: the number box (9ce0f772).** It is Qt's QML style: a box showing "-1,000" refused "-,000" while a digit was being deleted. This fork's number boxes are WinForms `NumericUpDown`, which takes its text as it is typed rather than refusing it, and the one box that turns thousands separators on is the subtitle frame box. The fault is not here.
+- **Skip: the macOS Window menu (d957ec6c)**, which is Qt and AppKit only, **and the Qt view-model test (89ff7b02)**, whose Lua capture count falls from 12 to 11 and whose Windows half skips, both following the encode change.
+
+### The five commits
+
+| Commit | Subject | Verdict |
+| --- | --- | --- |
+| f3aef488 | feat(firmware): a firmware entry may list other dumps of the same file in "sha1s" | already here (1.5.3, `ee0f01a8`) |
+| 9ce0f772 | fix(ui): number boxes show plain numbers, so every digit can be edited | skip (Qt QML; WinForms boxes do not refuse the text) |
+| d957ec6c | fix(macos): the Window menu's Move & Resize keys work in every window, not the main one alone | skip (Qt/macOS) |
+| 89ff7b02 | test(vm): two checks follow an encode from frame 0 powering on again (#639) | skip (Qt test; the count follows the port) |
+| 41a3bfed | fix(encode): an encode from frame 0 starts from a fresh power-on (#639) | portable (the C# encode path, and a test) |
+
+### Not proved
+
+Nothing was fetched or run: no package changed, so the 1.5.3Cores contract result stands, and the encode fix was read rather than built here. Its behaviour is upstream's measurement (a synthetic core showing a stale picture, 10 frames in 233 ms); this fork still loads the state at frame 0.

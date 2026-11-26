@@ -3919,3 +3919,34 @@ What did not map from upstream:
 Measured: the interface suite is 127 / 72 / 679 / 411 with none failed, and the Level B witness is 30 ok, 0 failed, the new frame-0 leg among them. The frame-0 behaviour was measured with a temporary hook, removed before the commit, that starts the encode the way the dialog does, on a project whose synthetic core draws a wrong picture for 8 frames after a state load, warmed to frame 30. The old code wrote seven frames for range 0 to 5 and the first was the frame-30 screen, the stale picture; the port writes the six frames asked for, the first being the true frame 0 (the black grid picture), and the other five equal the old run's frames 1 to 6. The scripted path - a script holds the machine, so it takes the state load - completes with six frames and hands the machine back on frame 30, leaving no scratch files.
 
 Not proved: the fresh path through the real dialog on Windows or Linux. The temporary hook called the same method the dialog calls but not the dialog itself, and every measurement used the synthetic core; no real core's game was encoded from frame 0.
+
+## A machine can be declared but not offered for new projects (user-decided, 2026-11-25)
+
+ares' Atari 2600 compatibility list has 588 titles: 30 never reach the end of a
+game (Nothing, Starts or In-Game) and 532 were never verified. The owner decided
+the machine should no longer be offered when a project is made, but a project
+that already names it has to keep running, and ares' `a26` sources have to stay
+in the guest for that to be possible. A core that simply removed the machine
+would have made every existing Atari 2600 project unloadable.
+
+So a machine entry may now carry `"hidden": true`. The machine stays in
+`machines[]`, stays a value of the machine setting, and is still built and run;
+only the New Project picker leaves it out. Opening a project that names a hidden
+machine puts it back in the picker, so re-saving cannot silently move the project
+to another machine. This is a declaration any package can use, not a special
+case for ares: `gen-config.py` owns the list of ids its package hides, the way it
+already owns the tape machines, and Chimera reads `MachineConfig.Hidden` from the
+package. A frontend older than the key ignores it and keeps showing the machine.
+
+Measured: `WizardHiddenMachineTests` passes 4 of 4 - a two-machine package
+offers only the visible one and pins it; a project that names the hidden machine
+gets it back and keeps it; the hidden machine claims no rom extension, so opening
+its file directly cannot make a new project on it; and an agent's create_project
+refuses it by name instead of pretending it does not exist. Each guard was removed
+on purpose once - the picker filter, the extension skip and the agent refusal -
+and its test failed. The wider Windows wizard run was not a clean measurement of
+this change: 115 of its 141 tests need a `libchimera` that exports the current
+session symbols, and the installed one is older (`ce_session_greenzone_held` is
+missing), so those fail before they reach the wizard; the 25 that ran before that
+point passed. Not proved: a real package in the real window. The test calls the
+same picker, extension and pinning code the wizard does.

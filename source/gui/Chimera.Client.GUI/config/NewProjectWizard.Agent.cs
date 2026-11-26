@@ -71,15 +71,11 @@ namespace Chimera.Client.GUI
 			foreach (var (name, value) in settings) answered[name] = value;
 			if (system is { Length: not 0 })
 			{
-				if (_cfg.Machines is { Count: > 0 } machines && _cfg.MachineSetting is { Length: not 0 } machineSetting)
+				if (_cfg.Machines is { Count: > 0 } && _cfg.MachineSetting is { Length: not 0 } machineSetting)
 				{
-					var machine = machines.FirstOrDefault(m => Names(m).Any(n => string.Equals(n, system, StringComparison.OrdinalIgnoreCase)));
-					if (machine is null)
-					{
-						return Refused($"{core.Name} has no machine called '{system}'. It has: "
-							+ string.Join(", ", machines.Select(static m => m.DisplayName)) + ".");
-					}
-					answered[machineSetting] = machine.When is { Count: > 0 } ? machine.When[0] : machine.Id ?? "";
+					var machine = AgentMachine(_cfg, system, core.Name, out var refusal);
+					if (refusal is not null) return Refused(refusal);
+					answered[machineSetting] = machine!.When is { Count: > 0 } ? machine.When[0] : machine.Id ?? "";
 				}
 				else if (!core.Systems.Any(s => string.Equals(s, system, StringComparison.OrdinalIgnoreCase)
 					|| string.Equals(core.SystemNameOf(s), system, StringComparison.OrdinalIgnoreCase)))
@@ -162,6 +158,35 @@ namespace Chimera.Client.GUI
 				}
 			}
 			return MakeProject() is { } refused ? Refused(refused.Why) : new() { Made = true };
+		}
+
+		/// <summary>
+		/// The machine an agent's system names, when it is one a NEW project may
+		/// use. A hidden machine does exist, so it is refused by name rather than
+		/// reported absent. <paramref name="refusal"/> is null on success.
+		/// </summary>
+		internal static WaterboxConfig.MachineConfig? AgentMachine(
+			WaterboxConfig cfg, string system, string coreName, out string? refusal)
+		{
+			refusal = null;
+			var machines = cfg.Machines ?? [ ];
+			var offered = machines.Where(static m => !m.Hidden).ToList();
+			if (offered.Count == 0) offered = [ .. machines ];
+			var machine = machines.FirstOrDefault(m =>
+				Names(m).Any(n => string.Equals(n, system, StringComparison.OrdinalIgnoreCase)));
+			if (machine is { Hidden: true })
+			{
+				refusal = $"{coreName}'s {machine.DisplayName} is not offered for a new project. It offers: "
+					+ string.Join(", ", offered.Select(static m => m.DisplayName)) + ".";
+				return null;
+			}
+			if (machine is null)
+			{
+				refusal = $"{coreName} has no machine called '{system}'. It has: "
+					+ string.Join(", ", offered.Select(static m => m.DisplayName)) + ".";
+				return null;
+			}
+			return machine;
 		}
 
 		/// <summary>The words a machine may be named by: its id, its label, and its setting's values.</summary>

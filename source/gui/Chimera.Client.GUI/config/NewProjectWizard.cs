@@ -60,6 +60,14 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private readonly ComboBox _machine;
 
+		/// <summary>
+		/// The machines the picker lists, in the order it lists them. Usually the
+		/// package's machines[]; a machine marked hidden is left out until a
+		/// project that already names it is opened, when it is put back so the
+		/// choice can round-trip.
+		/// </summary>
+		private List<WaterboxConfig.MachineConfig> _offeredMachines = [ ];
+
 		private readonly Label _machineLabel;
 
 		// page 5: what the core must compile for this game before it can run it
@@ -828,22 +836,52 @@ namespace Chimera.Client.GUI
 			{
 				// an unreadable package complains when the user tries to go on
 			}
+			OfferMachines(core);
+			if (_machine.Items.Count is not 0) _machine.SelectedIndex = 0;
+			// one system is not a choice, and a disabled box still says what it is
+			_machine.Enabled = _machine.Items.Count > 1;
+			PinMachine();
+			RefreshRendererChoices();
+		}
+
+		/// <summary>
+		/// Fills the machine picker with the machines this package offers. A machine
+		/// the package marks hidden is not offered for a NEW project, but it stays in
+		/// machines[] and in the machine setting's values, so a project that already
+		/// names it can still be opened and re-saved.
+		/// </summary>
+		private void OfferMachines(DiscoveredCorePackage? core)
+		{
 			_machine.Items.Clear();
 			var machines = _cfg?.Machines;
-			if (machines is { Count: > 0 })
+			List<WaterboxConfig.MachineConfig> offered = machines is { Count: > 0 }
+				? machines.Where(static m => !m.Hidden).ToList()
+				: [ ];
+			// a package whose every machine is hidden still has to offer one
+			if (offered.Count == 0 && machines is { Count: > 0 }) offered = [ .. machines ];
+			_offeredMachines = offered;
+			if (offered.Count > 0)
 			{
-				foreach (var machine in machines) _machine.Items.Add(machine.DisplayName);
+				foreach (var machine in offered) _machine.Items.Add(machine.DisplayName);
 			}
 			else if (core is not null)
 			{
 				// a package that is one machine still says which machine it is
 				_machine.Items.Add(core.SystemsSpelled);
 			}
-			if (_machine.Items.Count is not 0) _machine.SelectedIndex = 0;
-			// one system is not a choice, and a disabled box still says what it is
-			_machine.Enabled = _machine.Items.Count > 1;
-			PinMachine();
-			RefreshRendererChoices();
+		}
+
+		/// <summary>Puts a machine in the picker and selects it, even when it is hidden.</summary>
+		private void ShowMachine(WaterboxConfig.MachineConfig machine)
+		{
+			if (!_offeredMachines.Contains(machine))
+			{
+				_offeredMachines.Add(machine);
+				_machine.Items.Add(machine.DisplayName);
+				_machine.Enabled = _machine.Items.Count > 1;
+			}
+			var at = _offeredMachines.IndexOf(machine);
+			if (at >= 0) _machine.SelectedIndex = at;
 		}
 
 		/// <summary>
@@ -977,12 +1015,13 @@ namespace Chimera.Client.GUI
 				}
 			}
 
-			if (_cfg?.Machines is { Count: > 0 } machines)
+			if (_cfg?.Machines is { Count: > 0 })
 			{
 				var effective = WaterboxCore.EffectiveSettingsFor(_cfg, _settings);
 				var machine = _cfg.MachineFor(effective);
-				var at = machine is null ? -1 : machines.IndexOf(machine);
-				if (at >= 0) _machine.SelectedIndex = at;
+				// the machine the project names may be hidden from NEW projects; put
+				// it back in the picker so re-saving does not silently change it
+				if (machine is not null) ShowMachine(machine);
 			}
 			// read before the pickers are refreshed: refreshing them selects the
 			// core's default and writes THAT back over what the project said
@@ -1111,14 +1150,15 @@ namespace Chimera.Client.GUI
 		{
 			// the package's own loader refuses machines without a setting to pick
 			// between them, so these two are there together or not at all
-			if (_cfg?.Machines is not { Count: > 0 } machines
+			if (_cfg?.Machines is not { Count: > 0 }
 				|| _cfg.MachineSetting is not { Length: > 0 } machineSetting
-				|| _settings is null)
+				|| _settings is null
+				|| _offeredMachines.Count == 0)
 			{
 				return;
 			}
-			var index = Math.Max(0, Math.Min(machines.Count - 1, _machine.SelectedIndex));
-			var machine = machines[index];
+			var index = Math.Max(0, Math.Min(_offeredMachines.Count - 1, _machine.SelectedIndex));
+			var machine = _offeredMachines[index];
 			_settings.Values[machineSetting] = machine.When is { Count: > 0 } ? machine.When[0] : machine.Id ?? "";
 			// the machine decides which files the project takes, so a form built for
 			// another machine is stale
@@ -1127,8 +1167,8 @@ namespace Chimera.Client.GUI
 
 		/// <summary>The machine chosen on page one, for tests.</summary>
 		public string? ChosenMachine
-			=> _cfg?.Machines is { Count: > 0 } machines && _machine.SelectedIndex >= 0
-				? machines[_machine.SelectedIndex].Id
+			=> _offeredMachines.Count > 0 && _machine.SelectedIndex >= 0
+				? _offeredMachines[_machine.SelectedIndex].Id
 				: null;
 
 		/// <summary>
@@ -1911,6 +1951,29 @@ namespace Chimera.Client.GUI
 			RefreshExposedSettings();
 			_settingsGrid.SelectedObject = _settings;
 			ShowPage(2);
+		}
+
+		/// <summary>Fills the machine picker from a given config - the test door.</summary>
+		internal void UseMachinesFrom(WaterboxConfig cfg)
+		{
+			_cfg = cfg;
+			_settings = new WaterboxCoreSettings();
+			OfferMachines(null);
+			if (_machine.Items.Count is not 0) _machine.SelectedIndex = 0;
+			_machine.Enabled = _machine.Items.Count > 1;
+			PinMachine();
+		}
+
+		/// <summary>The machine names the picker offers, in order, for tests.</summary>
+		internal IReadOnlyList<string?> OfferedMachines
+			=> _offeredMachines.Select(static m => m.DisplayName).ToList();
+
+		/// <summary>Selects the machine an existing project names - the test door.</summary>
+		internal void SelectMachine(string settingValue)
+		{
+			var machine = _cfg?.Machines?.Find(m => m.Selects(settingValue));
+			if (machine is not null) ShowMachine(machine);
+			PinMachine();
 		}
 
 		/// <summary>

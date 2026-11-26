@@ -243,6 +243,9 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// file routes to the machine declared first (the package's default). An
 		/// image of the other machine is then refused with a message naming the
 		/// wizard, where the choice is explicit.
+		///
+		/// A machine marked hidden claims nothing here: opening its file directly
+		/// would make a NEW project on a machine the package no longer offers.
 		/// </summary>
 		public Dictionary<string, string> AllExtensions
 		{
@@ -252,6 +255,7 @@ namespace Chimera.Emulation.Common.Waterbox
 				foreach (var (ext, sysID) in Extensions ?? new()) if (!all.ContainsKey(ext)) all[ext] = sysID;
 				foreach (var machine in Machines ?? new())
 				{
+					if (machine.Hidden) continue;
 					foreach (var (ext, sysID) in machine.Extensions ?? new()) if (!all.ContainsKey(ext)) all[ext] = sysID;
 				}
 				return all;
@@ -405,6 +409,14 @@ namespace Chimera.Emulation.Common.Waterbox
 
 			/// <summary>What to call it in front of a user. Falls back to the id.</summary>
 			public string? Label { get; set; }
+
+			/// <summary>
+			/// True for a machine the package still declares and runs, but does not
+			/// offer for a NEW project: a project that already names it loads, and it
+			/// stays a legal value of the machine setting, but the New Project wizard
+			/// leaves it out of the picker.
+			/// </summary>
+			public bool Hidden { get; set; }
 
 			/// <summary>Values of the package's machine setting that mean this machine.</summary>
 			public List<string>? When { get; set; }

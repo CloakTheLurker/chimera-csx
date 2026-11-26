@@ -3950,3 +3950,11 @@ session symbols, and the installed one is older (`ce_session_greenzone_held` is
 missing), so those fail before they reach the wizard; the 25 that ran before that
 point passed. Not proved: a real package in the real window. The test calls the
 same picker, extension and pinning code the wizard does.
+
+## A seek of a few frames does not ask first (user-decided, 2026-11-26)
+
+The long seek's question (upstream issue 595) replays the frames between the nearest state and the target, estimated at the speed the last seek measured, and asks when that comes to more than ten seconds. The speed is what the last replay actually ran at, and a session's first seek - or any seek right after a cold core, or one across a state of a gigabyte - can measure a fraction of a frame a second. One frame then reads as fifteen seconds: the owner was shown "Seek to frame 701? That replays 1 frames, about 15 s at the speed the last seek ran (0 frames a second)", a question whose only useful answer is the one it should not have needed. The owner asked that a replay of fewer than thirty frames never ask.
+
+`TAStudio.SeekAsksFirst` is the rule now: at least thirty frames, and more than ten seconds at the last seek's speed, and a speed measured in this session, and not headless. Thirty frames is the floor because it is the smallest replay that is worth a question at any plausible speed; anything shorter is quicker to do than to ask about.
+
+Measured: the interface suite is 127 / 72 / 679 / 418 with none failed, the three new `TAStudioLongSeekTests` among them. Broken on purpose: with the frames floor taken out of the rule, `AReplayTooShortToMatterNeverAsks` failed on the one-frame case. Not proved: the dialog on screen for a genuinely long replay - the same message box, unchanged, but nobody clicked one - and a slow first seek measured on a real core.

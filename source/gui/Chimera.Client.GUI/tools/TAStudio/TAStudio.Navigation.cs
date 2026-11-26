@@ -50,12 +50,13 @@ namespace Chimera.Client.GUI
 			/* A seek that would replay for a long time asks first, with the frames
 			 * and the time the last seek's speed makes of them (upstream issue
 			 * 595). Before anything is loaded, so a declined seek has moved
-			 * nothing. No measurement yet - the first seek of a session - means
-			 * no estimate, and no question. */
+			 * nothing. A handful of frames is not a long seek, however slowly the
+			 * last one ran: one frame at a cold seek's fraction of a frame a
+			 * second read as fifteen seconds and asked (user-decided,
+			 * 2026-11-26). */
 			var replayFrom = closestState >= 0 ? closestState : Emulator.Frame;
 			var replayFrames = frame - replayFrom;
-			if (replayFrames > 0 && _seekFramesPerSecond > 0 && !HeadlessMode.Enabled
-				&& replayFrames / _seekFramesPerSecond > 10)
+			if (SeekAsksFirst(replayFrames, _seekFramesPerSecond, HeadlessMode.Enabled))
 			{
 				var answer = MessageBox.Show(this,
 					$"Seek to frame {frame}?\r\n\r\nThat replays {replayFrames:n0} frames, about {Duration(replayFrames / _seekFramesPerSecond)} "
@@ -159,5 +160,26 @@ namespace Chimera.Client.GUI
 		{
 			return SeekingTo == -1 ? Emulator.Frame : SeekingTo;
 		}
+
+		/// <summary>
+		/// A replay shorter than this never asks about the seek, however slowly the
+		/// last one ran: a handful of frames is not a long seek, and a session's
+		/// first seek (a cold core, a state over a gigabyte) measures a fraction of
+		/// a frame a second - one frame then read as fifteen seconds and asked
+		/// (user-decided, 2026-11-26).
+		/// </summary>
+		internal const int FramesTooFewToAskAbout = 30;
+
+		/// <summary>
+		/// Whether a seek asks before it runs: its replay is more than ten seconds
+		/// at the speed the last seek ran (upstream issue 595) and at least
+		/// <see cref="FramesTooFewToAskAbout"/> frames. Headless asks nothing, and
+		/// a session with no measurement yet has nothing to estimate from.
+		/// </summary>
+		internal static bool SeekAsksFirst(int replayFrames, double framesPerSecond, bool headless)
+			=> replayFrames >= FramesTooFewToAskAbout
+				&& framesPerSecond > 0
+				&& !headless
+				&& replayFrames / framesPerSecond > 10;
 	}
 }
